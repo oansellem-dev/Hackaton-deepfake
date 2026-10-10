@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import { getChallenge, type ChallengeResult, type Decision, type PrecheckPayload } from '@kyc/shared';
@@ -88,6 +91,13 @@ app.post('/api/sessions/:id/decision', (req, res) => {
   session.decision = { value, note, at: Date.now() };
   res.json(view(session));
 });
+
+// Mode partage : le serveur sert aussi le site construit (apps/web/dist), donc un seul tunnel suffit.
+const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
+if (existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get('*', (_req, res) => res.sendFile(join(webDist, 'index.html')));
+}
 
 const server = createServer(app);
 attachSignaling(server);

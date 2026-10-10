@@ -12,6 +12,35 @@ npm run dev        # serveur :8787 + site :5173 + extension (build en watch)
 Extension Chrome : `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » → `apps/extension/dist`.
 Après une modification, cliquer sur « Recharger » dans `chrome://extensions`.
 
+## Tester à deux (deux machines)
+
+La caméra n'est autorisée qu'en HTTPS (ou sur `localhost`). Le serveur sert donc le site lui-même et un seul tunnel HTTPS suffit.
+
+**Hôte (le recruteur)** — deux terminaux, dans le dossier du projet :
+
+```bash
+# Terminal 1 : construit le site et lance le serveur sur :8787 (arrêter avant tout `npm run dev`)
+npm run share
+
+# Terminal 2 : tunnel HTTPS vers le port 8787
+npx localtunnel --port 8787
+```
+
+Le tunnel affiche une adresse `https://xxxx.loca.lt`. C'est la seule adresse à connaître.
+
+1. Ouvrir cette adresse. La première visite demande un « Tunnel Password » : c'est l'IP publique de l'hôte (`curl https://ipv4.icanhazip.com`).
+2. Cliquer sur **Créer un entretien** et noter l'identifiant `<id>`.
+3. Ouvrir `https://xxxx.loca.lt/visio/<id>?role=recruiter`.
+
+**Candidat (l'ami)** — rien à installer :
+
+1. Ouvrir `https://xxxx.loca.lt/check/<id>` pour la pré-vérification (même mot de passe de tunnel à la première visite).
+2. Puis `https://xxxx.loca.lt/visio/<id>?role=candidate`.
+
+Pas de mot de passe de tunnel avec `cloudflared tunnel --url http://localhost:8787` si l'hôte préfère l'installer.
+
+Si les deux vidéos ne se connectent pas (Wi-Fi d'école ou d'entreprise qui bloque le pair à pair), passer l'un des deux en partage de connexion du téléphone : il manque un serveur TURN.
+
 ## Structure
 
 | Dossier | Brique | Rôle |

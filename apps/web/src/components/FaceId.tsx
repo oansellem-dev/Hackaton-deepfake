@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ANGLE_MAX_YAW_DEG,
+  ANGLE_MIN_YAW_DEG,
   MIN_PROFILE_SAMPLES,
+  angleProfiles,
   boundingBox,
   computeRatios,
   estimateYawDeg,
+  findVirtualCameras,
   handPointsOverFace,
   medianRatios,
   type FaceIdPlan,
   type FaceIdStep,
   type FaceIdStepResult,
+  type SignalStatus,
 } from '@kyc/shared';
 import { api } from '../config.ts';
 import { detect, loadTracker } from '../lib/tracker.ts';
@@ -22,33 +27,58 @@ const STEP_TEXT: Record<FaceIdStep, string> = {
 
 const STEP_LABEL: Record<FaceIdStep, string> = {
   center: 'Visage de face',
-  turn_a: 'Tête tournée (1)',
-  turn_b: 'Tête tournée (2)',
+  turn_a: 'Tête à droite',
+  turn_b: 'Tête à gauche',
   hand: 'Main devant le visage',
 };
 
 const FRAME_MS = 80; // ~12 analyses par seconde
-const CENTER_HOLD = 12; // images consécutives bien cadrées avant de valider
-const CENTER_SAMPLES = 16; // mesures de face collectées pour le profil
-const TURN_YAW_DEG = 20;
+const CENTER_HOLD = 6; // images bien cadrées d'affilée avant de commencer à mesurer
+const CENTER_SAMPLES = 16; // mesures de face pour le profil
+// Angle estimé par MediaPipe (profondeur des joues). Mesuré en test : une rotation de 32° est vue vers 16-17°,
+// et de face le bruit reste sous 2°. 14° correspond donc à une rotation volontaire.
+const TURN_YAW_DEG = 14;
 const TURN_FRAMES = 4;
 const HAND_POINTS = 8;
 const HAND_FRAMES = 4;
 const CENTER_TIMEOUT_MS = 25000;
 const ACTION_TIMEOUT_MS = 12000;
-const MAX_PASSIVE_FRAMES = 4;
+// Captures pour le détecteur passif : quelques-unes de face, et surtout PENDANT les défis,
+// là où un deepfake temps réel se dégrade (profil, main qui passe devant le visage).
+const MAX_PASSIVE_FRAMES = 10;
+const HAND_PASSIVE_FRAMES = 2;
+
+export type EnvResult = { label: string; status: SignalStatus; detail: string };
+
+export interface FaceIdOutcome {
+  steps: { step: FaceIdStep; result: FaceIdStepResult['result'] }[];
+  profileStored: boolean;
+  environment: EnvResult[];
+}
 
 interface Props {
   sessionId: string;
-  onDone: (steps: { step: FaceIdStep; result: FaceIdStepResult['result'] }[], profileStored: boolean) => void;
+  declaredCountry: string;
+  onDone: (outcome: FaceIdOutcome) => void;
 }
 
-type Phase = 'ready' | 'loading' | 'running' | 'sending' | 'error';
+type Phase = 'ready' | 'loading' | 'running' | 'sending' | 'blocked' | 'error';
 
-export function FaceId({ sessionId, onDone }: Props) {
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+function openCamera(deviceId?: string): Promise<MediaStream> {
+  const size = { width: { ideal: 640 }, height: { ideal: 480 } };
+  return navigator.mediaDevices.getUserMedia({
+    video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: 'user', ...size },
+    audio: false,
+  });
+}
+
+export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const stopRef = useRef<() => void>(() => undefined);
+  const envRef = useRef<EnvResult[]>([]);
   const [phase, setPhase] = useState<Phase>('ready');
   const [plan, setPlan] = useState<FaceIdPlan | null>(null);
   const [index, setIndex] = useState(0);
@@ -56,34 +86,76 @@ export function FaceId({ sessionId, onDone }: Props) {
   const [centered, setCentered] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(
-    () => () => {
-      stopRef.current();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    },
-    [],
-  );
+  const stopCamera = () => {
+    stopRef.current();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  };
+
+  useEffect(() => stopCamera, []);
 
   async function start() {
     setPhase('loading');
     setMessage('');
+    setDone([]);
+    setIndex(0);
     try {
-      // Uniquement la caméra de l'appareil : pas de fichier, pas de vidéo importée.
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
+      // Uniquement une caméra de l'appareil : pas de fichier, pas de vidéo importée.
+      let stream = await openCamera();
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+      let label = stream.getVideoTracks()[0]?.label ?? '';
+      // Si la caméra par défaut est virtuelle (OBS, ManyCam…), on passe sur une vraie caméra quand il y en a une.
+      if (findVirtualCameras([label]).length > 0) {
+        const real = devices.find((d) => d.label && findVirtualCameras([d.label]).length === 0);
+        if (real) {
+          stream.getTracks().forEach((t) => t.stop());
+          stream = await openCamera(real.deviceId);
+          label = stream.getVideoTracks()[0]?.label ?? real.label;
+        }
+      }
       streamRef.current = stream;
       const video = videoRef.current!;
       video.srcObject = stream;
       await video.play();
-      const [tracker, newPlan] = await Promise.all([loadTracker(), api.startFaceId(sessionId)]);
+
+      // Vérification de l'environnement en même temps : caméras, fuseau horaire, adresse IP.
+      const env = await api.sendPrecheck(sessionId, {
+        cameras: devices.map((d) => d.label),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        languages: [...navigator.languages],
+        declaredCountry,
+      });
+      envRef.current = env.signals;
+
+      let newPlan: FaceIdPlan;
+      try {
+        newPlan = await api.startFaceId(sessionId, label);
+      } catch (e) {
+        if (errorText(e).includes('déjà terminée')) {
+          stopCamera();
+          setPhase('blocked');
+          setMessage('Votre vérification du visage est déjà enregistrée. Vous pouvez fermer cette page.');
+          return;
+        }
+        if (errorText(e).includes('camera-virtuelle')) {
+          stopCamera();
+          setPhase('blocked');
+          setMessage(
+            `La caméra « ${label} » est une caméra virtuelle. Merci d’utiliser la caméra de votre ordinateur ou de votre ` +
+              'téléphone (désactivez OBS, ManyCam ou tout logiciel de ce type), puis réessayez.',
+          );
+          return;
+        }
+        throw e;
+      }
+      const tracker = await loadTracker();
       setPlan(newPlan);
       setPhase('running');
       run(newPlan, tracker);
     } catch (e) {
+      stopCamera();
       setPhase('error');
-      setMessage(`Impossible de démarrer : ${e instanceof Error ? e.message : String(e)}`);
+      setMessage(`Impossible de démarrer : ${errorText(e)}`);
     }
   }
 
@@ -97,6 +169,7 @@ export function FaceId({ sessionId, onDone }: Props) {
 
     const results: FaceIdStepResult[] = [];
     const ratioSamples: number[][] = [];
+    const angleSamples: { yawDeg: number; ratios: number[] }[] = [];
     const turnYaws: { step: FaceIdStep; yaw: number; at: number }[] = [];
     let step = 0;
     let stepStart = performance.now();
@@ -105,45 +178,61 @@ export function FaceId({ sessionId, onDone }: Props) {
     let goodStreak = 0;
     let actionStreak = 0;
     let passiveSent = 0;
+    let stepFrames = 0; // captures passives envoyées pendant l'étape en cours
+    // Une rotation ne compte qu'après être revenu de face (sinon l'étape suivante validerait la même rotation),
+    // et la seconde doit aller dans l'autre sens que la première.
+    let armed = false;
+    let turnedAny = false;
+    const signFor: Partial<Record<FaceIdStep, number>> = {};
     let lastFaceBox: ReturnType<typeof boundingBox> | null = null;
     let busy = false;
     let finished = false;
 
-    const finishStep = (result: FaceIdStepResult['result'], yaw = 0) => {
-      const current = p.steps[step];
-      results.push({ step: current, result, durationMs: Math.round(performance.now() - stepStart) });
-      if (current === 'turn_a' || current === 'turn_b') turnYaws.push({ step: current, yaw, at: results.length - 1 });
-      setDone((d) => [...d, result]);
-      step += 1;
-      stepStart = performance.now();
-      frames = tracked = goodStreak = actionStreak = 0;
-      setIndex(step);
-      if (step >= p.steps.length) void submit();
-    };
-
-    // Au temps écoulé : « failed » seulement si le suivi marchait bien (sinon c'est notre mesure qui est en cause).
-    const timeoutResult = () => (frames > 10 && tracked / frames > 0.7 ? 'failed' : 'inconclusive');
-
     const sendPassiveFrame = () => {
       if (passiveSent >= MAX_PASSIVE_FRAMES || !video.videoWidth) return;
       passiveSent += 1;
+      stepFrames += 1;
       jpegCanvas.width = video.videoWidth;
       jpegCanvas.height = video.videoHeight;
       jpegCanvas.getContext('2d')!.drawImage(video, 0, 0);
-      jpegCanvas.toBlob((blob) => blob && api.sendFrame(sessionId, blob).catch(() => undefined), 'image/jpeg', 0.85);
+      jpegCanvas.toBlob(
+        (blob) => blob && api.sendFrame(sessionId, blob, 'precheck').catch(() => undefined),
+        'image/jpeg',
+        0.85,
+      );
     };
+
+    const finishStep = (result: FaceIdStepResult['result'], yaw = 0) => {
+      const current = p.steps[step];
+      results.push({ step: current, result, durationMs: Math.round(performance.now() - stepStart) });
+      if ((current === 'turn_a' || current === 'turn_b') && result === 'passed') {
+        turnYaws.push({ step: current, yaw, at: results.length - 1 });
+      }
+      setDone((d) => [...d, result]);
+      step += 1;
+      stepStart = performance.now();
+      frames = tracked = goodStreak = actionStreak = stepFrames = 0;
+      armed = turnedAny = false;
+      setIndex(step);
+      setMessage('');
+      if (step >= p.steps.length) void submit();
+    };
+
+    // Au temps écoulé : « failed » seulement si le visage était bien suivi (sinon c'est notre mesure qui est en cause).
+    const timeoutResult = (): FaceIdStepResult['result'] => (frames > 10 && tracked / frames > 0.7 ? 'failed' : 'inconclusive');
 
     const tick = () => {
       if (busy || finished || step >= p.steps.length || video.readyState < 2) return;
       busy = true;
       try {
         const current = p.steps[step];
-        const { face, hands } = detect(tracker, video);
+        const { face, hands } = detect(tracker, video, current === 'hand');
         frames += 1;
         if (face) {
           tracked += 1;
           lastFaceBox = boundingBox(face);
         }
+        const yaw = face ? estimateYawDeg(face, video.videoWidth) : 0;
 
         if (current === 'center') {
           let luma = 0;
@@ -156,54 +245,89 @@ export function FaceId({ sessionId, onDone }: Props) {
           const w = box ? box.maxX - box.minX : 0;
           const cx = box ? (box.minX + box.maxX) / 2 : 0;
           const cy = box ? (box.minY + box.maxY) / 2 : 0;
-          const ok =
-            !!face && w > 0.25 && w < 0.65 && Math.abs(cx - 0.5) < 0.12 && Math.abs(cy - 0.5) < 0.15 && luma > 50 &&
-            Math.abs(estimateYawDeg(face, video.videoWidth)) < 8;
+          const framed = w > 0.25 && w < 0.65 && Math.abs(cx - 0.5) < 0.12 && Math.abs(cy - 0.5) < 0.15;
+          const ok = !!face && framed && luma > 50 && Math.abs(yaw) < 8;
           setCentered(ok);
           setMessage(
-            !face ? 'Je ne vois pas de visage.' : luma <= 50 ? 'Il fait trop sombre.' : w <= 0.25 ? 'Rapprochez-vous.' : w >= 0.65 ? 'Reculez un peu.' : !ok ? 'Centrez votre visage et regardez la caméra.' : 'Parfait, ne bougez plus…',
+            !face
+              ? 'Je ne vois pas de visage.'
+              : luma <= 50
+                ? 'Il fait trop sombre : éclairez votre visage.'
+                : w <= 0.25
+                  ? 'Rapprochez-vous un peu.'
+                  : w >= 0.65
+                    ? 'Reculez un peu.'
+                    : !framed
+                      ? 'Centrez votre visage dans l’ovale.'
+                      : !ok
+                        ? 'Regardez la caméra, de face.'
+                        : 'Parfait, ne bougez plus…',
           );
           goodStreak = ok ? goodStreak + 1 : 0;
-          if (ok && goodStreak >= CENTER_HOLD / 2) {
+          if (ok && goodStreak >= CENTER_HOLD) {
             const r = computeRatios(face!, video.videoWidth, video.videoHeight);
             if (r) ratioSamples.push(r);
-            if (ratioSamples.length % 4 === 1) sendPassiveFrame();
+            if (ratioSamples.length % 3 === 1) sendPassiveFrame();
           }
-          if (ratioSamples.length >= CENTER_SAMPLES) {
-            setMessage('');
-            finishStep('passed');
-          } else if (performance.now() - stepStart > CENTER_TIMEOUT_MS) finishStep(timeoutResult());
+          if (ratioSamples.length >= CENTER_SAMPLES) finishStep('passed');
+          else if (performance.now() - stepStart > CENTER_TIMEOUT_MS) finishStep(timeoutResult());
         } else if (current === 'turn_a' || current === 'turn_b') {
-          const yaw = face ? estimateYawDeg(face, video.videoWidth) : 0;
-          actionStreak = face && Math.abs(yaw) >= TURN_YAW_DEG ? actionStreak + 1 : 0;
-          if (actionStreak >= TURN_FRAMES) finishStep('passed', yaw);
-          else if (performance.now() - stepStart > ACTION_TIMEOUT_MS) finishStep(timeoutResult());
+          // Proportions sous plusieurs angles, pour comparer la visio même quand la tête n'est pas de face.
+          if (face && Math.abs(yaw) >= ANGLE_MIN_YAW_DEG && Math.abs(yaw) <= ANGLE_MAX_YAW_DEG) {
+            const r = computeRatios(face, video.videoWidth, video.videoHeight);
+            if (r) angleSamples.push({ yawDeg: yaw, ratios: r });
+          }
+          if (face && Math.abs(yaw) < 8) armed = true;
+          const other = current === 'turn_a' ? 'turn_b' : 'turn_a';
+          const expected = signFor[current] ?? (signFor[other] !== undefined ? -signFor[other]! : undefined);
+          const turnedEnough = !!face && Math.abs(yaw) >= TURN_YAW_DEG;
+          const wrongWay = turnedEnough && expected !== undefined && Math.sign(yaw) !== expected;
+          if (turnedEnough) turnedAny = true;
+          setMessage(
+            wrongWay
+              ? 'Dans l’autre sens, s’il vous plaît.'
+              : !armed && turnedEnough
+                ? 'Revenez de face, puis tournez la tête.'
+                : '',
+          );
+          actionStreak = armed && turnedEnough && !wrongWay ? actionStreak + 1 : 0;
+          if (actionStreak === 2 && stepFrames === 0) sendPassiveFrame();
+          if (actionStreak >= TURN_FRAMES) {
+            signFor[current] = Math.sign(yaw);
+            finishStep('passed', yaw);
+          } else if (performance.now() - stepStart > ACTION_TIMEOUT_MS) {
+            // A tourné la tête, mais pas dans le sens demandé : consigne mal comprise, jamais « failed ».
+            finishStep(turnedAny ? 'inconclusive' : timeoutResult());
+          }
         } else {
           const box = face ? boundingBox(face) : lastFaceBox;
           const over = box ? Math.max(0, ...hands.map((h) => handPointsOverFace(h, box))) : 0;
+          // Main qui commence à couvrir le visage : c'est là que le mélange d'un face-swap se trahit.
+          if (face && over > 0 && over < HAND_POINTS && stepFrames < HAND_PASSIVE_FRAMES) sendPassiveFrame();
           actionStreak = over >= HAND_POINTS ? actionStreak + 1 : 0;
           if (actionStreak >= HAND_FRAMES) finishStep('passed');
           else if (performance.now() - stepStart > ACTION_TIMEOUT_MS) finishStep(timeoutResult());
         }
       } catch (e) {
-        setPhase('error');
-        setMessage(`Analyse interrompue : ${e instanceof Error ? e.message : String(e)}`);
         finished = true;
+        clearInterval(timer);
+        stopCamera();
+        setPhase('error');
+        setMessage(`Analyse interrompue : ${errorText(e)}`);
       } finally {
         busy = false;
       }
     };
 
-    // Les deux virages doivent aller dans des sens opposés (le sens exact dépend du miroir, pas besoin de le connaître).
+    // Les deux virages doivent aller dans des sens opposés. Même côté deux fois : on ne conclut pas
+    // (jamais « failed » pour une consigne mal comprise).
     const checkTurns = () => {
-      const a = turnYaws.filter((t) => t.step === 'turn_a' && t.yaw !== 0);
-      const b = turnYaws.filter((t) => t.step === 'turn_b' && t.yaw !== 0);
+      const a = turnYaws.filter((t) => t.step === 'turn_a');
+      const b = turnYaws.filter((t) => t.step === 'turn_b');
       if (!a.length || !b.length) return;
       const signA = Math.sign(a[0].yaw);
       const bad = [...a.filter((t) => Math.sign(t.yaw) !== signA), ...b.filter((t) => Math.sign(t.yaw) === signA)];
-      if (bad.length === 0) return;
-      // Même côté deux fois : on ne conclut pas (jamais « failed » pour une consigne mal comprise).
-      for (const t of bad) if (results[t.at].result === 'passed') results[t.at].result = 'inconclusive';
+      for (const t of bad) results[t.at].result = 'inconclusive';
     };
 
     async function submit() {
@@ -218,12 +342,14 @@ export function FaceId({ sessionId, onDone }: Props) {
           results,
           ratios: profileOk ? medianRatios(ratioSamples) : [],
           samples: ratioSamples.length,
+          angles: profileOk ? angleProfiles(angleSamples) : [],
         });
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        onDone(res.steps, res.profileStored);
+        stopCamera();
+        onDone({ steps: res.steps, profileStored: res.profileStored, environment: envRef.current });
       } catch (e) {
+        stopCamera();
         setPhase('error');
-        setMessage(`Envoi impossible : ${e instanceof Error ? e.message : String(e)}`);
+        setMessage(`Envoi impossible : ${errorText(e)}`);
       }
     }
 
@@ -239,9 +365,10 @@ export function FaceId({ sessionId, onDone }: Props) {
     <div className="card">
       <h2>Vérification du visage</h2>
       <p className="muted">
-        Votre caméra analyse votre visage dans votre navigateur. Aucune image n’est enregistrée ; seules quelques
-        proportions sont conservées, chiffrées, jusqu’à la fin de l’entretien. Utilisez la caméra de votre ordinateur ou
-        de votre téléphone, rien d’autre.
+        Votre visage est analysé dans votre navigateur et par notre serveur. Aucune image n’est enregistrée : seule une
+        empreinte numérique de votre visage (des mesures) est conservée, chiffrée, jusqu’à la fin de l’entretien.
+        Utilisez la caméra de votre ordinateur ou de votre téléphone, rien d’autre. Cette étape vérifie aussi votre fuseau
+        horaire et votre adresse IP.
       </p>
 
       <div className={`faceid-stage ${centered && currentStep === 'center' ? 'faceid-ok' : ''}`}>
@@ -252,7 +379,7 @@ export function FaceId({ sessionId, onDone }: Props) {
       {phase === 'running' && currentStep && (
         <>
           <p className="faceid-instruction">{STEP_TEXT[currentStep]}</p>
-          {message && <p className="muted">{message}</p>}
+          <p className="muted faceid-hint">{message || ' '}</p>
           <ol className="faceid-steps">
             {plan!.steps.map((s, i) => (
               <li key={`${s}-${i}`} className={i < index ? `faceid-${done[i]}` : i === index ? 'faceid-current' : ''}>
@@ -269,11 +396,11 @@ export function FaceId({ sessionId, onDone }: Props) {
           Activer la caméra et commencer
         </button>
       )}
-      {phase === 'loading' && <p className="muted">Chargement de l’analyse…</p>}
+      {phase === 'loading' && <p className="muted">Préparation de la caméra et de l’analyse…</p>}
       {phase === 'sending' && <p className="muted">Enregistrement du résultat…</p>}
-      {phase === 'error' && (
+      {(phase === 'error' || phase === 'blocked') && (
         <>
-          <p className="muted">{message}</p>
+          <p className="faceid-error">{message}</p>
           <button className="primary" onClick={start}>
             Réessayer
           </button>

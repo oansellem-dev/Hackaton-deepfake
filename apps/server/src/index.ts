@@ -9,7 +9,7 @@ import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
 import { forwardFrame, viewWithAgent } from './agent.ts';
 import { recordChallenge } from './challenges.ts';
-import { faceIdRouter } from './faceid.ts';
+import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -77,7 +77,10 @@ app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' 
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'image manquante' });
   try {
     const { status, body } = await forwardFrame(session.id, req.body, req.headers['content-type'] ?? 'image/jpeg');
-    res.status(status).json(body);
+    const { embedding, ...rest } = (body ?? {}) as { embedding?: unknown };
+    onFrameEmbedding(session, embedding, req.query.phase === 'precheck' ? 'precheck' : 'live');
+    // L'empreinte reste sur le serveur : le navigateur ne reçoit que le résultat du détecteur passif.
+    res.status(status).json(rest);
   } catch {
     res.status(503).json({ error: 'agent injoignable' });
   }

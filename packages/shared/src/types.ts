@@ -27,6 +27,7 @@ export interface ChallengeRun {
   result: ChallengeResult;
   durationMs: number;
   at: number;
+  phase?: 'precheck' | 'live'; // absent = pendant l'entretien
 }
 
 // Règle n°2 : le recruteur décide, l'outil éclaire.
@@ -40,12 +41,23 @@ export interface Score {
   explanation: string[]; // 3 lignes max
 }
 
-// Identité déclarée par le candidat, avec son consentement explicite (RGPD).
+// Identité et informations écrites déclarées par le candidat, avec son consentement explicite (RGPD).
+// Tout est facultatif sauf le nom : une information absente ne pénalise jamais.
 export interface DeclaredIdentity {
   firstName: string;
   lastName: string;
+  email?: string;
+  phone?: string;
+  country?: string; // code ISO à 2 lettres
+  city?: string;
+  jobTitle?: string;
+  company?: string;
+  githubUrl?: string;
+  linkedinUrl?: string;
   consentAt: number;
 }
+
+export type IdentityPayload = Omit<DeclaredIdentity, 'consentAt'> & { consent: boolean };
 
 export interface Session {
   id: string;
@@ -71,11 +83,14 @@ export interface AgentRecommendation {
 export interface AgentInfo {
   available: boolean; // false : agent injoignable, le score local (computeScore) est utilisé
   recommendations: AgentRecommendation[];
+  passive?: { frames: number; medianFakeProbability: number | null }; // détecteur passif local
 }
 
 export interface SessionView extends Omit<Session, 'faceProfile'> {
   score: Score;
   hasFaceProfile: boolean;
+  // Ce que contient le profil, sans les valeurs (elles ne quittent jamais le serveur).
+  faceProfileSummary?: { samples: number; angles: number; embedding: boolean };
   agent?: AgentInfo;
 }
 

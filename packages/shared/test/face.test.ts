@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  boundingBox, computeRatios, estimateYawDeg, handPointsOverFace, judgeContinuity, medianRatios, ratioDistance,
-  type Point,
+  angleProfiles, boundingBox, combineContinuity, computeRatios, cosine, estimateYawDeg, handPointsOverFace,
+  isValidEmbedding, isValidRatios, judgeContinuity, judgeIdentity, meanEmbedding, medianRatios, ratioDistance,
+  referenceFor, type FaceProfile, type Point,
 } from '../src/face.ts';
 
 // Visage synthétique de face : 478 points, seuls ceux utilisés par les mesures sont placés.
@@ -63,4 +64,48 @@ test('continuité : trop peu de mesures ou zone grise = inconnu, jamais une accu
 
 test('médiane de plusieurs mesures', () => {
   assert.deepEqual(medianRatios([[1, 10], [3, 30], [2, 20]]), [2, 20]);
+});
+
+test('plusieurs angles : un profil par côté, comparé au plus proche', () => {
+  const r = (v: number) => Array.from({ length: 8 }, () => v);
+  const samples = [
+    ...[22, 25, 28, 30].map((y) => ({ yawDeg: y, ratios: r(2) })),
+    ...[-24, -26, -27, -29, -31].map((y) => ({ yawDeg: y, ratios: r(3) })),
+    { yawDeg: 60, ratios: r(9) }, // trop tourné : ignoré
+  ];
+  const angles = angleProfiles(samples);
+  assert.equal(angles.length, 2);
+  const profile: FaceProfile = { ratios: r(1), samples: 16, angles, createdAt: 0 };
+  assert.deepEqual(referenceFor(profile, 5), r(1)); // de face
+  assert.deepEqual(referenceFor(profile, 26), r(2)); // même côté, angle proche
+  assert.deepEqual(referenceFor(profile, -27), r(3));
+  assert.equal(referenceFor(profile, 55), null); // aucun profil à cet angle : on ne compare pas
+  assert.equal(referenceFor({ ...profile, angles: [] }, 25), null);
+});
+
+test('rapports valides', () => {
+  assert.ok(isValidRatios([1, 1, 1, 1, 1, 1, 1, 1]));
+  assert.ok(!isValidRatios([1, 1, 1]));
+  assert.ok(!isValidRatios([1, 1, 1, 1, 1, 1, 1, Number.NaN]));
+});
+
+test('empreinte : moyenne normalisée, similarité et verdict', () => {
+  const a = Array.from({ length: 128 }, (_, i) => (i % 2 ? 1 : 0));
+  const b = Array.from({ length: 128 }, (_, i) => (i % 2 ? 0 : 1));
+  assert.ok(isValidEmbedding(a) && !isValidEmbedding(a.slice(1)));
+  assert.ok(Math.abs(cosine(a, a) - 1) < 1e-9 && Math.abs(cosine(a, b)) < 1e-9);
+  const m = meanEmbedding([a, a, a]);
+  assert.ok(Math.abs(Math.hypot(...m) - 1) < 1e-9 && cosine(m, a) > 0.999);
+  assert.equal(judgeIdentity([0.7, 0.6]), 'unknown'); // trop peu de mesures
+  assert.equal(judgeIdentity([0.7, 0.65, 0.8, 0.6, 0.72]), 'consistent');
+  assert.equal(judgeIdentity([0.05, -0.1, 0.1, 0.0, 0.12]), 'different');
+  assert.equal(judgeIdentity([0.3, 0.32, 0.35, 0.3, 0.31]), 'unknown'); // zone grise
+});
+
+test('verdict combiné : un écart suffit, l’empreinte prime pour « même personne »', () => {
+  assert.equal(combineContinuity('consistent', 'different'), 'different');
+  assert.equal(combineContinuity('different', 'consistent'), 'different');
+  assert.equal(combineContinuity('consistent', 'unknown'), 'consistent');
+  assert.equal(combineContinuity('unknown', 'consistent'), 'consistent');
+  assert.equal(combineContinuity('unknown', 'unknown'), 'unknown');
 });

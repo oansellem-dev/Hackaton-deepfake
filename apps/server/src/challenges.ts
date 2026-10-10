@@ -13,7 +13,7 @@ export function recordChallenge(
   if (!challenge) return false;
 
   const at = Date.now();
-  session.challenges.push({ challengeId, result, durationMs, at });
+  session.challenges.push({ challengeId, result, durationMs, at, phase });
   const where = phase === 'precheck' ? ' (pré-vérification)' : '';
   upsertSignals(session, [
     {

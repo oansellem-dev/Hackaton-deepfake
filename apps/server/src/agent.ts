@@ -18,6 +18,7 @@ interface AgentOutput {
   level: 'green' | 'orange' | 'red' | 'insufficient_data';
   explanation: string;
   recommendations: { challenge: string; phrase: string; rationale: string }[];
+  passive?: { frames_analyzed: number; median_fake_probability: number | null } | null;
 }
 
 function statusOf(session: Session, id: string) {
@@ -41,7 +42,12 @@ function toAgentInput(session: Session) {
       .map((c) => ({
         type: TO_AGENT[c.challengeId],
         status: c.result === 'passed' ? 'passed' : c.result === 'failed' ? 'failed' : 'inconclusive',
+        phase: c.phase ?? 'live',
       })),
+    // Incohérences dans ce que le candidat a écrit (e-mail jetable, indicatif, profil GitHub…).
+    cv_contradictions: session.signals
+      .filter((s) => s.source === 'identity' && s.status === 'contradiction')
+      .map((s) => ({ field: s.id, detail: s.label })),
     available_challenges: Object.values(TO_AGENT),
   };
 }
@@ -69,7 +75,13 @@ export async function viewWithAgent(session: Session): Promise<SessionView> {
     const recommendations = out.recommendations
       .filter((r) => FROM_AGENT[r.challenge] && getChallenge(FROM_AGENT[r.challenge]))
       .map((r) => ({ challengeId: FROM_AGENT[r.challenge], phrase: r.phrase, rationale: r.rationale }));
-    const agent: AgentInfo = { available: true, recommendations };
+    const agent: AgentInfo = {
+      available: true,
+      recommendations,
+      passive: out.passive
+        ? { frames: out.passive.frames_analyzed, medianFakeProbability: out.passive.median_fake_probability }
+        : undefined,
+    };
     return {
       ...stripBiometrics(session),
       score: {

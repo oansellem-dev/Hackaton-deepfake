@@ -72,3 +72,16 @@ def test_face_continuity_only_penalizes_a_measured_difference():
     diff = post({"challenges": chal, "face_continuity": False})
     assert unknown["score"] == same["score"] == 100
     assert diff["score"] == 70 and diff["level"] == "orange" and any(s["id"] == "face_continuity" for s in diff["signals"])
+
+
+def test_precheck_challenges_count_for_score_but_stay_recommended_live():
+    out = post({"challenges": [{"type": "hand_occlusion", "status": "failed", "phase": "precheck"}],
+                "available_challenges": ["hand_occlusion", "head_turn", "random_phrase"]})
+    assert out["score"] < 100
+    assert out["recommendations"][0]["challenge"] == "hand_occlusion"
+
+
+def test_passive_summary_is_echoed_for_the_report():
+    out = post({"passive": {"frames_analyzed": 6, "median_fake_probability": 0.2},
+                "challenges": [{"type": "head_turn", "status": "passed"}]})
+    assert out["passive"] == {"frames_analyzed": 6, "median_fake_probability": 0.2}

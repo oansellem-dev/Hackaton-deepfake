@@ -39,10 +39,23 @@ export const RATIO_NAMES = [
   'inner-eye/eye-span',
 ] as const;
 
+// Proportions mesurées tête tournée, d'un côté (yaw < 0) ou de l'autre (yaw > 0).
+export interface AngleProfile {
+  yawDeg: number; // angle médian des mesures
+  ratios: number[];
+  samples: number;
+}
+
 export interface FaceProfile {
-  ratios: number[]; // même ordre que RATIO_NAMES
+  ratios: number[]; // de face, même ordre que RATIO_NAMES
   samples: number; // nombre de mesures de face dont c'est la médiane
+  angles?: AngleProfile[]; // plusieurs angles : la visio compare au profil le plus proche de l'angle observé
+  embedding?: number[]; // empreinte faciale (128 nombres, modèle SFace local), pour la comparaison 1:1 avec la visio
   createdAt: number;
+}
+
+export function isValidRatios(r: unknown): r is number[] {
+  return Array.isArray(r) && r.length === RATIO_NAMES.length && r.every((n) => Number.isFinite(n) && n > 0 && n < 10);
 }
 
 const MIN_LANDMARKS = 474;
@@ -136,7 +149,34 @@ export function ratioDistance(a: number[], b: number[]): number {
 export const SAME_FACE_MAX = 0.07;
 export const DIFFERENT_FACE_MIN = 0.12;
 export const MIN_LIVE_SAMPLES = 5;
-export const LIVE_MAX_YAW_DEG = 15;
+export const FRONTAL_MAX_YAW_DEG = 12; // en dessous : comparé au profil de face
+export const ANGLE_MIN_YAW_DEG = 12; // mesures « tête tournée » gardées entre ces deux angles
+export const ANGLE_MAX_YAW_DEG = 40;
+export const ANGLE_MATCH_DEG = 12; // écart d'angle toléré avec un profil tourné
+export const MIN_ANGLE_SAMPLES = 4;
+
+// Profil de référence pour un visage observé sous l'angle `yawDeg`, ou null si aucun ne correspond.
+export function referenceFor(profile: FaceProfile, yawDeg: number): number[] | null {
+  if (Math.abs(yawDeg) <= FRONTAL_MAX_YAW_DEG) return profile.ratios;
+  const match = (profile.angles ?? [])
+    .filter((a) => Math.sign(a.yawDeg) === Math.sign(yawDeg) && Math.abs(a.yawDeg - yawDeg) <= ANGLE_MATCH_DEG)
+    .sort((a, b) => Math.abs(a.yawDeg - yawDeg) - Math.abs(b.yawDeg - yawDeg))[0];
+  return match?.ratios ?? null;
+}
+
+// Regroupe les mesures « tête tournée » par côté et garde la médiane de chacun (au moins MIN_ANGLE_SAMPLES).
+export function angleProfiles(samples: { yawDeg: number; ratios: number[] }[]): AngleProfile[] {
+  const out: AngleProfile[] = [];
+  for (const side of [-1, 1]) {
+    const s = samples.filter(
+      (x) => Math.sign(x.yawDeg) === side && Math.abs(x.yawDeg) >= ANGLE_MIN_YAW_DEG && Math.abs(x.yawDeg) <= ANGLE_MAX_YAW_DEG,
+    );
+    if (s.length >= MIN_ANGLE_SAMPLES) {
+      out.push({ yawDeg: median(s.map((x) => x.yawDeg)), ratios: medianRatios(s.map((x) => x.ratios)), samples: s.length });
+    }
+  }
+  return out;
+}
 
 export type Continuity = 'consistent' | 'different' | 'unknown';
 
@@ -146,6 +186,52 @@ export function judgeContinuity(distances: number[]): Continuity {
   const m = median(distances);
   if (m <= SAME_FACE_MAX) return 'consistent';
   if (m >= DIFFERENT_FACE_MIN) return 'different';
+  return 'unknown';
+}
+
+// --- Empreinte faciale (calculée par l'agent local à partir des captures, jamais d'image conservée) ---
+
+export const EMBEDDING_SIZE = 128;
+// Similarité cosinus médiane. Seuil publié pour SFace : 0,363. Entre les deux, on ne conclut pas.
+export const SAME_PERSON_MIN = 0.4;
+export const DIFFERENT_PERSON_MAX = 0.25;
+export const MIN_PROFILE_EMBEDDINGS = 3;
+
+export function isValidEmbedding(e: unknown): e is number[] {
+  return Array.isArray(e) && e.length === EMBEDDING_SIZE && e.every((n) => Number.isFinite(n));
+}
+
+export function cosine(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return na && nb ? dot / Math.sqrt(na * nb) : 0;
+}
+
+// Moyenne de plusieurs empreintes, renormalisée : plus stable qu'une seule capture.
+export function meanEmbedding(list: number[][]): number[] {
+  const sum = list[0].map((_, i) => list.reduce((acc, e) => acc + e[i], 0));
+  const norm = Math.hypot(...sum) || 1;
+  return sum.map((x) => x / norm);
+}
+
+export function judgeIdentity(similarities: number[]): Continuity {
+  if (similarities.length < MIN_LIVE_SAMPLES) return 'unknown';
+  const m = median(similarities);
+  if (m >= SAME_PERSON_MIN) return 'consistent';
+  if (m <= DIFFERENT_PERSON_MAX) return 'different';
+  return 'unknown';
+}
+
+// Verdict final : un seul contrôle qui voit un visage différent suffit à lever un signal (à vérifier, jamais une preuve).
+// L'empreinte prime pour dire « même personne » ; les proportions servent quand l'empreinte manque.
+export function combineContinuity(identity: Continuity, geometry: Continuity): Continuity {
+  if (identity === 'different' || geometry === 'different') return 'different';
+  if (identity === 'consistent') return 'consistent';
+  if (identity === 'unknown' && geometry === 'consistent') return 'consistent';
   return 'unknown';
 }
 
@@ -170,6 +256,7 @@ export interface FaceIdSubmission {
   results: FaceIdStepResult[];
   ratios: number[]; // médiane des mesures de face
   samples: number;
+  angles?: AngleProfile[];
 }
 
 export const MIN_PROFILE_SAMPLES = 8;

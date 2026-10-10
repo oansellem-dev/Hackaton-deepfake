@@ -1,72 +1,85 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { SUPPORTED_COUNTRIES, type FaceIdStep, type SignalStatus } from '@kyc/shared';
-import { FaceId } from '../components/FaceId.tsx';
+import { SUPPORTED_COUNTRIES, type FaceIdStep, type IdentityPayload } from '@kyc/shared';
+import { FaceId, type FaceIdOutcome } from '../components/FaceId.tsx';
 import { api } from '../config.ts';
 
-type Result = { label: string; status: SignalStatus; detail: string };
-type Step = 'identity' | 'env' | 'face' | 'done';
+type Step = 'identity' | 'face' | 'done';
 
-const STEPS: { id: Step; label: string }[] = [
-  { id: 'identity', label: '1. Identité' },
-  { id: 'env', label: '2. Environnement' },
-  { id: 'face', label: '3. Visage' },
+const STEPS: { id: Exclude<Step, 'done'>; label: string }[] = [
+  { id: 'identity', label: '1. Vos informations' },
+  { id: 'face', label: '2. Vérification du visage' },
 ];
 
 const STEP_NAME: Record<FaceIdStep, string> = {
   center: 'Visage de face',
-  turn_a: 'Tête tournée',
-  turn_b: 'Tête tournée',
+  turn_a: 'Tête tournée à droite',
+  turn_b: 'Tête tournée à gauche',
   hand: 'Main devant le visage',
 };
 
-const CONSENT =
-  "J’accepte que mon nom soit recherché dans des sources publiques, que ma caméra analyse mon visage dans mon navigateur " +
-  'et que des proportions de mon visage (aucune image) soient conservées, chiffrées, jusqu’à la fin de l’entretien ' +
-  '(24 h au maximum), uniquement pour vérifier que la personne présente à l’entretien est bien celle-ci. ' +
-  'Le recruteur voit seulement des signaux à vérifier et reste seul décisionnaire.';
+const COUNTRY_NAMES: Record<string, string> = {
+  FR: 'France', BE: 'Belgique', CH: 'Suisse', LU: 'Luxembourg', DE: 'Allemagne', ES: 'Espagne', IT: 'Italie',
+  PT: 'Portugal', GB: 'Royaume-Uni', NL: 'Pays-Bas', PL: 'Pologne', RO: 'Roumanie', MA: 'Maroc', TN: 'Tunisie',
+  DZ: 'Algérie', SN: 'Sénégal', CA: 'Canada',
+};
 
-// Lien de pré-vérification envoyé au candidat : identité déclarée, environnement, puis parcours « Face ID ».
-// Le candidat voit toujours ce qui est vérifié avant de le lancer (règle n°5).
+const CONSENT =
+  'J’accepte que les informations ci-dessus soient vérifiées dans des sources publiques, que mon visage soit analysé ' +
+  'pendant cette vérification, et qu’une empreinte numérique de mon visage (des mesures, aucune image) soit conservée, chiffrée, ' +
+  'jusqu’à la fin de l’entretien (24 h au maximum), uniquement pour vérifier que la personne présente à l’entretien ' +
+  'est bien celle-ci. Le recruteur voit seulement des signaux à vérifier et reste seul décisionnaire.';
+
+// Garde l'étape en cours si le candidat recharge la page (rien de sensible : juste l'étape et le pays).
+function loadProgress(id: string): { step: Step; country: string } | null {
+  try {
+    const raw = sessionStorage.getItem(`kyc-precheck-${id}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveProgress(id: string, step: Step, country: string) {
+  try {
+    sessionStorage.setItem(`kyc-precheck-${id}`, JSON.stringify({ step, country }));
+  } catch {
+    /* stockage indisponible : on recommencera à l'étape 1 */
+  }
+}
+
+type Form = Omit<IdentityPayload, 'consent'>;
+
+const EMPTY: Form = {
+  firstName: '', lastName: '', email: '', phone: '', country: 'FR', city: '', jobTitle: '', company: '', githubUrl: '',
+  linkedinUrl: '',
+};
+
+// Lien de pré-vérification envoyé au candidat. Page 1 : identité et informations écrites (avec consentement).
+// Page 2 : vérification du visage (« Face ID ») et de l'environnement. Le candidat voit ce qui est vérifié avant (règle n°5).
 export function Precheck() {
   const { id = '' } = useParams();
-  const [step, setStep] = useState<Step>('identity');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const saved = loadProgress(id);
+  const [step, setStep] = useState<Step>(saved?.step ?? 'identity');
+  const [form, setForm] = useState<Form>({ ...EMPTY, country: saved?.country ?? 'FR' });
   const [consent, setConsent] = useState(false);
-  const [country, setCountry] = useState('FR');
-  const [results, setResults] = useState<Result[] | null>(null);
-  const [faceSummary, setFaceSummary] = useState<{ step: FaceIdStep; result: string }[] | null>(null);
-  const [profileStored, setProfileStored] = useState(false);
+  const [outcome, setOutcome] = useState<FaceIdOutcome | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submitIdentity() {
-    setRunning(true);
-    setError(null);
-    try {
-      await api.sendIdentity(id, { firstName, lastName, consent });
-      setStep('env');
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setRunning(false);
-    }
-  }
+  const set = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  async function runEnvironment() {
+  async function submitIdentity(e: React.FormEvent) {
+    e.preventDefault();
     setRunning(true);
     setError(null);
     try {
-      const res = await api.sendPrecheck(id, {
-        cameras: await listCameraLabels(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        languages: [...navigator.languages],
-        declaredCountry: country,
-      });
-      setResults(res.signals);
-    } catch (e) {
-      setError(String(e));
+      await api.sendIdentity(id, { ...form, consent });
+      saveProgress(id, 'face', form.country ?? 'FR');
+      setStep('face');
+    } catch (err) {
+      setError(String(err).includes('déjà terminée') ? 'Votre pré-vérification est déjà enregistrée.' : String(err));
     } finally {
       setRunning(false);
     }
@@ -86,77 +99,94 @@ export function Precheck() {
       </ol>
 
       {step === 'identity' && (
-        <div className="card">
-          <p>Indiquez votre identité telle qu’elle figure sur votre candidature.</p>
-          <label>
-            Prénom
-            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
-          </label>
-          <label>
-            Nom
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
-          </label>
+        <form className="card" onSubmit={submitIdentity}>
+          <p>
+            Avant votre entretien en visio, nous vérifions que la personne présente sera bien vous. Cela prend environ
+            deux minutes.
+          </p>
+          <div className="form-grid">
+            <label>
+              Prénom *
+              <input value={form.firstName} onChange={set('firstName')} autoComplete="given-name" required />
+            </label>
+            <label>
+              Nom *
+              <input value={form.lastName} onChange={set('lastName')} autoComplete="family-name" required />
+            </label>
+            <label>
+              E-mail
+              <input type="email" value={form.email} onChange={set('email')} autoComplete="email" />
+            </label>
+            <label>
+              Téléphone
+              <input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" placeholder="+33 6 12 34 56 78" />
+            </label>
+            <label>
+              Pays depuis lequel vous passerez l’entretien
+              <select value={form.country} onChange={set('country')}>
+                {SUPPORTED_COUNTRIES.map((c) => (
+                  <option key={c} value={c}>
+                    {COUNTRY_NAMES[c] ?? c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Ville
+              <input value={form.city} onChange={set('city')} autoComplete="address-level2" />
+            </label>
+            <label>
+              Poste actuel ou dernier poste
+              <input value={form.jobTitle} onChange={set('jobTitle')} autoComplete="organization-title" />
+            </label>
+            <label>
+              Entreprise
+              <input value={form.company} onChange={set('company')} autoComplete="organization" />
+            </label>
+            <label>
+              Profil GitHub (facultatif)
+              <input value={form.githubUrl} onChange={set('githubUrl')} placeholder="https://github.com/…" />
+            </label>
+            <label>
+              Profil LinkedIn (facultatif)
+              <input value={form.linkedinUrl} onChange={set('linkedinUrl')} placeholder="https://www.linkedin.com/in/…" />
+            </label>
+          </div>
+
+          <div className="what-we-check">
+            <strong>Ce que nous vérifions</strong>
+            <ul>
+              <li>votre nom dans des sources publiques (Wikipédia, GitHub, ORCID, moteur de recherche) ;</li>
+              <li>la cohérence de ce que vous déclarez (pays, téléphone, e-mail, profils) ;</li>
+              <li>à l’étape suivante : votre caméra, votre fuseau horaire, votre adresse IP et votre visage.</li>
+            </ul>
+            <p className="muted">
+              Les champs facultatifs vides ne vous pénalisent pas, et ne rien trouver sur vous en ligne non plus.
+            </p>
+          </div>
+
           <label className="consent">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>{CONSENT}</span>
           </label>
-          <p className="muted">
-            Ne trouver aucune information publique sur vous n’est pas un problème et ne vous pénalise pas.
-          </p>
-          <button className="primary" onClick={submitIdentity} disabled={running || !consent || !firstName.trim() || !lastName.trim()}>
-            {running ? 'Enregistrement…' : 'Continuer'}
+          <button
+            className="primary"
+            type="submit"
+            disabled={running || !consent || !form.firstName.trim() || !form.lastName.trim()}
+          >
+            {running ? 'Vérification…' : 'Continuer'}
           </button>
-          {error && <p className="muted">Erreur : {error}</p>}
-        </div>
-      )}
-
-      {step === 'env' && (
-        <div className="card">
-          <p>Cette étape vérifie quelques éléments techniques :</p>
-          <ul>
-            <li>le nom des caméras vues par votre navigateur ;</li>
-            <li>votre fuseau horaire, comparé au pays que vous indiquez ;</li>
-            <li>votre adresse IP.</li>
-          </ul>
-          <label>
-            Pays depuis lequel vous passerez l’entretien
-            <select value={country} onChange={(e) => setCountry(e.target.value)}>
-              {SUPPORTED_COUNTRIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-          {!results && (
-            <button className="primary" onClick={runEnvironment} disabled={running}>
-              {running ? 'Vérification…' : 'Lancer la vérification'}
-            </button>
-          )}
-          {error && <p className="muted">Erreur : {error}</p>}
-          {results && (
-            <>
-              <ul className="status-list">
-                {results.map((r) => (
-                  <li key={r.label} className={`status-${r.status}`}>
-                    <strong>{r.label}</strong> — {r.detail}
-                  </li>
-                ))}
-              </ul>
-              <button className="primary" onClick={() => setStep('face')}>
-                Continuer vers la vérification du visage
-              </button>
-            </>
-          )}
-        </div>
+          {error && <p className="faceid-error">{error}</p>}
+        </form>
       )}
 
       {step === 'face' && (
         <FaceId
           sessionId={id}
-          onDone={(steps, stored) => {
-            setFaceSummary(steps);
-            setProfileStored(stored);
+          declaredCountry={form.country ?? 'FR'}
+          onDone={(o) => {
+            setOutcome(o);
+            saveProgress(id, 'done', form.country ?? 'FR');
             setStep('done');
           }}
         />
@@ -165,34 +195,29 @@ export function Precheck() {
       {step === 'done' && (
         <div className="card">
           <h2>Merci, c’est terminé</h2>
+          {outcome && <p>Ce que nous avons vérifié :</p>}
           <ul className="status-list">
-            {faceSummary?.map((s, i) => (
+            {outcome?.environment.map((r) => (
+              <li key={r.label} className={`status-${r.status === 'contradiction' ? 'unknown' : r.status}`}>
+                <strong>{r.label}</strong>
+              </li>
+            ))}
+            {outcome?.steps.map((s, i) => (
               <li key={i} className={s.result === 'passed' ? 'status-ok' : 'status-unknown'}>
-                <strong>{STEP_NAME[s.step]}</strong> — {s.result === 'passed' ? 'réalisé' : 'non concluant, sans effet sur votre dossier'}
+                <strong>{STEP_NAME[s.step]}</strong> — {s.result === 'passed' ? 'réalisé' : 'non concluant'}
               </li>
             ))}
           </ul>
           <p className="muted">
-            {profileStored
-              ? 'Des proportions de votre visage (aucune image) sont conservées, chiffrées, jusqu’à la fin de l’entretien.'
-              : 'Aucune donnée de visage n’a été conservée.'}{' '}
+            {!outcome
+              ? 'Votre pré-vérification est enregistrée.'
+              : outcome.profileStored
+                ? 'Une empreinte numérique de votre visage (des mesures, aucune image) est conservée, chiffrée, jusqu’à la fin de l’entretien.'
+                : 'Aucune donnée de visage n’a été conservée.'}{' '}
             Le recruteur décide : cette vérification ne remplace pas son jugement. Vous pouvez fermer cette page.
           </p>
         </div>
       )}
     </div>
   );
-}
-
-// Les noms des caméras ne sont visibles qu'après une autorisation : on ouvre la caméra
-// un instant pour les lire, puis on la coupe aussitôt, sans capturer d'image.
-async function listCameraLabels(): Promise<string[]> {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    stream.getTracks().forEach((t) => t.stop());
-  } catch {
-    return [];
-  }
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices.filter((d) => d.kind === 'videoinput').map((d) => d.label);
 }

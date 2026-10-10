@@ -4,6 +4,7 @@ Règle de conception n°1 : une valeur absente (None / not_performed / pending) 
 Seules les contradictions et les défis échoués comptent.
 """
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -34,6 +35,7 @@ class ChallengeResult(BaseModel):
     compliance: float | None = Field(None, ge=0, le=1, description="C de GOTCHA : l'action a-t-elle été faite (0..1)")
     fidelity_loss: float | None = Field(None, ge=0, le=1, description="ΔF de GOTCHA : dégradation de l'image pendant le défi (0..1)")
     response_delay_ms: int | None = Field(None, ge=0)
+    phase: Literal["precheck", "live"] = "live"  # pré-vérification (sans recruteur) ou entretien
 
 
 class Environment(BaseModel):
@@ -112,4 +114,5 @@ class AssessmentOutput(BaseModel):
     signals: list[Signal]
     explanation: str
     recommendations: list[Recommendation]
+    passive: PassiveSummary | None = None  # résumé du détecteur passif, pour le rapport du recruteur
     advisory: str = "Score consultatif : le recruteur décide. Signal à vérifier, pas une accusation."

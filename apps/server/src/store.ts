@@ -77,7 +77,13 @@ export function getSession(id: string): Session | undefined {
 // Le profil du visage ne quitte jamais le serveur : la vue n'indique que sa présence.
 export function stripBiometrics(session: Session): Omit<SessionView, 'score'> {
   const { faceProfile, ...rest } = session;
-  return { ...rest, hasFaceProfile: Boolean(faceProfile) };
+  return {
+    ...rest,
+    hasFaceProfile: Boolean(faceProfile),
+    faceProfileSummary: faceProfile
+      ? { samples: faceProfile.samples, angles: faceProfile.angles?.length ?? 0, embedding: Boolean(faceProfile.embedding) }
+      : undefined,
+  };
 }
 
 export function view(session: Session): SessionView {

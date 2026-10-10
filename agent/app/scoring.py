@@ -93,7 +93,8 @@ def _other_signals(inp: AssessmentInput) -> list[Signal]:
     if inp.cv_contradictions:
         penalty = min(MAX_CV_PENALTY, CV_CONTRADICTION_PENALTY * len(inp.cv_contradictions))
         out.append(Signal(id="cv_contradiction", severity=Severity.MEDIUM, penalty=penalty,
-                          message="Contradiction entre le CV et les informations déclarées par le candidat.",
+                          message="Incohérence dans les informations écrites du candidat : signal à vérifier, "
+                                  "à aborder simplement avec lui.",
                           evidence={"items": [c.model_dump() for c in inp.cv_contradictions]}))
     if inp.face_continuity is False:
         out.append(Signal(id="face_continuity", severity=Severity.STRONG, penalty=FACE_CONTINUITY_PENALTY,

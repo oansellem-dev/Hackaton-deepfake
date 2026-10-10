@@ -54,7 +54,7 @@ export function Home() {
             </a>
           </p>
           <p>
-            4. <a href={`/report/${session.id}`}>Rapport d'entretien</a>
+            4. <a href={`/report/${session.id}`}>Résultat de la pré-vérification et rapport</a> (se met à jour tout seul)
           </p>
         </div>
       )}

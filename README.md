@@ -95,19 +95,43 @@ export ANTHROPIC_API_KEY=sk-ant-...                # optionnel : explication ref
 - Doc interactive de l'agent : `http://localhost:8000/docs`. Tests : `cd agent && .venv/Scripts/python -m pytest`.
 - Licence du modèle passif : recherche / non commercial. À remplacer avant un produit commercial.
 
-## Lien de pré-vérification complet (identité, environnement, Face ID)
+## Lien de pré-vérification (2 pages)
 
-`/check/:id` enchaîne trois étapes :
+Le recruteur crée un entretien sur `/` et envoie `/check/<id>` au candidat. Il suit le résultat sur `/report/<id>`, qui se met à jour tout seul : verdict de pré-vérification, informations déclarées, ce qui a été relevé, défis réussis ou non.
 
-1. **Identité** : prénom, nom et **consentement explicite** (obligatoire côté serveur). Le nom déclenche une recherche publique via l'API Brave Search (`BRAVE_API_KEY`). Ne rien trouver donne un signal `unknown`, sans effet sur le score. Sans clé, la recherche est simplement désactivée.
-2. **Environnement** : caméras, fuseau horaire, IP (inchangé).
-3. **Face ID** : caméra de l'appareil uniquement, ovale de cadrage, puis étapes tirées au hasard par le serveur (visage de face, tête tournée des deux côtés, main devant le visage). Parcours durci (étapes en plus) si un signal à vérifier existe déjà. Analyse MediaPipe dans le navigateur, une dizaine d'images JPEG partent seulement vers le détecteur passif local.
+**Page 1 — Vos informations.** Prénom et nom (obligatoires), e-mail, téléphone, pays, ville, poste, entreprise, GitHub, LinkedIn (facultatifs), et **consentement explicite** (refusé côté serveur sans la case cochée). Vérifications, uniquement par des API publiques officielles :
 
-Ce qui est conservé : **8 rapports de proportions du visage** (jamais d'image), chiffrés en AES-256-GCM dans `apps/server/data/sessions.json` (clé : `BIOMETRIC_KEY` en hexadécimal sur 64 caractères, sinon `data/biometric.key`). Ils sont effacés dès la décision du recruteur, et au plus tard après 24 h. Pendant l'entretien (visio de secours), le panneau mesure le visage affiché toutes les 2 s et le serveur le compare au profil : un écart médian ≥ 12 % crée un signal « visage différent » (fort), ≤ 7 % valide, entre les deux ne conclut pas.
+- présence publique du nom : Wikipédia FR/EN, GitHub, ORCID sans clé, et le web via Brave Search si `BRAVE_API_KEY` est défini ;
+- e-mail jetable (yopmail, mailinator…), indicatif téléphonique différent du pays déclaré, profil GitHub déclaré introuvable ou au nom différent (`GITHUB_TOKEN` facultatif pour lever la limite de 60 requêtes par heure) ;
+- LinkedIn : affiché au recruteur, jamais vérifié automatiquement (pas de scraping).
+
+Ne rien trouver ou laisser un champ vide ne pénalise jamais : seul un écart entre deux informations devient un signal à vérifier.
+
+**Page 2 — Vérification du visage.** Caméra de l'appareil uniquement : une caméra virtuelle (OBS, ManyCam…) est remplacée par la vraie caméra si l'appareil en a une, sinon refusée et tracée. La vérification d'environnement (caméras, fuseau horaire, IP) se fait au même moment. Puis, dans un ovale de cadrage (distance, lumière, visage de face) : tête tournée d'un côté puis de l'autre (retour de face obligatoire entre les deux, « Dans l'autre sens » si besoin), main devant le visage. Le serveur tire l'ordre au hasard et ajoute des étapes si un signal à vérifier existe déjà. Analyse MediaPipe dans le navigateur ; une dizaine d'images, surtout pendant les défis, partent vers l'agent local (détecteur passif et empreinte), analysées en mémoire puis jetées.
+
+**Ce qui est conservé** (jamais d'image), chiffré en AES-256-GCM dans `apps/server/data/sessions.json`, effacé dès la décision du recruteur et au plus tard après 24 h :
+
+- l'**empreinte faciale** : 128 nombres calculés par l'agent avec SFace (OpenCV Zoo, Apache 2.0), moyenne de plusieurs captures ;
+- les **proportions du visage** (écart des yeux, largeur du nez, de la bouche…), de face et sous deux angles.
+
+Clé de chiffrement : `BIOMETRIC_KEY` (64 caractères hexadécimaux), sinon `data/biometric.key` créé au premier lancement.
+
+**Pendant l'entretien** (visio de secours), le panneau envoie une capture et une mesure du visage toutes les 2 s. Le serveur compare à la pré-vérification : similarité d'empreinte (même personne ≥ 0,40, différente ≤ 0,25 ; le seuil publié de SFace est 0,363) et écart des proportions (≥ 12 % = différent). Un seul contrôle qui voit un visage différent lève le signal fort « Visage différent de celui de la pré-vérification » ; entre les seuils, on ne conclut pas.
+
+Mesuré en test (Chrome, caméra simulée) : même personne 0,97 de similarité et 1,2 % d'écart ; autre personne 0,05 et 10 %.
 
 ```bash
-npm install            # télécharge aussi les modèles MediaPipe dans apps/web/public (predev / prebuild)
+npm install                      # télécharge aussi les modèles MediaPipe dans apps/web/public (predev / prebuild)
+cd agent && .venv/Scripts/python -m uvicorn app.main:app --port 8000      # autre terminal
 BRAVE_API_KEY=... BIOMETRIC_KEY=$(openssl rand -hex 32) npm run dev
 ```
 
-À régler sur nos 20 tests : seuils de continuité (`SAME_FACE_MAX`, `DIFFERENT_FACE_MIN` dans `packages/shared/src/face.ts`) et détection de la main. Le panneau de l'extension Chrome ne mesure pas encore le visage (seule la visio de secours le fait).
+Au premier appel, l'agent télécharge ses modèles (DeepfakeGuard, YuNet, SFace : environ 70 Mo) depuis Hugging Face.
+
+## Tests de bout en bout (`tools/e2e/`)
+
+- `node tools/e2e/server.mjs <dossier de données>` : 30 contrôles sur l'API (consentement, caméra virtuelle, sources publiques, chiffrement, comparaison, effacement). Lancer le serveur avec `KYC_DATA_DIR=<dossier de données>`.
+- `python tools/e2e/make_video.py <visage.jpg> <sortie.y4m> [main.jpg]` : fabrique une fausse caméra (de face, tête tournée, main devant le visage).
+- `node tools/e2e/browser.mjs <candidat.y4m> <autre.y4m> <captures> all` : parcours complet dans Chrome sans interface (`npm i playwright-core` dans un dossier à part, `CHROME_PATH` si Chrome n'est pas au chemin Windows par défaut) : pré-vérification, visio avec la même personne, puis substitution par une autre personne.
+
+À régler sur nos 20 tests : seuils de continuité (`packages/shared/src/face.ts`) et de rotation (`TURN_YAW_DEG` dans `FaceId.tsx`). Le panneau de l'extension Chrome ne mesure pas encore les proportions du visage, mais ses captures alimentent déjà l'empreinte.

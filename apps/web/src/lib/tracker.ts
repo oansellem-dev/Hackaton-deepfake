@@ -43,12 +43,17 @@ export interface Detection {
 
 let lastTs = 0;
 
-export function detect(tracker: Tracker, video: HTMLVideoElement): Detection {
-  // MediaPipe exige des horodatages strictement croissants.
-  const ts = Math.max(performance.now(), lastTs + 1);
-  lastTs = ts;
+// MediaPipe exige des horodatages strictement croissants, même entre deux appels très rapprochés.
+function nextTs(): number {
+  lastTs = Math.max(performance.now(), lastTs + 1);
+  return lastTs;
+}
+
+// La détection des mains coûte cher : on ne la lance que si l'étape en a besoin.
+export function detect(tracker: Tracker, video: HTMLVideoElement, withHands = false): Detection {
+  const ts = nextTs();
   const face = tracker.face.detectForVideo(video, ts).faceLandmarks[0] ?? null;
-  const hands = tracker.hand.detectForVideo(video, ts).landmarks;
+  const hands = withHands ? tracker.hand.detectForVideo(video, ts).landmarks : [];
   return { face, hands };
 }
 
@@ -56,7 +61,7 @@ export function detect(tracker: Tracker, video: HTMLVideoElement): Detection {
 export async function sampleFace(video: HTMLVideoElement): Promise<{ ratios: number[]; yawDeg: number } | null> {
   if (video.readyState < 2 || video.videoWidth === 0) return null;
   const tracker = await loadTracker();
-  const face = tracker.face.detectForVideo(video, Math.max(performance.now(), ++lastTs)).faceLandmarks[0];
+  const face = tracker.face.detectForVideo(video, nextTs()).faceLandmarks[0];
   if (!face) return null;
   const ratios = computeRatios(face, video.videoWidth, video.videoHeight);
   return ratios ? { ratios, yawDeg: estimateYawDeg(face, video.videoWidth) } : null;

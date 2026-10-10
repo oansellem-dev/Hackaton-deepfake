@@ -29,8 +29,11 @@ _WORDS = ["lanterne", "violet", "horizon", "carton", "mimosa", "tracteur", "quar
 
 
 def recommend(inp: AssessmentInput, max_items: int = 2) -> list[Recommendation]:
-    done = {c.type for c in inp.challenges if c.status in (ChallengeStatus.PASSED, ChallengeStatus.FAILED)}
-    suspicious = any(c.status == ChallengeStatus.FAILED for c in inp.challenges) or bool(
+    # Un défi fait en pré-vérification reste utile en direct (devant le recruteur, il ne peut pas être préparé) :
+    # seuls les défis déjà faits pendant l'entretien sont écartés.
+    done = {c.type for c in inp.challenges
+            if c.phase == "live" and c.status in (ChallengeStatus.PASSED, ChallengeStatus.FAILED)}
+    suspicious = any(c.status == ChallengeStatus.FAILED for c in inp.challenges) or inp.face_continuity is False or bool(
         inp.environment.virtual_camera_detected)
     candidates = [t for t in _ORDER if t not in done and (inp.available_challenges is None or t in inp.available_challenges)]
     # Si un signal est déjà suspect, on insiste sur les défis les plus discriminants ; sinon on garde la liste douce.
@@ -66,4 +69,4 @@ def assess(inp: AssessmentInput) -> AssessmentOutput:
     score, level, signals = evaluate(inp)
     explanation = llm_explain.rewrite(score, level, signals) or explain(score, level, signals)
     return AssessmentOutput(session_id=inp.session_id, score=score, level=level, signals=signals,
-                            explanation=explanation, recommendations=recommend(inp))
+                            explanation=explanation, recommendations=recommend(inp), passive=inp.passive)

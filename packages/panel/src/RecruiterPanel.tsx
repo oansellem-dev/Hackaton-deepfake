@@ -34,7 +34,8 @@ const FRAME_MAX_WIDTH = 640;
 
 // Prochain défi : celui que recommande l'agent s'il est connu du panneau, sinon un tirage au hasard.
 function nextChallenge(session: SessionView): Challenge {
-  const done = session.challenges.map((c) => c.challengeId);
+  // Les défis de la pré-vérification restent utiles en direct : seuls ceux de l'entretien sont écartés.
+  const done = session.challenges.filter((c) => c.phase !== 'precheck').map((c) => c.challengeId);
   const rec = session.agent?.recommendations.find((r) => getChallenge(r.challengeId));
   if (rec) return { ...getChallenge(rec.challengeId)!, mascotLine: rec.phrase };
   return pickChallenge(done);
@@ -115,7 +116,8 @@ export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDete
           setSession(s);
           setError(null);
           // Première recommandation de l'agent : tant qu'aucun défi n'a été lancé, on la suit.
-          if (!followedRec.current && s.challenges.length === 0 && s.agent?.recommendations[0]) {
+          const liveDone = s.challenges.some((c) => c.phase !== 'precheck');
+          if (!followedRec.current && !liveDone && s.agent?.recommendations[0]) {
             followedRec.current = true;
             setChallenge(nextChallenge(s));
           }

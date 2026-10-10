@@ -4,6 +4,7 @@ import type {
   FaceIdPlan,
   FaceIdStepResult,
   FaceIdSubmission,
+  IdentityPayload,
   PrecheckPayload,
   SessionView,
   SignalStatus,
@@ -36,12 +37,11 @@ export function createApi(base: string = DEFAULT_API_BASE) {
         body: JSON.stringify({ challengeId, result, durationMs }),
       }),
     // Pré-vérification : nom, prénom et consentement explicite, puis parcours Face ID.
-    sendIdentity: (id: string, payload: { firstName: string; lastName: string; consent: boolean }) =>
-      call<{ checked: boolean; status: SignalStatus }>(`/api/sessions/${id}/identity`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }),
-    startFaceId: (id: string) => call<FaceIdPlan>(`/api/sessions/${id}/faceid/start`, { method: 'POST', body: '{}' }),
+    sendIdentity: (id: string, payload: IdentityPayload) =>
+      call<{ checked: boolean }>(`/api/sessions/${id}/identity`, { method: 'POST', body: JSON.stringify(payload) }),
+    // Refusé (409 « camera-virtuelle ») si la caméra utilisée est une caméra virtuelle connue.
+    startFaceId: (id: string, cameraLabel: string) =>
+      call<FaceIdPlan>(`/api/sessions/${id}/faceid/start`, { method: 'POST', body: JSON.stringify({ cameraLabel }) }),
     submitFaceId: (id: string, payload: FaceIdSubmission) =>
       call<{ profileStored: boolean; steps: { step: FaceIdStepResult['step']; result: FaceIdStepResult['result'] }[] }>(
         `/api/sessions/${id}/faceid/submit`,
@@ -51,8 +51,8 @@ export function createApi(base: string = DEFAULT_API_BASE) {
     sendFaceSample: (id: string, sample: { ratios: number[]; yawDeg: number }) =>
       call<{ verdict: string }>(`/api/sessions/${id}/face-sample`, { method: 'POST', body: JSON.stringify(sample) }),
     // Détecteur passif : une capture JPEG du visage. Analysée en mémoire côté agent, jamais conservée.
-    sendFrame: async (id: string, image: Blob): Promise<void> => {
-      const res = await fetch(`${base}/api/sessions/${id}/frame`, {
+    sendFrame: async (id: string, image: Blob, phase: 'precheck' | 'live' = 'live'): Promise<void> => {
+      const res = await fetch(`${base}/api/sessions/${id}/frame${phase === 'precheck' ? '?phase=precheck' : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'image/jpeg' },
         body: image,

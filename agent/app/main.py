@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
-from . import passive_detector
+from . import face_identity, passive_detector
 from .recommend import assess
 from .schemas import AssessmentInput, AssessmentOutput, PassiveSummary
 
@@ -24,11 +24,14 @@ def post_assess(inp: AssessmentInput) -> AssessmentOutput:
 async def post_frame(session_id: str, image: UploadFile = File(...)) -> dict:
     """Une capture du visage (JPEG/PNG) envoyée par le panneau toutes les ~2 s. L'image est analysée
     en mémoire puis jetée ; seule la probabilité est gardée."""
+    data = await image.read()
     try:
-        result = passive_detector.analyze_frame(await image.read())
+        result = passive_detector.analyze_frame(data)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return {"frame": result, "summary": passive_detector.record(session_id, result)}
+    # Empreinte faciale pour la comparaison 1:1 avec la pré-vérification ; renvoyée au serveur, jamais conservée ici.
+    return {"frame": result, "summary": passive_detector.record(session_id, result),
+            "embedding": face_identity.embed_bytes(data)}
 
 
 @app.delete("/session/{session_id}")

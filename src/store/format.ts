@@ -35,3 +35,14 @@ export const plage = (iso: string, dureeMin: number) => { const d = new Date(iso
 /** Lundi de la semaine qui contient `d`. */
 export function lundi(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); const j = (x.getDay() + 6) % 7; x.setDate(x.getDate() - j); return x; }
 export const plusJours = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+const fmtMois = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" });
+const fmtNomJour = new Intl.DateTimeFormat("fr-FR", { weekday: "short" });
+/** « 5 octobre » */
+export const semaineDu = (d: Date) => fmtMois.format(d);
+/** « Lun », « Mar »… */
+export const jourNom = (d: Date) => { const s = fmtNomJour.format(d).replace(".", ""); return s.charAt(0).toUpperCase() + s.slice(1); };
+export const estWE = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
+export const debutJour = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+/** « 2026-10-12 » en heure locale (pour les champs date). */
+export const isoDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

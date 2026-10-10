@@ -1,46 +1,42 @@
-/* ═══ Manta — raie nacrée, SVG + CSS, six états ═══
-   Elle flotte, respire, cligne des yeux, se déforme en ressort quand on la presse.
-   Jamais d'état rouge ou fâché. Jamais en dessous de 48 px. */
-.manta { display: inline-block; overflow: visible; --halo: #3a6cf6; --halo-soft: rgba(58,108,246,.55); cursor: pointer; }
-.manta * { transform-box: fill-box; transform-origin: center; }
-.manta__scene { animation: manta-float 3.6s ease-in-out infinite; }
-.manta__body { animation: manta-breathe 3.6s ease-in-out infinite; }
-.manta__halo { fill: var(--halo); opacity: .85; transition: fill .4s var(--ease), opacity .4s; }
-.manta__eye { animation: manta-blink 5.2s infinite; }
-.manta__brow { opacity: 0; transition: opacity .25s; }
-.manta__shadow { animation: manta-shadow 3.6s ease-in-out infinite; }
+/* ═══ Manta — raie nacrée, six états. Jamais rouge ni fâchée. ═══ */
+.manta { position: relative; display: inline-block; flex: none; vertical-align: middle; cursor: pointer; --halo: #56b4f0; -webkit-tap-highlight-color: transparent; }
+.manta__shadow { position: absolute; left: 24%; right: 24%; bottom: 0; height: 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(62,74,110,.42), rgba(62,74,110,0)); animation: m-shadow 3.6s ease-in-out infinite; }
+.manta__press { position: absolute; left: 0; right: 0; top: 0; bottom: 7%; transform-origin: 50% 100%; }
+.manta__float { position: absolute; inset: 0; animation: m-float 3.6s ease-in-out infinite; will-change: transform; }
+.manta__body, .manta__face { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.manta__body { filter: drop-shadow(0 3px 5px rgba(62,74,110,.2)); }
+.manta__halo { position: absolute; left: 30%; width: 40%; top: 35%; height: 30%; border-radius: 50%; background: radial-gradient(closest-side, var(--halo) 0%, var(--halo) 22%, transparent 100%); opacity: .9; transition: opacity var(--t-slow) var(--ease), transform var(--t-slow) var(--ease); }
+.manta__eye { transform-box: fill-box; transform-origin: center; animation: m-blink 5.2s infinite; }
+.manta__eyes { transform-box: fill-box; }
+.manta__brow { opacity: 0; transition: opacity var(--t); }
 
 /* Propose un défi : rebond */
-.manta[data-state="defi"] .manta__scene { animation: manta-bounce .9s var(--spring) 2, manta-float 3.6s ease-in-out 1.8s infinite; }
+.manta[data-state="defi"] .manta__float { animation: m-bounce .9s var(--spring) 2, m-float 3.6s ease-in-out 1.8s infinite; }
 /* Analyse en cours : halo qui pulse, regard qui balaie */
-.manta[data-state="analyse"] .manta__halo { animation: manta-pulse 1.3s ease-in-out infinite; }
-.manta[data-state="analyse"] .manta__pupils { animation: manta-scan 1.7s ease-in-out infinite; }
-/* Signal à vérifier : halo orange, sourcil levé, yeux plissés, tête penchée */
-.manta[data-state="signal"] { --halo: #f0a44a; --halo-soft: rgba(240,164,74,.55); }
-.manta[data-state="signal"] .manta__scene { animation: none; transform: rotate(-9deg); transition: transform .35s var(--ease); }
-.manta[data-state="signal"] .manta__eye { animation: none; transform: scaleY(.55); }
+.manta[data-state="analyse"] .manta__halo { animation: m-pulse 1.3s ease-in-out infinite; }
+.manta[data-state="analyse"] .manta__eyes { animation: m-scan 1.7s ease-in-out infinite; }
+/* Signal à vérifier : halo orange, sourcil levé, tête à peine penchée (attentive, pas soupçonneuse) */
+.manta[data-state="signal"] { --halo: #f4a259; }
+.manta[data-state="signal"] .manta__float { animation: none; transform: rotate(-4deg); transition: transform var(--t-slow) var(--ease); }
 .manta[data-state="signal"] .manta__brow { opacity: 1; }
 /* Présence vérifiée : halo vert, yeux rieurs, petit saut */
-.manta[data-state="verifie"] { --halo: #3fc38a; --halo-soft: rgba(63,195,138,.55); }
-.manta[data-state="verifie"] .manta__scene { animation: manta-jump .65s var(--spring) 1, manta-float 3.6s ease-in-out .65s infinite; }
+.manta[data-state="verifie"] { --halo: #5fd39c; }
+.manta[data-state="verifie"] .manta__float { animation: m-jump .65s var(--spring) 1, m-float 3.6s ease-in-out .65s infinite; }
 /* Test de lumière : halo renforcé, couleur fournie par la séquence */
-.manta[data-state="lumiere"] .manta__halo { opacity: 1; }
-.manta[data-state="lumiere"] .manta__glow { opacity: .5; }
-
+.manta[data-state="lumiere"] .manta__halo { opacity: 1; transform: scale(1.3); }
 /* Pression : ressort */
-.manta.is-pressed .manta__scene { animation: manta-squish .55s var(--spring) 1; }
+.manta.is-pressed .manta__press { animation: m-squish .55s var(--spring) 1; }
 
-@keyframes manta-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-@keyframes manta-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.025, .985); } }
-@keyframes manta-shadow { 0%,100% { transform: scaleX(1); opacity: .5; } 50% { transform: scaleX(.86); opacity: .35; } }
-@keyframes manta-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
-@keyframes manta-bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-12px); } 70% { transform: translateY(2px); } }
-@keyframes manta-jump { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-14px) scale(1.05); } 100% { transform: translateY(0) scale(1); } }
-@keyframes manta-pulse { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } }
-@keyframes manta-scan { 0%,100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
-@keyframes manta-squish { 0% { transform: scale(1); } 30% { transform: scale(1.14, .84); } 60% { transform: scale(.92, 1.08); } 100% { transform: scale(1); } }
+@keyframes m-float { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-5%) scale(1.02, .985); } }
+@keyframes m-shadow { 0%,100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.84); opacity: .55; } }
+@keyframes m-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+@keyframes m-bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-11%); } 70% { transform: translateY(2%); } }
+@keyframes m-jump { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-12%) scale(1.05); } 100% { transform: translateY(0) scale(1); } }
+@keyframes m-pulse { 0%,100% { opacity: .6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.28); } }
+@keyframes m-scan { 0%,100% { transform: translateX(-2.5px); } 50% { transform: translateX(2.5px); } }
+@keyframes m-squish { 0% { transform: scale(1); } 30% { transform: scale(1.14, .84); } 60% { transform: scale(.93, 1.07); } 100% { transform: scale(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .manta * { animation: none !important; }
-  .manta[data-state="signal"] .manta__scene { transition: none; }
+  .manta *, .manta__float { animation: none !important; }
+  .manta__float, .manta__halo { transition: opacity var(--t) !important; }
 }

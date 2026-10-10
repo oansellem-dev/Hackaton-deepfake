@@ -5,6 +5,7 @@
  */
 import type { Etat } from "./types";
 import { actions, nomComplet } from "./store";
+import { ouvrirNouvelEntretien } from "../app/events";
 
 export interface Reponse {
   comprise: boolean;
@@ -24,7 +25,7 @@ function trouver(e: Etat, texte: string) {
 }
 
 export const ACTIONS_RAPIDES = (e: Etat): Reponse["suggestions"] => [
-  { libelle: "Envoyer un lien", executer: aller("#/entretiens/nouveau") },
+  { libelle: "Envoyer un lien", executer: ouvrirNouvelEntretien },
   { libelle: "Voir les rapports", executer: aller("#/entretiens?filtre=termines") },
   { libelle: `Signaux à vérifier (${e.entretiens.filter((x) => [...x.preVerification.signaux, ...x.signaux].some((s) => s.resultat === "a_verifier") || x.defis.some((d) => d.resultat === "a_verifier")).length})`, executer: aller("#/entretiens?filtre=signal") },
 ];
@@ -38,7 +39,7 @@ export function interpreter(demande: string, e: Etat): Reponse {
     const x = trouver(e, t);
     if (!x) return { comprise: false, message: "À qui envoyer le lien ? Je n'ai pas reconnu le nom.", suggestions: ACTIONS_RAPIDES(e) };
     const relance = x.preVerification.statut !== "non_envoyee";
-    return { comprise: true, message: relance ? `Lien relancé à ${nomComplet(x)}.` : `Lien de pré-vérification envoyé à ${nomComplet(x)}.`, executer: () => { relance ? actions.relancerLien(x.id) : actions.envoyerLien(x.id); location.hash = "#/entretiens"; } };
+    return { comprise: true, message: relance ? `Lien relancé à ${nomComplet(x)}.` : `Lien de pré-vérification envoyé à ${nomComplet(x)}.`, executer: () => { if (relance) actions.relancerLien(x.id); else actions.envoyerLien(x.id); } };
   }
   // Ouvrir le rapport de Y
   if (/rapport|resultat|deroule/.test(t)) {
@@ -54,7 +55,7 @@ export function interpreter(demande: string, e: Etat): Reponse {
   // Pré-vérifications en attente
   if (/pre ?verif|en attente|lien/.test(t)) return { comprise: true, message: "Voici les pré-vérifications en attente.", executer: aller("#/entretiens?filtre=preverif") };
   // Créer un entretien
-  if (/nouvel|nouveau|creer|cree|ajout|planifi/.test(t)) return { comprise: true, message: "On crée un nouvel entretien.", executer: aller("#/entretiens/nouveau") };
+  if (/nouvel|nouveau|creer|cree|ajout|planifi/.test(t)) return { comprise: true, message: "On crée un nouvel entretien.", executer: ouvrirNouvelEntretien };
   // Candidat seul → sa fiche
   const x = trouver(e, t);
   if (x) return { comprise: true, message: `Voici ${nomComplet(x)}.`, executer: aller(x.statut === "termine" ? `#/rapport/${x.id}` : `#/entretiens?q=${encodeURIComponent(x.candidat.nom)}`) };

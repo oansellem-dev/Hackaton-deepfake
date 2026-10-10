@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Avatar, Avatars, Bar, Btn, Field, ICirc, Input, Modal, Pill, Select, Tabs, Textarea, transition } from "../ui/ui";
+import { Avatar, Avatars, Bar, Btn, Field, ICirc, Input, Modal, Pill, Select, Tabs, Textarea, transition, type BarTon } from "../ui/ui";
 import { toast } from "../ui/toast";
-import { IcArrowUR, IcBell, IcCal, IcCheck, IcClock, IcDot, IcFilter, IcGear, IcHand, IcHome, IcList, IcMail, IcPlus, IcSearch, IcSpark, IcSun } from "../ui/icons";
+import { IcArrowUR, IcBell, IcCal, IcCheck, IcClock, IcDot, IcFilter, IcGear, IcHand, IcHome, IcList, IcMail, IcPlus, IcSearch, IcSpark, IcSun, IcFlag, IcPlay, IcDots } from "../ui/icons";
 import { Manta, type MantaState } from "../manta/Manta";
 import "./styleguide.css";
 
@@ -11,7 +11,7 @@ const ETATS: { s: MantaState; t: string; halo?: string }[] = [
   { s: "analyse", t: "Je vérifie le geste…" },
   { s: "signal", t: "Signal à vérifier : l'image s'est déformée pendant le geste." },
   { s: "verifie", t: "Présence humaine vérifiée." },
-  { s: "lumiere", t: "J'éclaire ton visage avec quelques couleurs.", halo: "#d9453f" },
+  { s: "lumiere", t: "J'éclaire ton visage avec quelques couleurs.", halo: "#f4a259" },
 ];
 
 export function Styleguide() {
@@ -36,10 +36,10 @@ export function Styleguide() {
           <div className="sg-grid-3">
             <div className="card sg-demo"><span className="t-caption">Panneau → carte</span><p>Liseré blanc en haut à gauche, ombre froide large en bas à droite.</p></div>
             <div className="inset sg-demo"><span className="t-caption">Élément en creux</span><p>Champs, onglet actif, fonds secondaires.</p></div>
-            <div className="sg-demo sg-oncolor"><span className="pill pill--glass">• Pastille en verre</span><span className="pill pill--glass">• Flou + saturation</span><span className="t-caption" style={{ color: "#fff" }}>Posée sur une couleur</span></div>
+            <div className="sg-demo sg-oncolor"><span className="pill pill--glass">• Pastille en verre</span><span className="pill pill--glass">• Flou + saturation</span><span className="pill pill--glass">Posée sur une couleur</span></div>
           </div>
           <div className="sg-grid-3" style={{ marginTop: 14 }}>
-            <div className="card sg-demo tilt"><span className="t-caption">Élément incliné</span><p>Un seul par écran, 2 à 3°, ombre plus forte.</p></div>
+            <div className="card sg-demo"><span className="t-caption">Élément incliné</span><p>Un seul par écran, 2 à 3°, ombre plus forte : voir la barre « Signal à vérifier » en 5.</p></div>
             <div className="hatch sg-demo"><span className="t-caption">Week-end hachuré</span></div>
             <div className="card sg-demo lift"><span className="t-caption">Survol</span><p>Se soulève d'1,5 px, l'ombre s'élargit. Pression : s'enfonce.</p></div>
           </div>
@@ -89,7 +89,8 @@ export function Styleguide() {
           <div className="row wrap" style={{ gap: 12 }}>
             <Btn variant="primary" icon={<IcMail />} onClick={() => toast("Lien de pré-vérification envoyé à Camille Royer")}>Envoyer le lien de pré-vérification</Btn>
             <Btn icon={<IcPlus />} onClick={() => toast("Entretien créé", "info")}>Nouvel entretien</Btn>
-            <Btn variant="blue" icon={<IcArrowUR />} onClick={() => toast("Rapport ouvert")}>Rapport</Btn>
+            <Btn variant="now" icon={<IcPlay />} onClick={() => toast("Panneau Oval ouvert")}>Rejoindre maintenant</Btn>
+            <Btn icon={<IcArrowUR />} onClick={() => toast("Rapport ouvert")}>Rapport</Btn>
             <Btn variant="inset">Filtrer</Btn>
             <Btn variant="ghost">Annuler</Btn>
             <Btn size="sm" icon={<IcClock />}>14:00 – 15:00</Btn>
@@ -110,10 +111,16 @@ export function Styleguide() {
         <section className="panel sg-section rise" style={{ "--i": 5 } as React.CSSProperties}>
           <h2 className="t-h2">5 · Barres de statut (planning et déroulé)</h2>
           <div className="sg-bars">
-            <Bar ton="green" icon={<IcCheck />} label="Entretien fait" chip="Présence vérifiée" style={{ "--i": 0 } as React.CSSProperties} className="grow-x" onClick={() => toast("Rapport d'Ava Tessier")} />
-            <Bar ton="violet" icon={<IcArrowUR />} label="Lien envoyé" chip="Pré-vérification faite" style={{ "--i": 1 } as React.CSSProperties} className="grow-x" onClick={() => toast("Fiche de Léo Carlier")} />
-            <Bar ton="blue" icon={<IcDot />} label="Entretien fait" chip="Signal à vérifier" attention style={{ "--i": 2 } as React.CSSProperties} className="grow-x" onClick={() => toast("Rapport de Noah Martin")} />
-            <Bar ton="gold" icon={<IcClock />} label="Lien envoyé" chip="En attente" style={{ "--i": 3 } as React.CSSProperties} className="grow-x" onClick={() => toast("Lien relancé à Mia Roche")} />
+            {([
+              { ton: "green", icon: <IcCheck />, label: "Entretien fait", chip: "Présence vérifiée", msg: "Rapport d'Ava Tessier" },
+              { ton: "violet", icon: <IcArrowUR />, label: "Lien envoyé", chip: "En attente", msg: "Fiche de Mia Roche" },
+              { ton: "gold", icon: <IcFlag />, label: "Entretien fait", chip: "Signal à vérifier", attention: true, msg: "Rapport de Noah Martin" },
+              { ton: "blue", icon: <IcClock />, label: "Entretien · 11:00", chip: "Mar 13", msg: "Entretien de Léo Carlier" },
+              { ton: "now", icon: <IcPlay />, label: "Entretien · 14:20", chip: "Aujourd'hui", msg: "Panneau Oval ouvert" },
+              { ton: "neutral", icon: <IcDots />, label: "Lien envoyé", chip: "Non faite", msg: "Pas un signal négatif" },
+            ] as { ton: BarTon; icon: React.ReactNode; label: string; chip: string; attention?: boolean; msg: string }[]).map((b, i) => (
+              <div key={i} className="grow-x" style={{ "--i": i } as React.CSSProperties}><Bar ton={b.ton} icon={b.icon} label={b.label} chip={b.chip} attention={b.attention} onClick={() => toast(b.msg)} /></div>
+            ))}
           </div>
           <div className="sg-cal" style={{ marginTop: 16 }}>
             {["Lun 5", "Mar 6", "Mer 7", "Jeu 8", "Ven 9", "Sam 10", "Dim 11", "Lun 12", "Mar 13", "Mer 14"].map((j, i) => {
@@ -122,6 +129,7 @@ export function Styleguide() {
               return <div key={j} className={`daytag ${we ? "daytag--we" : ""} ${today ? "daytag--today" : ""}`}><span>{n}<b>{d}</b></span></div>;
             })}
             {Array.from({ length: 10 }).map((_, i) => <div key={i} className={`cell ${i === 5 || i === 6 ? "cell--we" : ""}`} />)}
+            <i className="sg-today" aria-hidden />
           </div>
         </section>
 
@@ -129,14 +137,14 @@ export function Styleguide() {
         <section className="panel sg-section rise" style={{ "--i": 6 } as React.CSSProperties}>
           <h2 className="t-h2">6 · Onglets, recherche, navigation</h2>
           <div className="row wrap" style={{ gap: 16 }}>
-            <Tabs raised value={nav} onChange={setNav} items={[{ id: "accueil", label: "Tableau de bord", icon: <IcHome /> }, { id: "entretiens", label: "Entretiens", icon: <IcList /> }, { id: "defis", label: "Défis", icon: <IcSpark /> }]} />
+            <Tabs pills value={nav} onChange={setNav} items={[{ id: "accueil", label: "Tableau de bord", icon: <IcHome /> }, { id: "entretiens", label: "Entretiens", icon: <IcList /> }, { id: "defis", label: "Défis", icon: <IcSpark /> }]} />
             <ICirc label="Rechercher" size="sm"><IcSearch /></ICirc>
             <Avatars><Avatar initiales="JE" couleur="blue" title="Jules E." /><Avatar initiales="CL" couleur="coral" title="Clara L." /><Avatar initiales="TS" couleur="green" title="Théo S." /></Avatars>
             <Btn icon={<IcPlus />}>Nouvel entretien</Btn>
             <ICirc label="Signaux à vérifier" badge={1}><IcBell /></ICirc>
           </div>
           <div className="row wrap" style={{ gap: 16, marginTop: 16 }}>
-            <Tabs value={tab} onChange={setTab} items={[{ id: "tous", label: "Tous", count: 12 }, { id: "venir", label: "À venir", count: 5 }, { id: "signal", label: "Signal à vérifier", count: 1 }, { id: "ok", label: "Présence vérifiée", count: 6 }]} />
+            <Tabs pills value={tab} onChange={setTab} items={[{ id: "tous", label: "Tous", count: 12 }, { id: "venir", label: "À venir", count: 5 }, { id: "signal", label: "Signal à vérifier", count: 1 }, { id: "ok", label: "Présence vérifiée", count: 6 }]} />
             <label className="search"><IcSearch width={16} height={16} /><input placeholder="Rechercher un candidat" /></label>
           </div>
           <div className="row" style={{ gap: 10, marginTop: 16 }}>
@@ -169,7 +177,7 @@ export function Styleguide() {
           </div>
           <div className="sg-grid-3" style={{ marginTop: 16 }}>
             <div className="card lift sg-cand"><Avatar couleur="coral" initiales="EP" /><div><strong>Emma Perrin</strong><div className="t-small muted">Développeuse back-end</div></div></div>
-            <div className="card lift sg-cand sg-cand--today"><div className="row row--between"><strong>Emma Perrin</strong><Pill ton="glass">• Dans 15 min</Pill></div><div className="t-small" style={{ opacity: .8 }}>Développeuse back-end · pré-vérification faite</div><div className="row" style={{ gap: 8, marginTop: 8 }}><Btn size="sm" icon={<IcClock />}>14:00 – 15:00</Btn><Btn size="sm" variant="primary">Rejoindre avec Oval</Btn></div></div>
+            <div className="card lift sg-cand sg-cand--today"><div className="row row--between"><strong>Emma Perrin</strong><Pill ton="glass">• Dans 15 min</Pill></div><div className="t-small" style={{ opacity: .8 }}>Développeuse back-end · pré-vérification faite</div><div className="row" style={{ gap: 8, marginTop: 8 }}><Btn size="sm" icon={<IcClock />}>14:00 – 15:00</Btn><Btn size="sm" variant="glass" icon={<IcPlay />}>Rejoindre avec Oval</Btn></div></div>
             <div className="card lift sg-cand" style={{ flexDirection: "column", alignItems: "center", textAlign: "center" }}><Avatar couleur="green" initiales="LM" size="lg" /><strong>Lucas Morin</strong><span className="t-small muted">Développeur mobile</span><Pill ton="soft-green" icon={<IcCheck />}>3/4 · Lumière passée</Pill></div>
           </div>
         </section>
@@ -199,7 +207,7 @@ export function Styleguide() {
             <span className="t-small muted">180–260 ms · <span className="kbd">transform</span> et <span className="kbd">opacity</span> seulement · <span className="kbd">prefers-reduced-motion</span> : fondus uniquement</span>
           </div>
           <ul className="sg-list" style={{ marginTop: 14 }}>
-            {liste.map((n, i) => <li key={n} className="card sg-list__item" style={{ viewTransitionName: `sg-${i}-${n.replace(/\W/g, "")}` } as React.CSSProperties}><Avatar couleur={(["coral", "navy", "blue", "green", "gold"] as const)[i % 5]} initiales={n.split(" ").map((x) => x[0]).join("")} size="sm" /><span>{n}</span></li>)}
+            {liste.map((n, i) => <li key={n} className="card sg-list__item" style={{ viewTransitionName: `sg-${n.replace(/\W/g, "")}` } as React.CSSProperties}><Avatar couleur={(["coral", "navy", "blue", "green", "gold"] as const)[i % 5]} initiales={n.split(" ").map((x) => x[0]).join("")} size="sm" /><span>{n}</span></li>)}
           </ul>
         </section>
 

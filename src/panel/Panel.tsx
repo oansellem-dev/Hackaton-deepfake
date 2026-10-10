@@ -15,7 +15,7 @@ const ORDRE: DefiType[] = ["main_devant_visage", "rotation_tete", "phrase_aleato
 
 export function Panel() {
   const etat = useEtat();
-  const [id, setId] = useState<string>(() => getEtat().entretiens.find((e) => e.id === "e-emma")?.id ?? getEtat().entretiens[0].id);
+  const [id, setId] = useState<string>(() => new URLSearchParams(location.search).get("e") ?? getEtat().entretiens.find((e) => e.id === "e-emma")?.id ?? getEtat().entretiens[0].id);
   const entretien: Entretien | undefined = etat.entretiens.find((e) => e.id === id);
   const [etape, setEtape] = useState<Etape>("attente");
   const [defi, setDefi] = useState<Defi | null>(null);
@@ -25,7 +25,9 @@ export function Panel() {
   const [scenario, setScenario] = useState<"A" | "B">("A");
   const clics = useRef<number[]>([]);
 
-  useEffect(() => { setId(scenario === "A" ? "e-emma" : "e-marc"); setScore(null); setDefi(null); setEtape("attente"); }, [scenario]);
+  // Changement de scénario en mode démo (ignoré au premier rendu pour garder ?e=)
+  const scenPrec = useRef(scenario);
+  useEffect(() => { if (scenPrec.current === scenario) return; scenPrec.current = scenario; setId(scenario === "A" ? "e-emma" : "e-marc"); setScore(null); setDefi(null); setEtape("attente"); }, [scenario]);
 
   // Flux réel : moteur de défis et serveur de score (voir integration.ts)
   useEffect(() => abonnerPanneau((ev) => {

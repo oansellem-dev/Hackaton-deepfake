@@ -1,0 +1,35 @@
+/* Oval — jetons de design (référence : grande surface arrondie, cartes blanches, encre bleu nuit) */
+:root {
+  --font: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --page: #d6d8dd;                 /* fond neutre autour de la surface */
+  --surface-top: #ffffff;
+  --surface-mid: #e9f1fc;          /* bleu pâle */
+  --surface-bot: #ece7f7;          /* touche de lilas */
+  --card: #ffffff;
+  --card-soft: #f3f4f8;
+  --card-color: #e4ecfb;           /* carte colorée douce (bleu Manta) */
+
+  --ink: #141f3d;                  /* bleu nuit */
+  --ink-2: #3c4766;                /* gris lisible sur projecteur (contraste > 7:1) */
+  --ink-3: #5e6885;
+  --line: rgba(20, 31, 61, 0.1);
+
+  --halo-bleu: #4f7df3;
+  --halo-orange: #f0a04b;
+  --halo-vert: #34b27b;
+
+  --pill-vert-bg: #dcf4e7;  --pill-vert-fg: #0f5d3a;
+  --pill-orange-bg: #fdebd3; --pill-orange-fg: #7a4300;
+  --pill-gris-bg: #e9eaf0;  --pill-gris-fg: #3c4766;
+  --pill-bleu-bg: #e1e9ff;  --pill-bleu-fg: #1d3d9c;
+
+  --r-surface: 32px;
+  --r-card: 28px;
+  --r-pill: 999px;
+
+  --shadow-card: 0 2px 6px rgba(20, 31, 61, 0.04), 0 12px 32px rgba(20, 31, 61, 0.06);
+  --shadow-float: 0 8px 24px rgba(20, 31, 61, 0.08);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}

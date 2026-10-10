@@ -1,0 +1,49 @@
+/* Panneau recruteur — 360 px, une information principale par état, léger pendant la visio */
+.panel-body { background: var(--page); }
+.panel {
+  width: 360px; max-width: 100%; min-height: 100vh; margin: 0 auto;
+  background: linear-gradient(170deg, var(--surface-top) 0%, var(--surface-mid) 60%, var(--surface-bot) 100%);
+  padding: 16px 16px 20px; display: flex; flex-direction: column; gap: 14px;
+}
+.panel__top { display: flex; align-items: center; justify-content: space-between; }
+.logo { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 1px; }
+.logo__o { display: inline-block; width: 13px; height: 20px; border: 2.5px solid var(--ink); border-radius: 50%; margin-right: 1px; }
+
+.panel__manta { display: flex; align-items: center; gap: 12px; }
+.panel__bubble {
+  flex: 1; background: var(--card); border-radius: 20px; padding: 12px 14px;
+  box-shadow: var(--shadow-card); font-size: 15px; line-height: 1.35;
+}
+.panel__bubble strong { font-weight: 500; }
+
+.panel .card { padding: 18px 18px; border-radius: 22px; }
+.panel .card__title { font-size: 18px; }
+.panel .cols { gap: 10px; }
+.panel .col__label { font-size: 12.5px; }
+.panel .col__value { font-size: 14px; }
+
+.panel__quote { font-size: 20px; font-weight: 400; letter-spacing: -0.01em; line-height: 1.25; }
+.panel__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.panel__actions .btn { flex: 1; }
+
+.score { display: flex; align-items: baseline; gap: 10px; }
+.score__value { font-size: 72px; font-weight: 300; letter-spacing: -0.05em; line-height: 1; }
+.score__label { color: var(--ink-2); font-size: 14px; }
+.explications { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.explications li { display: flex; gap: 8px; }
+.explications li::before { content: "·"; color: var(--ink-3); }
+.signaux { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.signaux li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; }
+.signaux .pill { flex-shrink: 0; }
+
+.decision { display: grid; gap: 8px; }
+.decision__done { font-size: 14px; color: var(--ink-2); }
+
+.demo {
+  position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff; border-radius: 999px; padding: 6px 8px;
+  display: flex; gap: 4px; font-size: 12px; box-shadow: var(--shadow-float); z-index: 10;
+}
+.demo button { background: transparent; border: 0; color: #fff; padding: 5px 8px; border-radius: 999px; }
+.demo button[aria-pressed="true"], .demo button:hover { background: rgba(255,255,255,.18); }
+.demo__sep { width: 1px; background: rgba(255,255,255,.25); margin: 2px 2px; }

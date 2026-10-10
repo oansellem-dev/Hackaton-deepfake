@@ -1,0 +1,76 @@
+@import "./tokens.css";
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--page);
+  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.4;
+}
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+a { color: inherit; }
+
+/* Surface principale, fond doux blanc → bleu pâle → lilas */
+.surface {
+  background: linear-gradient(160deg, var(--surface-top) 0%, var(--surface-mid) 55%, var(--surface-bot) 100%);
+  border-radius: var(--r-surface);
+  box-shadow: 0 30px 80px rgba(20, 31, 61, 0.18);
+  min-height: calc(100vh - 32px);
+  margin: 16px;
+  padding: 24px 32px 40px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 24px 28px;
+}
+.card--soft { background: var(--card-soft); box-shadow: none; }
+.card--color { background: var(--card-color); box-shadow: none; }
+.card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card__title { font-size: 22px; font-weight: 500; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+.card__rule { height: 1px; background: var(--line); margin: 18px 0; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.col__label { color: var(--ink-3); font-size: 14px; margin-bottom: 2px; }
+.col__value { font-size: 16px; font-weight: 500; }
+
+/* Pilules de statut : toujours un mot à côté de la couleur */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: var(--r-pill); padding: 4px 11px;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+}
+.pill--vert { background: var(--pill-vert-bg); color: var(--pill-vert-fg); }
+.pill--orange { background: var(--pill-orange-bg); color: var(--pill-orange-fg); }
+.pill--gris { background: var(--pill-gris-bg); color: var(--pill-gris-fg); }
+.pill--bleu { background: var(--pill-bleu-bg); color: var(--pill-bleu-fg); }
+
+/* Boutons en pilule */
+.btn {
+  border: 0; border-radius: var(--r-pill); padding: 11px 20px;
+  font-size: 15px; font-weight: 500; line-height: 1;
+  transition: transform .15s var(--ease), background .15s;
+  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+}
+.btn:active { transform: scale(0.97); }
+.btn--primary { background: var(--ink); color: #fff; }
+.btn--primary:hover { background: #22305a; }
+.btn--secondary { background: #e9eaf0; color: var(--ink); }
+.btn--secondary:hover { background: #dfe1e9; }
+.btn--ghost { background: transparent; color: var(--ink-2); padding: 8px 12px; }
+.btn--ghost:hover { background: rgba(20,31,61,.06); }
+.btn--sm { padding: 8px 14px; font-size: 14px; }
+.btn:focus-visible { outline: 2px solid var(--halo-bleu); outline-offset: 2px; }
+
+.big-number { font-size: 120px; font-weight: 300; letter-spacing: -0.05em; line-height: 0.95; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
+}

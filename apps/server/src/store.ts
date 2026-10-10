@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { computeScore, type Session, type SessionView, type Signal } from '@kyc/shared';
@@ -11,6 +11,8 @@ export const BIOMETRIC_MAX_AGE_MS = 24 * 3600 * 1000;
 
 const sessions = new Map<string, Session>();
 
+const newRecruiterKey = () => randomBytes(18).toString('base64url');
+
 type Stored = Omit<Session, 'faceProfile'> & { faceProfileSealed?: string };
 
 function load(): void {
@@ -19,6 +21,8 @@ function load(): void {
     for (const { faceProfileSealed, ...rest } of JSON.parse(readFileSync(FILE, 'utf8')) as Stored[]) {
       const session: Session = rest;
       if (faceProfileSealed) session.faceProfile = unseal(faceProfileSealed);
+      // Entretiens créés avant les jetons : on leur en donne un (lisible dans le fichier par l'hôte).
+      session.recruiterKey ??= newRecruiterKey();
       sessions.set(session.id, session);
     }
     purgeExpiredBiometrics();
@@ -64,6 +68,7 @@ export function createSession(candidateLabel: string): Session {
     precheckDone: false,
     signals: [],
     challenges: [],
+    recruiterKey: newRecruiterKey(),
   };
   sessions.set(session.id, session);
   schedulePersist();
@@ -74,9 +79,9 @@ export function getSession(id: string): Session | undefined {
   return sessions.get(id);
 }
 
-// Le profil du visage ne quitte jamais le serveur : la vue n'indique que sa présence.
+// Le profil du visage et le jeton du recruteur ne quittent jamais le serveur : la vue n'indique que leur présence.
 export function stripBiometrics(session: Session): Omit<SessionView, 'score'> {
-  const { faceProfile, ...rest } = session;
+  const { faceProfile, recruiterKey, ...rest } = session;
   return {
     ...rest,
     hasFaceProfile: Boolean(faceProfile),

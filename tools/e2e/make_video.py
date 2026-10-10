@@ -3,7 +3,7 @@
 Usage : python make_video.py <visage.jpg> <sortie.y4m> [--hand main.jpg] [--mode precheck|live|static] [--preview dossier]
 
 Modes (vidéo jouée en boucle, 15 i/s) :
-- precheck : 3 s de face (cadrage), tête tournée d'un côté puis de l'autre, puis main devant le visage ;
+- precheck : 3 s de face (cadrage), puis tête tournée et main devant le visage, deux fois chacune ;
 - live     : gestes plus rapprochés (la main revient toutes les ~6 s), pour les défis en direct ;
 - static   : visage de face immobile, sans aucun geste (cas « défi non exécuté »).
 La rotation est simulée par une déformation cylindrique de l'image ; la main est une photo collée par-dessus.
@@ -96,7 +96,8 @@ if args.mode == "static":
 elif args.mode == "live":
     frames = [base] * 20 + hand_pass() + [base] * 10 + turn(1) + [base] * 20 + hand_pass() + [base] * 10 + turn(-1)
 else:
-    frames = [base] * 45 + turn(1) + [base] * 10 + turn(-1) + [base] * 10 + hand_pass() + [base] * 10
+    frames = ([base] * 45 + turn(1) + [base] * 10 + hand_pass() + [base] * 10 + turn(-1) + [base] * 10
+              + hand_pass() + [base] * 10)
 
 with open(args.out, "wb") as f:
     f.write(f"YUV4MPEG2 W{W} H{H} F{FPS}:1 Ip A1:1 C420jpeg\n".encode())

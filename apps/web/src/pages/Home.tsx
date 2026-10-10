@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import type { SessionView } from '@kyc/shared';
-import { api } from '../config.ts';
+import { api, recruiterKeyFor } from '../config.ts';
 
 // Écran recruteur : crée un entretien et donne les liens à envoyer.
 export function Home() {
   const [label, setLabel] = useState('Candidat démo');
-  const [session, setSession] = useState<SessionView | null>(null);
+  const [session, setSession] = useState<(SessionView & { recruiterKey: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const origin = window.location.origin;
 
   async function create() {
     try {
-      setSession(await api.createSession(label));
+      const created = await api.createSession(label);
+      recruiterKeyFor(created.id, created.recruiterKey);
+      setSession(created);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -37,7 +39,8 @@ export function Home() {
       {session && (
         <div className="card">
           <p>
-            Identifiant d'entretien (à coller dans l'extension) : <code>{session.id}</code>
+            Code recruteur (à coller dans l'extension, ne pas transmettre au candidat) :{' '}
+            <code>{`${session.id}:${session.recruiterKey}`}</code>
           </p>
           <p>
             1. Lien de pré-vérification à envoyer au candidat :<br />
@@ -49,12 +52,13 @@ export function Home() {
           </p>
           <p>
             3. Visio de secours, côté recruteur :{' '}
-            <a href={`/visio/${session.id}?role=recruiter`} target="_blank" rel="noreferrer">
+            <a href={`/visio/${session.id}?role=recruiter&key=${session.recruiterKey}`} target="_blank" rel="noreferrer">
               ouvrir
             </a>
           </p>
           <p>
-            4. <a href={`/report/${session.id}`}>Résultat de la pré-vérification et rapport</a> (se met à jour tout seul)
+            4. <a href={`/report/${session.id}?key=${session.recruiterKey}`}>Résultat de la pré-vérification et rapport</a>{' '}
+            (se met à jour tout seul)
           </p>
         </div>
       )}

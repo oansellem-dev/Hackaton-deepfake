@@ -69,6 +69,10 @@ export interface Session {
   faceId?: FaceIdPlan & { startedAt: number; completedAt?: number };
   // Proportions du visage (biométrie) : stockées chiffrées, jamais renvoyées au client, effacées à la décision.
   faceProfile?: FaceProfile;
+  // Probabilités de trucage du détecteur passif sur les dernières captures (15 au plus), sans les images.
+  passiveScores?: number[];
+  // Jeton du recruteur (serveur seulement) : exigé pour lire les signaux, décider et enregistrer les défis.
+  recruiterKey?: string;
   signals: Signal[];
   challenges: ChallengeRun[];
   decision?: { value: Decision; note?: string; at: number };
@@ -87,7 +91,7 @@ export interface AgentInfo {
   passive?: { frames: number; medianFakeProbability: number | null }; // détecteur passif local
 }
 
-export interface SessionView extends Omit<Session, 'faceProfile'> {
+export interface SessionView extends Omit<Session, 'faceProfile' | 'recruiterKey'> {
   score: Score;
   hasFaceProfile: boolean;
   // Ce que contient le profil, sans les valeurs (elles ne quittent jamais le serveur).

@@ -1,9 +1,10 @@
-import { computeScore, getChallenge, type AgentInfo, type Session, type SessionView } from '@kyc/shared';
+import { computeScore, getChallenge, median, type AgentInfo, type Session, type SessionView } from '@kyc/shared';
 import { stripBiometrics } from './store.ts';
 
 // Agent de score et de recommandation (agent/, FastAPI). S'il est injoignable, on retombe sur computeScore.
 const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:8000';
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 15000; // analyse d'une capture
+const ASSESS_TIMEOUT_MS = 6000; // score : au-delà, on affiche le score local plutôt que de faire attendre le recruteur
 
 // Défis de la bibliothèque ↔ types de l'agent.
 const TO_AGENT: Record<string, string> = {
@@ -27,7 +28,13 @@ function statusOf(session: Session, id: string) {
 
 // Traduit une session en entrée de l'agent. Un signal « unknown » devient null : il ne compte jamais.
 function toAgentInput(session: Session) {
-  const cam = statusOf(session, 'precheck.virtual-camera');
+  // Caméra virtuelle : installée et utilisée à la pré-vérification, ou utilisée pendant l'entretien.
+  const cam = [statusOf(session, 'precheck.virtual-camera'), statusOf(session, 'live.virtual-camera')].includes(
+    'contradiction',
+  )
+    ? 'contradiction'
+    : statusOf(session, 'precheck.virtual-camera');
+  const passive = session.passiveScores ?? [];
   const tz = statusOf(session, 'precheck.timezone');
   const face = statusOf(session, 'face.continuity');
   return {
@@ -37,6 +44,8 @@ function toAgentInput(session: Session) {
       timezone_consistent: tz === 'ok' ? true : tz === 'contradiction' ? false : null,
     },
     face_continuity: face === 'ok' ? true : face === 'contradiction' ? false : null,
+    // Gardé côté serveur : un redémarrage de l'agent ne fait pas perdre les captures déjà analysées.
+    passive: passive.length ? { frames_analyzed: passive.length, median_fake_probability: median(passive) } : null,
     challenges: session.challenges
       .filter((c) => TO_AGENT[c.challengeId])
       .map((c) => ({
@@ -60,7 +69,7 @@ export async function viewWithAgent(session: Session): Promise<SessionView> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(toAgentInput(session)),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(ASSESS_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`agent ${res.status}`);
     const out = (await res.json()) as AgentOutput;

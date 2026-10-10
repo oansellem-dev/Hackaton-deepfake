@@ -8,6 +8,7 @@ import type { ChallengeResult, Decision, PrecheckPayload } from '@kyc/shared';
 import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
 import { forwardFrame, viewWithAgent } from './agent.ts';
+import { hasRecruiterKey, recruiterOnly } from './auth.ts';
 import { cleanMetrics, recordChallenge } from './challenges.ts';
 import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
@@ -30,10 +31,11 @@ app.get('/api/health', (_req, res) => {
 
 app.post('/api/sessions', async (req, res) => {
   const session = createSession(String(req.body?.candidateLabel ?? 'Candidat'));
-  res.status(201).json(await viewWithAgent(session));
+  // Seule réponse qui contient le jeton du recruteur : à garder, il donne accès aux signaux et au rapport.
+  res.status(201).json({ ...(await viewWithAgent(session)), recruiterKey: session.recruiterKey });
 });
 
-app.get('/api/sessions/:id', async (req, res) => {
+app.get('/api/sessions/:id', recruiterOnly, async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
   res.json(await viewWithAgent(session));
@@ -54,7 +56,7 @@ app.post('/api/sessions/:id/precheck', (req, res) => {
 });
 
 // Brique B : résultat d'un défi exécuté pendant l'entretien.
-app.post('/api/sessions/:id/challenges', async (req, res) => {
+app.post('/api/sessions/:id/challenges', recruiterOnly, async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
 
@@ -78,11 +80,20 @@ app.use(faceIdRouter);
 app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' }), async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
+  // Le candidat n'envoie des captures que pendant sa vérification du visage ; ensuite, seul le recruteur le peut.
+  const precheck = req.query.phase === 'precheck';
+  const faceIdOpen =
+    !!session.faceId && (!session.faceId.completedAt || Date.now() - session.faceId.completedAt < 60_000);
+  if (!(precheck && faceIdOpen) && !hasRecruiterKey(req, session.recruiterKey)) {
+    return res.status(403).json({ error: 'réservé au recruteur' });
+  }
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'image manquante' });
   try {
     const { status, body } = await forwardFrame(session.id, req.body, req.headers['content-type'] ?? 'image/jpeg');
-    const { embedding, ...rest } = (body ?? {}) as { embedding?: unknown };
-    onFrameEmbedding(session, embedding, req.query.phase === 'precheck' ? 'precheck' : 'live');
+    const { embedding, ...rest } = (body ?? {}) as { embedding?: unknown; frame?: { fake_probability?: unknown } };
+    onFrameEmbedding(session, embedding, precheck ? 'precheck' : 'live');
+    const p = rest.frame?.fake_probability;
+    if (typeof p === 'number' && Number.isFinite(p)) session.passiveScores = [...(session.passiveScores ?? []), p].slice(-15);
     // L'empreinte reste sur le serveur : le navigateur ne reçoit que le résultat du détecteur passif.
     res.status(status).json(rest);
   } catch {
@@ -91,7 +102,7 @@ app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' 
 });
 
 // Règle n°2 : la décision appartient au recruteur, on la trace pour le rapport (brique E).
-app.post('/api/sessions/:id/decision', async (req, res) => {
+app.post('/api/sessions/:id/decision', recruiterOnly, async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
 

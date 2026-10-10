@@ -8,9 +8,13 @@ const BASE = process.env.BASE ?? 'http://localhost:8787';
 const [candidateVideo, otherVideo, shots, mode = 'all'] = process.argv.slice(2);
 let failures = 0;
 const ok = (cond, msg) => { console.log(cond ? 'OK  ' : 'FAIL', msg); if (!cond) failures++; };
+const keys = new Map(); // jetons recruteur, reçus à la création des entretiens
 const api = async (path, body) => {
-  const r = await fetch(BASE + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
-  return r.json();
+  const headers = { 'Content-Type': 'application/json', 'X-Recruiter-Key': keys.get(path.split('/')[3]) ?? '' };
+  const r = await fetch(BASE + path, body ? { method: 'POST', headers, body: JSON.stringify(body) } : { headers });
+  const json = await r.json();
+  if (path === '/api/sessions' && json.recruiterKey) keys.set(json.id, json.recruiterKey);
+  return json;
 };
 
 function launch(video) {
@@ -77,7 +81,7 @@ async function visio(candidateBrowser, recruiterBrowser, id, seconds) {
   const cand = await newPage(candidateBrowser, 'visio-candidat');
   const rec = await newPage(recruiterBrowser, 'visio-recruteur');
   await cand.goto(`${BASE}/visio/${id}?role=candidate`);
-  await rec.goto(`${BASE}/visio/${id}?role=recruiter`);
+  await rec.goto(`${BASE}/visio/${id}?role=recruiter&key=${keys.get(id)}`);
   await rec.waitForSelector('text=Connecté', { timeout: 30000 }).catch(() => console.log('     pas de connexion WebRTC'));
   await rec.waitForTimeout(seconds * 1000);
   await rec.screenshot({ path: `${shots}/4-visio-${id}.png` });
@@ -92,7 +96,7 @@ async function liveChallenges(candidateBrowser, recruiterBrowser, id, tag) {
   const cand = await newPage(candidateBrowser, 'visio-candidat');
   const rec = await newPage(recruiterBrowser, 'visio-recruteur');
   await cand.goto(`${BASE}/visio/${id}?role=candidate`);
-  await rec.goto(`${BASE}/visio/${id}?role=recruiter`);
+  await rec.goto(`${BASE}/visio/${id}?role=recruiter&key=${keys.get(id)}`);
   await rec.waitForSelector('text=Connecté', { timeout: 30000 });
   await rec.waitForTimeout(4000);
   const results = [];

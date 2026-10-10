@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { RecruiterPanel } from '@kyc/panel';
-import { API_BASE, WS_URL } from '../config.ts';
+import { API_BASE, WS_URL, api, recruiterKeyFor } from '../config.ts';
 import { createLiveDetector } from '../lib/liveDetector.ts';
-import { sampleFace } from '../lib/tracker.ts';
+import { loadTracker, sampleFace } from '../lib/tracker.ts';
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -13,12 +13,18 @@ export function Visio() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
   const role = params.get('role') === 'recruiter' ? 'recruiter' : 'candidate';
+  const recruiterKey = role === 'recruiter' ? recruiterKeyFor(id, params.get('key')) : undefined;
 
   const localRef = useRef<HTMLVideoElement>(null);
   const remoteRef = useRef<HTMLVideoElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState('Connexion…');
-  const detector = useMemo(() => createLiveDetector(id), [id]);
+  const detector = useMemo(() => createLiveDetector(id, recruiterKey), [id, recruiterKey]);
+
+  // Côté recruteur, l'analyse d'image se charge dès l'ouverture : le premier défi démarre sans attendre.
+  useEffect(() => {
+    if (role === 'recruiter') loadTracker().catch(() => undefined);
+  }, [role]);
 
   useEffect(() => {
     let closed = false;
@@ -87,6 +93,9 @@ export function Visio() {
         if (closed) return stream.getTracks().forEach((t) => t.stop());
         local = stream;
         if (localRef.current) localRef.current.srcObject = stream;
+        if (role === 'candidate') {
+          api.reportLiveCamera(id, stream.getVideoTracks()[0]?.label ?? '').catch(() => undefined);
+        }
         stream.getTracks().forEach((t) => pc.addTrack(t, stream));
         const join = () => send({ type: 'join', room: id, role });
         if (ws.readyState === WebSocket.OPEN) join();
@@ -124,9 +133,10 @@ export function Visio() {
             sessionId={id}
             stream={remoteStream}
             apiBase={API_BASE}
-            reportUrl={`/report/${id}`}
+            reportUrl={`/report/${id}${recruiterKey ? `?key=${recruiterKey}` : ''}`}
             faceSampler={sampleFace}
             detector={detector}
+            recruiterKey={recruiterKey}
           />
         </aside>
       )}

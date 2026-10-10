@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { createApi } from '@kyc/panel';
 import { getChallenge, type SessionView, type Signal } from '@kyc/shared';
-import { api } from '../config.ts';
+import { API_BASE, recruiterKeyFor } from '../config.ts';
 
 const DECISION_LABEL = {
   continue: 'Poursuivre',
@@ -46,6 +47,9 @@ function SignalList({ signals }: { signals: Signal[] }) {
 // Aucune image. La page se met à jour toute seule pendant que le candidat fait sa pré-vérification.
 export function Report() {
   const { id = '' } = useParams();
+  const [params] = useSearchParams();
+  const key = recruiterKeyFor(id, params.get('key'));
+  const api = useMemo(() => createApi(API_BASE, key), [key]);
   const [session, setSession] = useState<SessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,8 +66,15 @@ export function Report() {
       alive = false;
       clearInterval(timer);
     };
-  }, [id]);
+  }, [api, id]);
 
+  if (error?.startsWith('403') && !session) {
+    return (
+      <div className="page">
+        Ce rapport est réservé au recruteur : ouvrez-le avec le lien donné à la création de l’entretien.
+      </div>
+    );
+  }
   if (error && !session) return <div className="page">Erreur : {error}</div>;
   if (!session) return <div className="page">Chargement…</div>;
 

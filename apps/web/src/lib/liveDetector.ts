@@ -1,4 +1,4 @@
-import type { ChallengeDetector, DetectorOutcome } from '@kyc/panel';
+import { createApi, type ChallengeDetector, type DetectorOutcome } from '@kyc/panel';
 import {
   HAND_FRAMES,
   HAND_POINTS_OVER_FACE,
@@ -12,7 +12,7 @@ import {
   mouthOpenness,
   type ChallengeResult,
 } from '@kyc/shared';
-import { api } from '../config.ts';
+import { API_BASE } from '../config.ts';
 import { detect, loadTracker } from './tracker.ts';
 
 const FRAME_MS = 80; // ~12 analyses par seconde
@@ -25,7 +25,8 @@ const CAPTURE_MAX_WIDTH = 640;
 // Défis en direct (brique B), sur le flux du candidat affiché dans le panneau, avec la même détection que la
 // pré-vérification. Rien n'est enregistré : au plus une capture par défi part vers l'agent local (détecteur passif
 // et empreinte), au moment où un trucage se trahit le plus (main qui repart, tête tournée).
-export function createLiveDetector(sessionId: string): ChallengeDetector {
+export function createLiveDetector(sessionId: string, recruiterKey?: string): ChallengeDetector {
+  const api = createApi(API_BASE, recruiterKey);
   return async (video, challenge, signal) => {
     const tracker = await loadTracker();
     return new Promise<DetectorOutcome>((resolve) => {

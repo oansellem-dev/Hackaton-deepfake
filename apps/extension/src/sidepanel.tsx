@@ -10,22 +10,30 @@ const api = createApi(API_BASE);
 
 function App() {
   const [sessionId, setSessionId] = useState('');
+  const [recruiterKey, setRecruiterKey] = useState<string | undefined>();
   const [draft, setDraft] = useState('');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    chrome.storage.local.get('sessionId').then(({ sessionId }) => sessionId && setSessionId(sessionId));
+    chrome.storage.local.get(['sessionId', 'recruiterKey']).then(({ sessionId, recruiterKey }) => {
+      if (sessionId) setSessionId(sessionId);
+      if (recruiterKey) setRecruiterKey(recruiterKey);
+    });
   }, []);
 
-  function selectSession(id: string) {
+  // Code recruteur donné à la création de l'entretien : « identifiant:jeton ».
+  function selectSession(code: string) {
+    const [id, key] = code.split(':');
     setSessionId(id);
-    chrome.storage.local.set({ sessionId: id });
+    setRecruiterKey(key);
+    chrome.storage.local.set({ sessionId: id, recruiterKey: key });
   }
 
   async function createSession() {
     try {
-      selectSession((await api.createSession('Candidat')).id);
+      const created = await api.createSession('Candidat');
+      selectSession(`${created.id}:${created.recruiterKey}`);
     } catch (e) {
       setError(String(e));
     }
@@ -53,7 +61,7 @@ function App() {
         <h1>KYC Visio</h1>
         <button onClick={createSession}>Nouvel entretien</button>
         <p>ou reprendre un entretien existant :</p>
-        <input placeholder="Identifiant d'entretien" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <input placeholder="Code recruteur (identifiant:jeton)" value={draft} onChange={(e) => setDraft(e.target.value)} />
         <button disabled={!draft} onClick={() => selectSession(draft.trim())}>
           Reprendre
         </button>
@@ -73,7 +81,7 @@ function App() {
           onClick={() => {
             stopCapture();
             setSessionId('');
-            chrome.storage.local.remove('sessionId');
+            chrome.storage.local.remove(['sessionId', 'recruiterKey']);
           }}
         >
           Changer
@@ -94,7 +102,8 @@ function App() {
         sessionId={sessionId}
         stream={stream}
         apiBase={API_BASE}
-        reportUrl={`${WEB_BASE}/report/${sessionId}`}
+        recruiterKey={recruiterKey}
+        reportUrl={`${WEB_BASE}/report/${sessionId}${recruiterKey ? `?key=${recruiterKey}` : ''}`}
       />
     </div>
   );

@@ -15,6 +15,7 @@ interface Props {
   reportUrl?: string;
   // Mesure du visage affiché (MediaPipe côté site). Absent : pas de comparaison avec la pré-vérification.
   faceSampler?: FaceSampler;
+  recruiterKey?: string; // jeton donné à la création de l'entretien
 }
 
 const LEVEL_LABEL = {
@@ -41,8 +42,16 @@ function nextChallenge(session: SessionView): Challenge {
   return pickChallenge(done);
 }
 
-export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDetector, reportUrl, faceSampler }: Props) {
-  const api = useMemo(() => createApi(apiBase), [apiBase]);
+export function RecruiterPanel({
+  sessionId,
+  stream,
+  apiBase,
+  detector = stubDetector,
+  reportUrl,
+  faceSampler,
+  recruiterKey,
+}: Props) {
+  const api = useMemo(() => createApi(apiBase, recruiterKey), [apiBase, recruiterKey]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [session, setSession] = useState<SessionView | null>(null);

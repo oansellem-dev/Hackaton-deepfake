@@ -33,8 +33,8 @@ export function Reglages() {
   const retablir = () => { actions.reglages({ textesLien: seed().reglages.textesLien }); toast("Texte d'origine rétabli"); };
   return (
     <div className="pages">
-      <header className="panel page-head rise" style={{ "--i": 1 } as CSSProperties}>
-        <div><h1 className="t-display">Réglages</h1><p className="muted">Test de lumière, textes envoyés aux candidats, envoi des e-mails et démo.</p></div>
+      <header className="page-head rise" style={{ "--i": 1 } as CSSProperties}>
+        <div><h1 className="t-display">Réglages</h1><p className="muted">Test de lumière, e-mail envoyé aux candidats, équipe et démo.</p></div>
       </header>
       <div className="reglages-grid">
         <section className="panel bloc rise" style={{ "--i": 2 } as CSSProperties}>

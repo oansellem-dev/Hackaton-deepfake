@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
 import type { PreVerification, Resultat, SequenceLumiere, SignauxTechniques } from "../store/types";
 import { actions, getEtat, parId, useEtat } from "../store/store";
 import { relever, signauxDepuis, simulerGeste, simulerLumiere } from "../store/integration";
@@ -10,16 +10,20 @@ import "./candidat.css";
 
 /**
  * PAGE CANDIDAT — lien de pré-vérification (deux minutes).
+ * Une seule colonne, une carte par étape, une action principale par écran.
  * Accord → Caméra → Lumière → Geste → Fin. Le candidat ne voit jamais de score.
- * Les mesures (lumière, geste) sont simulées : le moteur vidéo de l'équipe remplace
- * simulerLumiere / simulerGeste dans integration.ts.
+ * Les mesures sont simulées : le moteur vidéo de l'équipe remplace simulerLumiere / simulerGeste (integration.ts).
  */
 type Etape = "accord" | "camera" | "lumiere" | "geste" | "fin" | "refus";
-const ETAPES: { id: Etape; label: string }[] = [{ id: "accord", label: "Accord" }, { id: "camera", label: "Caméra" }, { id: "lumiere", label: "Lumière" }, { id: "geste", label: "Geste" }, { id: "fin", label: "Fin" }];
+const ETAPES: { id: Etape; label: string; duree: string; ic: ReactNode }[] = [
+  { id: "camera", label: "Caméra", duree: "10 s", ic: <IcCam /> },
+  { id: "lumiere", label: "Lumière", duree: "6 s", ic: <IcSun /> },
+  { id: "geste", label: "Geste", duree: "5 s", ic: <IcHand /> },
+];
 
 export function PreVerif({ token, entretienId, prenom }: { token: string; entretienId?: string; prenom?: string }) {
   // Démo : #/candidat/<jeton>?etape=lumiere ouvre directement une étape (répétition du pitch)
-  const [etape, setEtape] = useState<Etape>(() => { const e = new URLSearchParams(location.hash.split("?")[1] ?? "").get("etape"); return e && ETAPES.some((x) => x.id === e) ? (e as Etape) : "accord"; });
+  const [etape, setEtape] = useState<Etape>(() => { const e = new URLSearchParams(location.hash.split("?")[1] ?? "").get("etape"); return e && ["accord", "camera", "lumiere", "geste", "fin"].includes(e) ? (e as Etape) : "accord"; });
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [sansCamera, setSansCamera] = useState(false);
   const lumiereP = useRef<Promise<Resultat>>(Promise.resolve("passe"));
@@ -62,26 +66,34 @@ export function PreVerif({ token, entretienId, prenom }: { token: string; entret
   }, [etape]); // eslint-disable-line
 
   const idx = ETAPES.findIndex((e) => e.id === etape);
+  const progression = etape === "accord" ? 0 : etape === "fin" || etape === "refus" ? ETAPES.length : idx;
   return (
-    <div className="cand-app">
-      <div className="shell cand">
-        <header className="cand__head">
-          <span className="cand__logo"><span className="logo-o" />oval</span>
-          <nav className="cand__steps" aria-label="Étapes">
-            {ETAPES.map((e, i) => <span key={e.id} className={`cand__step${i < idx ? " is-fait" : ""}${i === idx ? " is-now" : ""}`} aria-current={i === idx ? "step" : undefined}>{i < idx && <IcCheck />}{e.label}</span>)}
-          </nav>
-          <span className="cand__secure"><IcLock /> Aucune vidéo enregistrée</span>
-        </header>
-        <div className="cand__body page" key={etape}>
-          {etape === "accord" && <Accord prenom={prenom} onAccepter={() => void accepter()} onRefuser={refuser} />}
-          {etape === "camera" && <Camera stream={stream} sansCamera={sansCamera} tech={tech} onSuite={() => setEtape(sansCamera ? "fin" : "lumiere")} />}
-          {etape === "lumiere" && <Lumiere stream={stream} onFin={finLumiere} />}
-          {etape === "geste" && <Geste stream={stream} onFin={finGeste} />}
-          {etape === "fin" && <Final prenom={prenom} titre={`C'est terminé, à tout à l'heure${prenom ? ` ${prenom}` : ""} !`} texte="Ton recruteur sait que la vérification technique est faite. Aucune vidéo n'a été enregistrée. Tu peux fermer cette page." />}
-          {etape === "refus" && <Final titre="C'est noté." texte="Refuser ne joue pas contre toi. Le recruteur te proposera une autre solution : un entretien sans l'outil, ou en présentiel." neutre />}
+    <div className="cv">
+      <header className="cv__top">
+        <span className="cv__logo"><span className="logo-o" />oval</span>
+        <span className="cv__lock"><IcLock /> Aucune vidéo enregistrée</span>
+      </header>
+
+      {etape !== "accord" && etape !== "refus" && (
+        <div className="cv__progress" aria-label={`Étape ${Math.min(idx + 1, ETAPES.length)} sur ${ETAPES.length}`}>
+          <div className="cv__segs" aria-hidden>{ETAPES.map((e, i) => <i key={e.id} className={i < progression ? "is-fait" : i === progression ? "is-now" : ""} />)}</div>
+          <span>{etape === "fin" ? "Terminé" : <>Étape {idx + 1} sur {ETAPES.length} · <b>{ETAPES[idx].label}</b></>}</span>
         </div>
-        <p className="cand__ref">Lien personnel · référence {token.slice(0, 8)}</p>
-      </div>
+      )}
+
+      <main className="cv__card page" key={etape}>
+        {etape === "accord" && <Accord prenom={prenom} onAccepter={() => void accepter()} onRefuser={refuser} />}
+        {etape === "camera" && <Camera stream={stream} sansCamera={sansCamera} tech={tech} onSuite={() => setEtape(sansCamera ? "fin" : "lumiere")} />}
+        {etape === "lumiere" && <Lumiere stream={stream} onFin={finLumiere} />}
+        {etape === "geste" && <Geste stream={stream} onFin={finGeste} />}
+        {etape === "fin" && <Final etat="verifie" titre={`Merci${prenom ? ` ${prenom}` : ""}, c'est terminé !`} texte="Ton recruteur sait que la vérification est faite. Aucune vidéo n'a été enregistrée. Tu peux fermer cette page, à tout à l'heure." />}
+        {etape === "refus" && <Final etat="neutre" titre="C'est noté." texte="Refuser ne joue pas contre toi. Le recruteur te proposera une autre solution : un entretien sans l'outil, ou en présentiel." />}
+      </main>
+
+      <footer className="cv__foot">
+        <span><IcCheck /> Dans ton navigateur</span><span><IcCheck /> Aucune pièce d'identité</span><span><IcCheck /> Aucune analyse d'émotions</span>
+        <span className="cv__ref">réf. {token.slice(0, 8)}</span>
+      </footer>
     </div>
   );
 }
@@ -90,39 +102,40 @@ export function PreVerif({ token, entretienId, prenom }: { token: string; entret
 function Accord({ prenom, onAccepter, onRefuser }: { prenom?: string; onAccepter: () => void; onRefuser: () => void }) {
   return (
     <>
-      <div className="cand__hero">
-        <Manta size={150} />
-        <h1>Bonjour{prenom ? ` ${prenom}` : ""}, deux minutes avant ton entretien</h1>
-        <p className="muted">Je suis Manta. Je vérifie qu'il y a bien une vraie personne derrière la caméra.</p>
+      <div className="cv__manta">
+        <Manta size={84} />
+        <p className="cv__bulle">Bonjour{prenom ? ` ${prenom}` : ""} ! Je suis Manta. Je vérifie juste qu'une vraie personne est devant la caméra, pas qui tu es.</p>
       </div>
-      <div className="cand__cols">
-        <section className="card cand__box">
-          <h2 className="t-h3">Ce que je vérifie</h2>
-          <ul className="cand__list">
-            <li><span className="cand__ic cand__ic--ok"><IcCam /></span>Ta caméra et ta connexion</li>
-            <li><span className="cand__ic cand__ic--ok"><IcSun /></span>La lumière sur ton visage, quelques secondes, sans flash</li>
-            <li><span className="cand__ic cand__ic--ok"><IcHand /></span>Un geste simple de la main</li>
-          </ul>
-        </section>
-        <section className="card cand__box">
-          <h2 className="t-h3">Ce que je ne fais pas</h2>
-          <ul className="cand__list">
-            <li><span className="cand__ic"><IcX /></span>Aucune vidéo enregistrée</li>
-            <li><span className="cand__ic"><IcX /></span>Pas de pièce d'identité</li>
-            <li><span className="cand__ic"><IcX /></span>Pas d'analyse de tes émotions</li>
-          </ul>
-        </section>
+      <h1 className="cv__h1">Deux minutes avant ton entretien</h1>
+      <ol className="cv__plan">
+        {ETAPES.map((e, i) => (
+          <li key={e.id}>
+            <span className="cv__planIc">{e.ic}</span>
+            <span className="cv__planTxt"><b>{i + 1}. {e.label}</b>{e.id === "camera" ? "J'active ta caméra et je vérifie ta connexion." : e.id === "lumiere" ? "L'écran change doucement de couleur, sans flash." : "Tu passes la main devant ton visage."}</span>
+            <span className="cv__planDur">{e.duree}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="cv__non">
+        <span><IcX /> Pas de vidéo enregistrée</span><span><IcX /> Pas de pièce d'identité</span><span><IcX /> Pas d'analyse d'émotions</span>
       </div>
-      <div className="cand__actions">
-        <Btn variant="primary" size="lg" onClick={onAccepter}>J'accepte et je commence</Btn>
-        <button type="button" className="cand__refus" onClick={onRefuser}>Je préfère ne pas faire cette vérification</button>
-        <p className="t-small faint">Refuser ne joue pas contre toi. Le recruteur te proposera une autre solution.</p>
-      </div>
+      <Btn variant="primary" size="lg" block onClick={onAccepter}>J'accepte et je commence</Btn>
+      <button type="button" className="cv__link" onClick={onRefuser}>Je préfère ne pas faire cette vérification</button>
+      <p className="cv__fine">Refuser ne joue pas contre toi : le recruteur te proposera une autre solution.</p>
     </>
   );
 }
 
-/* ── 2. Caméra + signaux techniques ────────────────────────── */
+/* ── Viseur : la caméra dans un cadre compact, sur fond clair ── */
+function Viseur({ stream, etat, badge, couleur }: { stream: MediaStream | null; etat: Parameters<typeof FaceScan>[0]["etat"]; badge?: ReactNode; couleur?: string }) {
+  return (
+    <div className="cv__viseur">
+      <FaceScan stream={stream} etat={etat} largeur="min(210px, 48vw)" badge={badge} couleur={couleur} />
+    </div>
+  );
+}
+
+/* ── 2. Caméra + vérifications techniques ──────────────────── */
 function Camera({ stream, sansCamera, tech, onSuite }: { stream: MediaStream | null; sansCamera: boolean; tech: MutableRefObject<Promise<SignauxTechniques> | null>; onSuite: () => void }) {
   const [t, setT] = useState<SignauxTechniques | null>(null);
   useEffect(() => {
@@ -132,27 +145,26 @@ function Camera({ stream, sansCamera, tech, onSuite }: { stream: MediaStream | n
   }, [tech, stream, sansCamera]);
   const pret = !!stream || sansCamera;
   return (
-    <div className="cand__stage">
-      <div className="cand__hud"><i className="cand__live" />{sansCamera ? "Caméra non disponible" : stream ? "Analyse locale · rien ne quitte ton navigateur" : "Connexion à la caméra…"}</div>
-      <FaceScan stream={stream} etat={sansCamera ? "off" : stream ? "idle" : "scan"} largeur="min(290px, 60vw)"
-        badge={sansCamera ? <><i />Pas de caméra</> : stream ? <><i />Place ton visage dans l'ovale</> : <><i />Connexion…</>} />
-      <div className="cand__checks">
-        <Check titre="Caméra" valeur={sansCamera ? "Non autorisée, pas grave" : t ? t.cameras[0] ?? "Caméra du navigateur" : "…"} ok={!!stream} attente={!pret} />
+    <>
+      <h1 className="cv__h1">{sansCamera ? "Pas de caméra, pas grave" : "Place ton visage dans l'ovale"}</h1>
+      <p className="cv__sous">{sansCamera ? "Le recruteur fera les vérifications en direct pendant l'entretien." : "Rien ne quitte ton navigateur : l'analyse se fait sur ton ordinateur."}</p>
+      <Viseur stream={stream} etat={sansCamera ? "off" : stream ? "idle" : "scan"} badge={sansCamera ? <><i />Caméra non disponible</> : stream ? <><i />Caméra active</> : <><i />Connexion…</>} />
+      <ul className="cv__checks">
+        <Check titre="Caméra" valeur={sansCamera ? "Non autorisée" : t ? t.cameras[0] ?? "Caméra du navigateur" : "…"} ok={!!stream} attente={!pret} />
         <Check titre="Fuseau horaire" valeur={t?.fuseau ?? "…"} ok={!!t} attente={!t} />
         <Check titre="Langue" valeur={t?.langue ?? "…"} ok={!!t} attente={!t} />
-        <Check titre="Connexion" valeur="Relevée côté serveur" ok={!!t} attente={!t} />
-      </div>
-      {sansCamera && <p className="cand__note">Pas de caméra ? Ce n'est pas un problème : le recruteur fera les vérifications en direct pendant l'entretien.</p>}
-      <Btn variant="glass" size="lg" onClick={onSuite} disabled={!pret}>{sansCamera ? "Terminer" : "Continuer"}</Btn>
-    </div>
+        <Check titre="Connexion" valeur="Relevée" ok={!!t} attente={!t} />
+      </ul>
+      <Btn variant="primary" size="lg" block onClick={onSuite} disabled={!pret}>{sansCamera ? "Terminer" : "Continuer"}</Btn>
+    </>
   );
 }
 function Check({ titre, valeur, ok, attente }: { titre: string; valeur: string; ok: boolean; attente: boolean }) {
   return (
-    <div className={`cand__check${ok ? " is-ok" : ""}`}>
-      <span className="cand__checkIc">{attente ? <i className="cand__spin" /> : ok ? <IcCheck /> : <IcInfo />}</span>
-      <span className="cand__checkTxt"><b>{titre}</b>{valeur}</span>
-    </div>
+    <li className={`cv__check${ok ? " is-ok" : ""}`}>
+      <span className="cv__checkIc">{attente ? <i className="cv__spin" /> : ok ? <IcCheck /> : <IcInfo />}</span>
+      <span className="cv__checkTxt"><b>{titre}</b>{valeur}</span>
+    </li>
   );
 }
 
@@ -188,19 +200,18 @@ function Lumiere({ stream, onFin }: { stream: MediaStream | null; onFin: (s: Seq
   };
 
   if (phase === "avert") return (
-    <div className="cand__stage">
-      <Manta size={110} state="lumiere" haloColor="#56b4f0" />
-      <h2 className="cand__stageTitre">Test de lumière</h2>
-      <ul className="cand__avert">
-        <li><IcSun />L'écran va changer de couleur pendant environ {Math.round((AMORCE + n * duree) / 1000)} secondes, en fondus doux. Jamais de flash.</li>
-        <li><IcCam />Approche-toi de l'écran et monte sa luminosité.</li>
-        <li><IcInfo />Si les changements de lumière te gênent (sensibilité à la lumière, épilepsie), passe cette étape : ça ne compte pas contre toi.</li>
+    <>
+      <h1 className="cv__h1">Test de lumière</h1>
+      <p className="cv__sous">L'écran va changer de couleur pendant environ {Math.round((AMORCE + n * duree) / 1000)} secondes, en fondus doux. Jamais de flash.</p>
+      <div className="cv__swatches" aria-hidden>{seq.current.map((c) => <i key={c} style={{ background: COULEURS[c].fond }} />)}</div>
+      <ul className="cv__avert">
+        <li><span className="cv__planIc"><IcSun /></span>Approche-toi de l'écran et monte sa luminosité.</li>
+        <li><span className="cv__planIc"><IcCam /></span>Reste face à la caméra, sans bouger.</li>
+        <li><span className="cv__planIc cv__planIc--gold"><IcInfo /></span>Sensible à la lumière (épilepsie, migraines) ? Passe cette étape : ça ne compte pas contre toi.</li>
       </ul>
-      <div className="cand__duo">
-        <Btn variant="glass" size="lg" icon={<IcSun />} onClick={lancer}>Lancer le test</Btn>
-        <Btn variant="ghost" className="cand__ghost" onClick={() => finir(true)}>Passer cette étape</Btn>
-      </div>
-    </div>
+      <Btn variant="primary" size="lg" block icon={<IcSun />} onClick={lancer}>Lancer le test</Btn>
+      <button type="button" className="cv__link" onClick={() => finir(true)}>Passer cette étape</button>
+    </>
   );
 
   const c = i >= 0 ? COULEURS[seq.current[i]] : { fond: "#0b0e1d", encre: "#ffffff", halo: "#56b4f0" };
@@ -210,9 +221,9 @@ function Lumiere({ stream, onFin }: { stream: MediaStream | null; onFin: (s: Seq
       {seq.current.map((nom, k) => <div key={k} className={`lum__layer${k <= i ? " on" : ""}`} style={{ background: COULEURS[nom].fond, zIndex: k + 1 }} />)}
       <div className="lum__ui">
         <FaceScan stream={stream} etat="lumiere" couleur={c.encre} hud={c.encre} progression={(i + 1) / seq.current.length} largeur="min(300px, 36vh)" />
-        <div className="cand__bulle" aria-live="polite">
+        <div className="lum__bulle" aria-live="polite">
           <Manta size={48} state="lumiere" haloColor={c.halo} />
-          <p>{i < 0 ? "Prêt ? Reste face à l'écran…" : <>J'éclaire ton visage avec quelques couleurs. Reste près de l'écran, encore <b>{reste} seconde{reste > 1 ? "s" : ""}</b>.</>}</p>
+          <p>{i < 0 ? "Prêt ? Reste face à l'écran…" : <>Reste près de l'écran, encore <b>{reste} seconde{reste > 1 ? "s" : ""}</b>.</>}</p>
         </div>
         <div className="lum__dots" aria-hidden>{seq.current.map((_, k) => <i key={k} className={k <= i ? "on" : ""} />)}</div>
       </div>
@@ -232,28 +243,27 @@ function Geste({ stream, onFin }: { stream: MediaStream | null; onFin: (p: Promi
     window.setTimeout(() => onFin(p), 1100);
   };
   return (
-    <div className="cand__stage">
-      <div className="cand__hud"><i className="cand__live" />Défi gestuel · analyse dans ton navigateur</div>
-      <FaceScan stream={stream} etat={phase === "consigne" ? "geste" : phase === "analyse" ? "scan" : "ok"} largeur="min(290px, 60vw)"
-        badge={phase === "consigne" ? <><i />Passe ta main devant ton visage</> : phase === "analyse" ? <><i />Je vérifie le geste…</> : <><IcCheck />Merci, c'est noté</>} />
-      <h2 className="cand__stageTitre">{phase === "merci" ? "Merci, c'est noté." : "Passe lentement ta main devant ton visage, puis retire-la."}</h2>
+    <>
+      <h1 className="cv__h1">{phase === "merci" ? "Merci, c'est noté" : phase === "analyse" ? "Je vérifie le geste…" : "Passe lentement ta main devant ton visage"}</h1>
+      <p className="cv__sous">{phase === "consigne" ? "De gauche à droite, puis retire-la. Clique sur « C'est fait » quand c'est bon." : phase === "analyse" ? "Quelques secondes, dans ton navigateur." : "Dernière étape terminée."}</p>
+      <Viseur stream={stream} etat={phase === "consigne" ? "geste" : phase === "analyse" ? "scan" : "ok"} badge={phase === "consigne" ? <><i />Main devant le visage</> : phase === "analyse" ? <><i />Analyse…</> : <><IcCheck />C'est noté</>} />
       {phase === "consigne" && (
-        <div className="cand__duo">
-          <Btn variant="glass" size="lg" icon={<IcCheck />} onClick={() => void fait()}>C'est fait</Btn>
-          <Btn variant="ghost" className="cand__ghost" onClick={() => onFin(Promise.resolve("passe"))}>Passer cette étape</Btn>
-        </div>
+        <>
+          <Btn variant="primary" size="lg" block icon={<IcCheck />} onClick={() => void fait()}>C'est fait</Btn>
+          <button type="button" className="cv__link" onClick={() => onFin(Promise.resolve("passe"))}>Passer cette étape</button>
+        </>
       )}
-    </div>
+    </>
   );
 }
 
 /* ── 5. Fin ou refus ───────────────────────────────────────── */
-function Final({ titre, texte, neutre }: { prenom?: string; titre: string; texte: string; neutre?: boolean }) {
+function Final({ titre, texte, etat }: { titre: string; texte: string; etat: "verifie" | "neutre" }) {
   return (
-    <div className="cand__hero cand__hero--fin">
-      <Manta size={150} state={neutre ? "neutre" : "verifie"} />
-      <h1>{titre}</h1>
-      <p className="muted">{texte}</p>
+    <div className="cv__fin">
+      <Manta size={120} state={etat} />
+      <h1 className="cv__h1">{titre}</h1>
+      <p className="cv__sous">{texte}</p>
     </div>
   );
 }

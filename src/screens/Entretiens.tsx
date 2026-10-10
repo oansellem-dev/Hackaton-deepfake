@@ -1,18 +1,23 @@
-import { useEffect, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type { Entretien } from "../store/types";
 import { aujourdhui, initiales, memeJour, nbSignauxAVerifier, nomComplet, useEtat } from "../store/store";
-import { quand, relatif } from "../store/format";
+import { heure, quand, relatif } from "../store/format";
 import { DECISIONS_COURT } from "../store/texts";
 import { doux, statutEntretien, statutPreVerif } from "../store/statuts";
 import { envoyerPreVerif } from "../store/envoi";
-import { Avatar, Btn, Pill, Pop, Tabs, Vide, transition, type Ton } from "../ui/ui";
-import { IcArrowUR, IcArrowR, IcCheck, IcChevron, IcDots, IcFilter, IcFlag, IcRefresh, IcSort, IcX } from "../ui/icons";
+import { ouvrirNouvelEntretien } from "../app/events";
+import { Avatar, Btn, Input, Pill, Pop, Vide, transition } from "../ui/ui";
+import { IcArrowR, IcCal, IcCheck, IcChevron, IcFilter, IcFlag, IcMail, IcPlay, IcPlus, IcRefresh, IcSearch, IcSort, IcX } from "../ui/icons";
 import { aller, useRoute } from "../app/router";
-import { NouvelEntretienForm } from "./NouvelEntretien";
 import "./entretiens.css";
 
 type Filtre = "tous" | "avenir" | "signal" | "verifiee" | "termines" | "aujourdhui" | "preverif";
-const ONGLETS: Filtre[] = ["tous", "avenir", "signal", "verifiee"];
+const TUILES: { id: Filtre; label: string; ic: ReactNode; ton: "blue" | "gold" | "green" | "neutral" }[] = [
+  { id: "tous", label: "Tous les entretiens", ic: <IcCal />, ton: "neutral" },
+  { id: "avenir", label: "À venir", ic: <IcPlay />, ton: "blue" },
+  { id: "signal", label: "Signal à vérifier", ic: <IcFlag />, ton: "gold" },
+  { id: "verifiee", label: "Présence vérifiée", ic: <IcCheck />, ton: "green" },
+];
 const LIBELLES: Record<Filtre, string> = { tous: "Tous", avenir: "À venir", signal: "Signal à vérifier", verifiee: "Présence vérifiée", termines: "Terminés", aujourdhui: "Aujourd'hui", preverif: "Pré-vérification en attente" };
 const TEST: Record<Filtre, (x: Entretien, ref: Date) => boolean> = {
   tous: () => true,
@@ -25,7 +30,6 @@ const TEST: Record<Filtre, (x: Entretien, ref: Date) => boolean> = {
 };
 const valide = (f?: string): Filtre => (f && f in TEST ? (f as Filtre) : "tous");
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-const icPv = (ton: Ton) => (ton === "soft-green" ? <IcCheck /> : ton === "soft-gold" ? <IcFlag /> : ton === "soft-violet" ? <IcArrowR /> : <IcDots />);
 
 export function Entretiens() {
   const etat = useEtat();
@@ -49,14 +53,31 @@ export function Entretiens() {
   const ouvrir = (x: Entretien) => aller(`#/rapport/${x.id}`);
   const clavier = (e: KeyboardEvent, x: Entretien) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(x); } };
   const attente = etat.entretiens.filter((x) => TEST.preverif(x, ref)).sort((a, b) => +new Date(a.preVerification.envoyeeLe ?? a.creeLe) - +new Date(b.preVerification.envoyeeLe ?? b.creeLe));
+  const speciale = !TUILES.some((t) => t.id === filtre);
 
   return (
     <div className="ent">
-      <section className="panel ent__liste rise" style={{ "--i": 1 } as CSSProperties}>
-        <header className="ent__head">
-          <h1 className="t-display">Entretiens</h1>
+      <header className="ent__head rise" style={{ "--i": 1 } as CSSProperties}>
+        <div><h1 className="t-display">Entretiens</h1><p className="muted">Cliquez sur une ligne pour ouvrir le rapport.</p></div>
+        <Btn variant="primary" icon={<IcPlus />} onClick={ouvrirNouvelEntretien}>Nouvel entretien</Btn>
+      </header>
+
+      <div className="ent__tuiles rise" style={{ "--i": 2 } as CSSProperties}>
+        {TUILES.map((t) => {
+          const n = base.filter((x) => TEST[t.id](x, ref)).length;
+          return (
+            <button key={t.id} type="button" className={`panel etuile etuile--${t.ton}${filtre === t.id ? " is-on" : ""}`} aria-pressed={filtre === t.id} onClick={() => changer(t.id)}>
+              <span className="etuile__ic">{t.ic}</span><b className="num">{n}</b><span className="etuile__label">{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="ent__corps">
+        <section className="panel ent__liste rise" style={{ "--i": 3 } as CSSProperties}>
           <div className="ent__tools">
-            <Pop align="right" width={280} button={({ open, toggle }) => <Btn icon={<IcFilter />} onClick={toggle} aria-expanded={open}>Poste : {poste || "tous"} <IcChevron /></Btn>}>
+            <label className="ent__search"><IcSearch /><Input value={q} placeholder="Nom, poste, e-mail…" onChange={(e) => changer(filtre, poste, e.target.value)} />{q && <button type="button" aria-label="Effacer" onClick={() => changer(filtre, poste, "")}><IcX /></button>}</label>
+            <Pop align="right" width={280} button={({ open, toggle }) => <Btn icon={<IcFilter />} onClick={toggle} aria-expanded={open}>{poste || "Tous les postes"} <IcChevron /></Btn>}>
               {(close) => (
                 <>
                   <div className="menu__title">Poste</div>
@@ -65,53 +86,49 @@ export function Entretiens() {
                 </>
               )}
             </Pop>
-            <Btn icon={<IcSort />} onClick={() => transition(() => setTri((t) => (t === "asc" ? "desc" : "asc")))} aria-label={tri === "asc" ? "Trier du plus récent au plus ancien" : "Trier du plus ancien au plus récent"}>Date {tri === "asc" ? "↑" : "↓"}</Btn>
+            <Btn icon={<IcSort />} onClick={() => transition(() => setTri((t) => (t === "asc" ? "desc" : "asc")))}>{tri === "asc" ? "Plus proches d'abord" : "Plus récents d'abord"}</Btn>
+            {speciale && <button type="button" className="pill pill--soft-blue ent__chip" onClick={() => changer("tous")}>{LIBELLES[filtre]} <IcX /></button>}
           </div>
-        </header>
-        <div className="ent__filtres">
-          <Tabs pills value={ONGLETS.includes(filtre) ? filtre : ""} onChange={(id) => changer(id as Filtre)} items={ONGLETS.map((f) => ({ id: f, label: LIBELLES[f], count: base.filter((x) => TEST[f](x, ref)).length }))} />
-          {!ONGLETS.includes(filtre) && <button type="button" className="pill pill--soft-blue ent__chip" onClick={() => changer("tous")}>{LIBELLES[filtre]} <IcX /></button>}
-          {q && <button type="button" className="pill pill--soft-blue ent__chip" onClick={() => changer(filtre, poste, "")}>Recherche : {q} <IcX /></button>}
-        </div>
-        <ul className="ent-list">
-          {liste.map((x, i) => {
-            const pv = statutPreVerif(x, ref);
-            const st = statutEntretien(x, ref);
-            return (
-              <li key={x.id} className="card lift ent-row rise" role="link" tabIndex={0} aria-label={`Rapport de ${nomComplet(x)}`} style={{ "--i": Math.min(i, 8), viewTransitionName: `ent-${x.id}` } as CSSProperties} onClick={() => ouvrir(x)} onKeyDown={(e) => clavier(e, x)}>
-                <div className="ent-row__who"><Avatar initiales={initiales(x)} couleur={x.candidat.couleur} /><div><strong>{nomComplet(x)}</strong><span>{x.candidat.poste}</span></div></div>
-                <div className="ent-row__col"><span className="col__label">Entretien</span><span className="col__value">{quand(x.date, ref)}</span></div>
-                <div className="ent-row__col"><span className="col__label">Pré-vérification</span><Pill ton={pv.ton} icon={icPv(pv.ton)}>{pv.texte}</Pill></div>
-                <div className="ent-row__col"><span className="col__label">Statut</span><Pill ton={doux(st.ton)} dot>{st.texte}</Pill>{x.decision.valeur !== "non_prise" && <span className="ent-row__dec">Décision : {DECISIONS_COURT[x.decision.valeur]}</span>}</div>
-                <Btn icon={<IcArrowUR />} onClick={(e) => { e.stopPropagation(); ouvrir(x); }}>Rapport</Btn>
-              </li>
-            );
-          })}
-        </ul>
-        {!liste.length && <Vide titre="Aucun entretien ne correspond." texte="Changez de filtre ou de poste." action={<Btn onClick={() => changer("tous", "", "")}>Tout montrer</Btn>} />}
-      </section>
 
-      <div className="ent__droite">
-        <section className="panel ent__nouvel rise" style={{ "--i": 2 } as CSSProperties}>
-          <h2 className="t-h1">Nouvel entretien</h2>
-          <NouvelEntretienForm />
+          <div className="tbl" role="table" aria-label="Entretiens">
+            <div className="tbl__head" role="row"><span>Candidat</span><span>Date</span><span>Pré-vérification</span><span>Statut</span><span /></div>
+            {liste.map((x, i) => {
+              const pv = statutPreVerif(x, ref);
+              const st = statutEntretien(x, ref);
+              const enAttente = TEST.preverif(x, ref);
+              return (
+                <div key={x.id} role="row" className="tbl__row rise" tabIndex={0} aria-label={`Rapport de ${nomComplet(x)}`} style={{ "--i": Math.min(i, 10), viewTransitionName: `ent-${x.id}` } as CSSProperties} onClick={() => ouvrir(x)} onKeyDown={(e) => clavier(e, x)}>
+                  <span className="tbl__who"><Avatar initiales={initiales(x)} couleur={x.candidat.couleur} /><span><b>{nomComplet(x)}</b><small>{x.candidat.poste}</small></span></span>
+                  <span className="tbl__date"><b>{memeJour(new Date(x.date), ref) ? "Aujourd'hui" : quand(x.date, ref).split(" · ")[0]}</b><small>{heure(x.date)}{x.statut === "termine" ? ` · ${x.dureeMin} min` : ""}</small></span>
+                  <span><Pill ton={pv.ton} dot>{pv.texte}</Pill></span>
+                  <span className="tbl__statut"><Pill ton={doux(st.ton)} dot>{st.texte}</Pill>{x.decision.valeur !== "non_prise" && <small>Décision : {DECISIONS_COURT[x.decision.valeur]}</small>}</span>
+                  <span className="tbl__act">
+                    {enAttente && <button type="button" className="icirc icirc--sm" title="Relancer le lien par e-mail" aria-label="Relancer le lien" onClick={(e) => { e.stopPropagation(); void envoyerPreVerif(x.id, true); }}><IcRefresh /></button>}
+                    {x.preVerification.statut === "non_envoyee" && x.statut !== "termine" && <button type="button" className="icirc icirc--sm" title="Envoyer le lien de pré-vérification" aria-label="Envoyer le lien" onClick={(e) => { e.stopPropagation(); void envoyerPreVerif(x.id); }}><IcMail /></button>}
+                    <span className="icirc icirc--sm tbl__go"><IcArrowR /></span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {!liste.length && <Vide titre="Aucun entretien ne correspond." texte="Changez de filtre, de poste ou de recherche." action={<Btn onClick={() => changer("tous", "", "")}>Tout montrer</Btn>} />}
         </section>
-        <section className="panel bloc rise" style={{ "--i": 3 } as CSSProperties}>
-          <h2 className="t-h2">Liens en attente</h2>
-          {!attente.length ? <Vide titre="Aucun lien en attente." texte="Tous les liens envoyés ont été ouverts ou faits." /> : (
+
+        <aside className="panel ent__attente rise" style={{ "--i": 4 } as CSSProperties}>
+          <div className="row" style={{ justifyContent: "space-between" }}><h2 className="t-h3">Liens en attente</h2><Pill ton={attente.length ? "soft-gold" : "soft-green"}>{attente.length}</Pill></div>
+          <p className="t-small muted">Candidats qui n'ont pas encore fait leur pré-vérification.</p>
+          {!attente.length ? <Vide titre="Aucun lien en attente." /> : (
             <ul className="attente">
               {attente.map((x) => (
                 <li key={x.id}>
-                  <i className={`dot dot--${x.preVerification.statut === "ouverte" ? "blue" : "gold"}`} />
-                  <a className="grow attente__nom" href={`#/rapport/${x.id}`}>{nomComplet(x)}</a>
-                  <button type="button" className="pill attente__btn" onClick={() => void envoyerPreVerif(x.id, true)} title={`Relancer ${x.candidat.prenom} par e-mail`}>
-                    <IcRefresh />{x.preVerification.statut === "ouverte" ? "Ouvert" : x.preVerification.relanceeLe ? `Relancé ${relatif(x.preVerification.relanceeLe, ref).toLowerCase()}` : `Envoyé ${relatif(x.preVerification.envoyeeLe ?? x.creeLe, ref).toLowerCase()}`} · Relancer
-                  </button>
+                  <Avatar initiales={initiales(x)} couleur={x.candidat.couleur} size="sm" />
+                  <span className="attente__txt"><a href={`#/rapport/${x.id}`}>{nomComplet(x)}</a><small>{x.preVerification.statut === "ouverte" ? "Lien ouvert, pas terminé" : x.preVerification.relanceeLe ? `Relancé ${relatif(x.preVerification.relanceeLe, ref).toLowerCase()}` : `Envoyé ${relatif(x.preVerification.envoyeeLe ?? x.creeLe, ref).toLowerCase()}`} · entretien {quand(x.date, ref).toLowerCase()}</small></span>
+                  <Btn size="sm" icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer</Btn>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </aside>
       </div>
     </div>
   );

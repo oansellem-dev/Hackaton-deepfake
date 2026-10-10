@@ -95,9 +95,22 @@ export ANTHROPIC_API_KEY=sk-ant-...                # optionnel : explication ref
 - Doc interactive de l'agent : `http://localhost:8000/docs`. Tests : `cd agent && .venv/Scripts/python -m pytest`.
 - Licence du modèle passif : recherche / non commercial. À remplacer avant un produit commercial.
 
+## Conformité RGPD
+
+Audit, corrections et questions juridiques ouvertes : [docs/conformite-rgpd.md](docs/conformite-rgpd.md). En bref : empreinte et détecteur de trucage calculés dans le navigateur (aucune image envoyée), gabarit chiffré et stocké à part sans identité, consentement biométrique explicite avec alternative sans biométrie et retrait, suppression à la décision, manuelle ou à expiration, lien candidat à usage unique, journal d'audit, clé d'accès (passkey) pour confirmer l'appareil en visio.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `BIOMETRIC_KEY` | fichier `data/biometric.key` | clé AES-256 des gabarits (64 caractères hexadécimaux) |
+| `BIOMETRIC_TTL_HOURS` | 24 | durée maximale d'un gabarit |
+| `BIOMETRIC_SWEEP_SECONDS` | 600 | fréquence de la suppression automatique |
+| `CANDIDATE_LINK_TTL_HOURS` | 24 | validité du lien de pré-vérification |
+| `FACE_SAME_PERSON_MIN` / `FACE_DIFFERENT_PERSON_MAX` | 0,40 / 0,25 | seuils de similarité d'empreinte |
+| `FORCE_HTTPS` | — | `1` derrière un proxy TLS : redirection HTTPS et HSTS |
+
 ## Lien de pré-vérification (2 pages)
 
-Le recruteur crée un entretien sur `/` et envoie `/check/<id>` au candidat. Il suit le résultat sur `/report/<id>`, qui se met à jour tout seul : verdict de pré-vérification, informations déclarées, ce qui a été relevé, défis réussis ou non.
+Le recruteur crée un entretien sur `/` (en indiquant son entreprise, responsable du traitement) et envoie `/check/<jeton>` au candidat : jeton de 32 caractères, valable 24 h, une seule utilisation. Il suit le résultat sur `/report/<id>`, qui se met à jour tout seul : verdict de pré-vérification, informations déclarées, ce qui a été relevé, défis réussis ou non.
 
 **Page 1 — Vos informations.** Prénom et nom (obligatoires), e-mail, téléphone, pays, ville, poste, entreprise, GitHub, LinkedIn (facultatifs), et **consentement explicite** (refusé côté serveur sans la case cochée). Vérifications, uniquement par des API publiques officielles :
 

@@ -4,6 +4,7 @@ import type {
   FaceIdPlan,
   FaceIdStepResult,
   FaceIdSubmission,
+  FlashSubmission,
   IdentityPayload,
   PrecheckPayload,
   SessionView,
@@ -47,6 +48,12 @@ export function createApi(base: string = DEFAULT_API_BASE) {
         `/api/sessions/${id}/faceid/submit`,
         { method: 'POST', body: JSON.stringify(payload) },
       ),
+    // Test du reflet de l'écran : résumé d'un essai (analysé dans le navigateur), ou « passer ».
+    sendFlash: (id: string, payload: FlashSubmission) =>
+      call<{ recorded: boolean; final: boolean }>(`/api/sessions/${id}/flash`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
     // Pendant l'entretien : proportions du visage affiché, comparées au profil de la pré-vérification.
     sendFaceSample: (id: string, sample: { ratios: number[]; yawDeg: number }) =>
       call<{ verdict: string }>(`/api/sessions/${id}/face-sample`, { method: 'POST', body: JSON.stringify(sample) }),

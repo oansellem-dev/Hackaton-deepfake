@@ -74,6 +74,16 @@ def test_face_continuity_only_penalizes_a_measured_difference():
     assert diff["score"] == 70 and diff["level"] == "orange" and any(s["id"] == "face_continuity" for s in diff["signals"])
 
 
+def test_screen_flash_only_penalizes_a_finished_test_without_reaction():
+    chal = [{"type": "hand_occlusion", "status": "passed", "compliance": 1.0}]
+    unknown = post({"challenges": chal, "screen_flash_responsive": None})
+    reacted = post({"challenges": chal, "screen_flash_responsive": True})
+    no_reaction = post({"challenges": chal, "screen_flash_responsive": False})
+    assert unknown["score"] == reacted["score"] == 100
+    assert no_reaction["score"] == 85 and any(s["id"] == "screen_flash" for s in no_reaction["signals"])
+    assert all("faux candidat" not in s["message"].lower() for s in no_reaction["signals"])
+
+
 def test_precheck_challenges_count_for_score_but_stay_recommended_live():
     out = post({"challenges": [{"type": "hand_occlusion", "status": "failed", "phase": "precheck"}],
                 "available_challenges": ["hand_occlusion", "head_turn", "random_phrase"]})

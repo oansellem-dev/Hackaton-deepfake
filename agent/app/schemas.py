@@ -77,6 +77,9 @@ class AssessmentInput(BaseModel):
     media: Media = Media()
     passive: PassiveSummary | None = None  # rempli par le serveur depuis /frame si absent
     face_continuity: bool | None = None  # visage de l'entretien cohérent avec celui de la pré-vérification ; None = non mesuré
+    # Test du reflet de l'écran (pré-vérification) : l'image a suivi les couleurs affichées par l'écran du candidat.
+    # False = aucune réaction sur un test terminé ; None = non fait, passé ou non concluant (ne pénalise pas).
+    screen_flash_responsive: bool | None = None
     available_challenges: list[ChallengeType] | None = None  # défis que le panneau sait détecter ; None = tous
 
 

@@ -10,6 +10,7 @@ import { attachSignaling } from './signaling.ts';
 import { forwardFrame, viewWithAgent } from './agent.ts';
 import { recordChallenge } from './challenges.ts';
 import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
+import { flashRouter } from './flash.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -68,6 +69,7 @@ app.post('/api/sessions/:id/challenges', async (req, res) => {
 });
 
 app.use(faceIdRouter);
+app.use(flashRouter);
 
 // Détecteur passif : le panneau envoie une capture du visage (JPEG) toutes les ~2 s.
 // Elle est transmise à l'agent local, analysée en mémoire, jamais conservée.

@@ -51,6 +51,11 @@ async function precheck(browser, id, who) {
   let shot = false;
   while (Date.now() - t0 < 180000) {
     if (await page.locator('text=Merci, c’est terminé').count()) break;
+    // Étape 3 (reflet de l'écran) : passée ici pour garder ce scénario inchangé ; elle a son propre test (flash.mjs).
+    if (await page.locator('text=Passer ce test').count()) {
+      await page.click('text=Passer ce test');
+      continue;
+    }
     const err = await page.locator('.faceid-error').allTextContents();
     if (err.length) { console.log('     erreur affichée :', err.join(' ')); break; }
     const state = await page.evaluate(() => {

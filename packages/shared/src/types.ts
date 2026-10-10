@@ -1,6 +1,7 @@
 // Contrat partagé entre le serveur, le site web et l'extension.
 
 import type { FaceIdPlan, FaceProfile } from './face.ts';
+import type { FlashSummary } from './flash.ts';
 
 export type Severity = 'strong' | 'medium';
 
@@ -68,6 +69,8 @@ export interface Session {
   faceId?: FaceIdPlan & { startedAt: number; completedAt?: number };
   // Proportions du visage (biométrie) : stockées chiffrées, jamais renvoyées au client, effacées à la décision.
   faceProfile?: FaceProfile;
+  // Test du reflet de l'écran : résumé de chaque essai (aucune mesure image par image, aucune image).
+  screenFlash?: FlashSummary;
   signals: Signal[];
   challenges: ChallengeRun[];
   decision?: { value: Decision; note?: string; at: number };

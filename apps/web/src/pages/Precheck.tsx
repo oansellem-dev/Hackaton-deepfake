@@ -2,14 +2,23 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { SUPPORTED_COUNTRIES, type FaceIdStep, type IdentityPayload } from '@kyc/shared';
 import { FaceId, type FaceIdOutcome } from '../components/FaceId.tsx';
+import { ScreenFlash, type ScreenFlashOutcome } from '../components/ScreenFlash.tsx';
 import { api } from '../config.ts';
 
-type Step = 'identity' | 'face' | 'done';
+type Step = 'identity' | 'face' | 'flash' | 'done';
 
 const STEPS: { id: Exclude<Step, 'done'>; label: string }[] = [
   { id: 'identity', label: '1. Vos informations' },
   { id: 'face', label: '2. Vérification du visage' },
+  { id: 'flash', label: '3. Reflet de l’écran' },
 ];
+
+const FLASH_TEXT: Record<ScreenFlashOutcome['result'], string> = {
+  passed: 'réalisé',
+  failed: 'non concluant',
+  inconclusive: 'non concluant',
+  skipped: 'passé',
+};
 
 const STEP_NAME: Record<FaceIdStep, string> = {
   center: 'Visage de face',
@@ -64,6 +73,7 @@ export function Precheck() {
   const [form, setForm] = useState<Form>({ ...EMPTY, country: saved?.country ?? 'FR' });
   const [consent, setConsent] = useState(false);
   const [outcome, setOutcome] = useState<FaceIdOutcome | null>(null);
+  const [flash, setFlash] = useState<ScreenFlashOutcome | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,7 +168,11 @@ export function Precheck() {
             <ul>
               <li>votre nom dans des sources publiques (Wikipédia, GitHub, ORCID, moteur de recherche) ;</li>
               <li>la cohérence de ce que vous déclarez (pays, téléphone, e-mail, profils) ;</li>
-              <li>à l’étape suivante : votre caméra, votre fuseau horaire, votre adresse IP et votre visage.</li>
+              <li>à l’étape suivante : votre caméra, votre fuseau horaire, votre adresse IP et votre visage ;</li>
+              <li>
+                enfin, le reflet des couleurs de votre écran sur votre visage (analysé dans votre navigateur, test
+                facultatif).
+              </li>
             </ul>
             <p className="muted">
               Les champs facultatifs vides ne vous pénalisent pas, et ne rien trouver sur vous en ligne non plus.
@@ -186,6 +200,18 @@ export function Precheck() {
           declaredCountry={form.country ?? 'FR'}
           onDone={(o) => {
             setOutcome(o);
+            saveProgress(id, 'flash', form.country ?? 'FR');
+            setStep('flash');
+          }}
+        />
+      )}
+
+      {step === 'flash' && (
+        <ScreenFlash
+          sessionId={id}
+          deviceId={outcome?.deviceId}
+          onDone={(f) => {
+            setFlash(f);
             saveProgress(id, 'done', form.country ?? 'FR');
             setStep('done');
           }}
@@ -195,7 +221,7 @@ export function Precheck() {
       {step === 'done' && (
         <div className="card">
           <h2>Merci, c’est terminé</h2>
-          {outcome && <p>Ce que nous avons vérifié :</p>}
+          {(outcome || flash) && <p>Ce que nous avons vérifié :</p>}
           <ul className="status-list">
             {outcome?.environment.map((r) => (
               <li key={r.label} className={`status-${r.status === 'contradiction' ? 'unknown' : r.status}`}>
@@ -207,6 +233,11 @@ export function Precheck() {
                 <strong>{STEP_NAME[s.step]}</strong> — {s.result === 'passed' ? 'réalisé' : 'non concluant'}
               </li>
             ))}
+            {flash && (
+              <li className={flash.result === 'passed' ? 'status-ok' : 'status-unknown'}>
+                <strong>Reflet de l’écran</strong> — {FLASH_TEXT[flash.result]}
+              </li>
+            )}
           </ul>
           <p className="muted">
             {!outcome

@@ -128,8 +128,56 @@ BRAVE_API_KEY=... BIOMETRIC_KEY=$(openssl rand -hex 32) npm run dev
 
 Au premier appel, l'agent télécharge ses modèles (DeepfakeGuard, YuNet, SFace : environ 70 Mo) depuis Hugging Face.
 
+## Étape 3 : test du reflet de l’écran
+
+Après la vérification du visage, l’écran du candidat passe en plein écran et affiche 12 couleurs tirées au hasard (400 à 600 ms chacune, environ 8 s en tout). Un vrai visage renvoie ces couleurs vers la caméra avec un léger retard. Une image injectée (caméra virtuelle, vidéo rejouée, visage de synthèse) ne voit pas l’écran du candidat et ne suit pas la suite.
+
+- **Analyse dans le navigateur** (`packages/shared/src/flash.ts`). Pour chaque couleur, on mesure la teinte moyenne du centre du visage, on retire la dérive lente de la caméra (balance des blancs), puis on calcule l’accord avec la suite affichée, sur 26 retards possibles (0 à 500 ms). On le compare à 1 000 suites tirées au hasard que l’écran n’a jamais affichées.
+- **Verdict d’un essai.**
+  - Réussi : accord ≥ 0,5 et moins de 1 % des suites au hasard font aussi bien.
+  - Échec : accord < 0,4 et pas meilleur que le hasard (p ≥ 0,05).
+  - Sinon, non concluant.
+  - Trop peu d’images ou visage absent donnent toujours non concluant (règle n° 1).
+- **Côté candidat.**
+  - Deux essais au plus, avec des conseils entre les deux (luminosité, distance, contre-jour).
+  - Le test devient un signal à vérifier (gravité moyenne, 15 points) seulement si tous les essais sont des échecs.
+  - Un test interrompu ou passé n’a aucun effet.
+  - « Passer ce test » est proposé avant le premier essai, pour les personnes sensibles aux lumières clignotantes. Les couleurs changent au plus 2,5 fois par seconde, sous le seuil WCAG de 3 flashs par seconde.
+- **Ce qui part au serveur** (`POST /api/sessions/:id/flash`) : le résumé de chaque essai (verdict, accord, p, retard, ampleur, images par seconde). Les mesures image par image restent dans le navigateur : la couleur de la peau image par image peut trahir le pouls, qui est une donnée de santé.
+- **Agent Python** : le champ `screen_flash_responsive` (`false` = aucune réaction sur un test terminé) retire 15 points.
+- **Limite connue.** Un échange de visage qui recopie l’éclairage de la vraie caméra de l’attaquant peut suivre les couleurs. Ce test vise les flux injectés. Une photo imprimée renvoie la lumière : elle passe ce test, mais pas les défis de mouvement. Les signaux sont complémentaires.
+
+### Espace de test : `/lab/flash`
+
+Il sert à faire les 20 essais du plan sans serveur ni entretien. Le journal reste dans le navigateur et s’exporte en CSV ou JSON. La page calcule le **taux de détection** (attaques classées « échec ») et le **taux de faux positifs** (vrais visages classés « échec »).
+
+- **Vrais visages (10 essais)** : sources « Caméra », dans plusieurs pièces, à plusieurs distances et plusieurs luminosités d’écran.
+- **Attaques (10 essais)** :
+  - « Vidéo rejouée, enregistrée ici » : bouton d’enregistrement de 6 s, la vidéo reste en mémoire dans l’onglet ;
+  - caméra virtuelle OBS qui diffuse une vidéo ;
+  - téléphone tenu devant la caméra ;
+  - filtre de visage.
+- **Les deux simulations** (photo qui renvoie l’écran, photo figée) vérifient seulement la chaîne technique. Elles ne comptent pas dans les chiffres.
+- **Graphiques** : les bandes des couleurs affichées et les courbes de la teinte mesurée, puis l’accord selon le retard face à la ligne du hasard.
+
+Calibré sur des caméras simulées (`packages/shared/test/flash.test.ts`) :
+
+| Cas | Réussi | Échec |
+|---|---|---|
+| Visage avec un reflet de 1,5 % ou plus | 100 % | 0 % |
+| Visage avec un reflet très faible (0,7 %) | 76 % | 2 % |
+| Image injectée | 1 à 2 % | 82 à 93 % |
+
+Ces chiffres sont à confirmer avec les 20 vrais essais. Les seuils sont dans `FLASH_THRESHOLDS`.
+
 ## Tests de bout en bout (`tools/e2e/`)
 
+- `npm test` : tests unitaires (mesures du visage, test du reflet).
+- `node tools/e2e/flash.mjs <photo de visage.jpg>` : 16 contrôles dans Chrome sans interface (site construit, serveur lancé, `BASE` et `CHROME_PATH` si besoin) :
+  - espace de test (photo qui renvoie l’écran → réussi, photo figée → échec) ;
+  - pré-vérification avec une fausse caméra fixe (deux essais → signal à vérifier, rapport) ;
+  - « Passer ce test » ;
+  - règles du serveur (ordre, nombre d’essais, validation).
 - `node tools/e2e/server.mjs <dossier de données>` : 30 contrôles sur l'API (consentement, caméra virtuelle, sources publiques, chiffrement, comparaison, effacement). Lancer le serveur avec `KYC_DATA_DIR=<dossier de données>`.
 - `python tools/e2e/make_video.py <visage.jpg> <sortie.y4m> [main.jpg]` : fabrique une fausse caméra (de face, tête tournée, main devant le visage).
 - `node tools/e2e/browser.mjs <candidat.y4m> <autre.y4m> <captures> all` : parcours complet dans Chrome sans interface (`npm i playwright-core` dans un dossier à part, `CHROME_PATH` si Chrome n'est pas au chemin Windows par défaut) : pré-vérification, visio avec la même personne, puis substitution par une autre personne.

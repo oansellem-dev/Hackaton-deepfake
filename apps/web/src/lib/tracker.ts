@@ -26,7 +26,13 @@ export function loadTracker(): Promise<Tracker> {
       }),
     });
     try {
-      return await make('GPU');
+      const gpu = await make('GPU');
+      // Sans WebGL utilisable, MediaPipe se crée sur le GPU puis échoue à la première image : on essaie à vide.
+      const probe = document.createElement('canvas');
+      probe.width = probe.height = 64;
+      gpu.face.detectForVideo(probe, nextTs());
+      gpu.hand.detectForVideo(probe, nextTs());
+      return gpu;
     } catch {
       return make('CPU');
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getChallenge, type SessionView, type Signal } from '@kyc/shared';
+import { combineFlashAttempts, getChallenge, type FlashSummary, type SessionView, type Signal } from '@kyc/shared';
 import { api } from '../config.ts';
 
 const DECISION_LABEL = {
@@ -12,6 +12,16 @@ const DECISION_LABEL = {
 const RESULT_LABEL = { passed: 'réussi', failed: 'non exécuté ou image déformée', inconclusive: 'non concluant' } as const;
 
 const PRECHECK_SOURCES: Signal['source'][] = ['identity', 'precheck', 'face'];
+
+const FLASH_RESULT = { passed: 'réussi', failed: 'aucune réaction de l’image', inconclusive: 'non concluant' } as const;
+
+function flashStatus(f?: FlashSummary): string {
+  if (!f) return 'pas encore fait';
+  const n = `${f.attempts.length} essai${f.attempts.length > 1 ? 's' : ''}`;
+  if (f.skipped) return 'passé par le candidat';
+  if (!f.final) return `interrompu après ${n}`;
+  return `${FLASH_RESULT[combineFlashAttempts(f.attempts).result]} (${n})`;
+}
 
 function SignalList({ signals }: { signals: Signal[] }) {
   if (signals.length === 0) return <p className="muted">Aucun signal.</p>;
@@ -99,6 +109,8 @@ export function Report() {
                   session.faceProfileSummary.angles ? ` et sous ${session.faceProfileSummary.angles} angle(s)` : ''
                 }), effacé à votre décision`
               : 'non enregistré ou effacé'}
+            {' · '}
+            test du reflet de l’écran : {flashStatus(session.screenFlash)}
           </p>
         )}
         <p className="muted">Le score et ces signaux sont une aide. La décision vous appartient.</p>

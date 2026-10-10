@@ -34,6 +34,10 @@ export function Home() {
         {error && <p className="muted">Serveur injoignable : {error}</p>}
       </div>
 
+      <p className="muted">
+        Équipe : <a href="/lab/flash">espace de test du reflet de l’écran</a> (essais et chiffres pour le jury).
+      </p>
+
       {session && (
         <div className="card">
           <p>

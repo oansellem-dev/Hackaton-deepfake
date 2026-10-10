@@ -54,6 +54,7 @@ export interface FaceIdOutcome {
   steps: { step: FaceIdStep; result: FaceIdStepResult['result'] }[];
   profileStored: boolean;
   environment: EnvResult[];
+  deviceId?: string; // caméra utilisée, reprise par le test du reflet de l'écran
 }
 
 interface Props {
@@ -344,8 +345,9 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
           samples: ratioSamples.length,
           angles: profileOk ? angleProfiles(angleSamples) : [],
         });
+        const deviceId = streamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
         stopCamera();
-        onDone({ steps: res.steps, profileStored: res.profileStored, environment: envRef.current });
+        onDone({ steps: res.steps, profileStored: res.profileStored, environment: envRef.current, deviceId });
       } catch (e) {
         stopCamera();
         setPhase('error');

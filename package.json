@@ -13,7 +13,8 @@
     "dev:ext": "npm -w apps/extension run dev",
     "share": "npm -w apps/web run build && npm -w apps/server run start",
     "build":"npm -w apps/web run build && npm -w apps/extension run build",
-    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension"
+    "test": "node --test packages/shared/test/*.test.ts",
+    "typecheck":"tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension"
   },
   "devDependencies": {
     "concurrently": "9.1.0",

@@ -30,6 +30,7 @@ function toAgentInput(session: Session) {
   const cam = statusOf(session, 'precheck.virtual-camera');
   const tz = statusOf(session, 'precheck.timezone');
   const face = statusOf(session, 'face.continuity');
+  const flash = statusOf(session, 'precheck.screen-flash');
   return {
     session_id: session.id,
     environment: {
@@ -37,6 +38,8 @@ function toAgentInput(session: Session) {
       timezone_consistent: tz === 'ok' ? true : tz === 'contradiction' ? false : null,
     },
     face_continuity: face === 'ok' ? true : face === 'contradiction' ? false : null,
+    // Test du reflet de l'écran : l'image a-t-elle suivi les couleurs affichées ? null = non fait ou non concluant.
+    screen_flash_responsive: flash === 'ok' ? true : flash === 'contradiction' ? false : null,
     challenges: session.challenges
       .filter((c) => TO_AGENT[c.challengeId])
       .map((c) => ({

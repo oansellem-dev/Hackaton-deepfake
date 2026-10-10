@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { FlashLab } from './pages/FlashLab.tsx';
 import { Home } from './pages/Home.tsx';
 import { Precheck } from './pages/Precheck.tsx';
 import { Report } from './pages/Report.tsx';
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/check/:id" element={<Precheck />} />
         <Route path="/visio/:id" element={<Visio />} />
         <Route path="/report/:id" element={<Report />} />
+        <Route path="/lab/flash" element={<FlashLab />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

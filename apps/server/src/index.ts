@@ -8,7 +8,7 @@ import type { ChallengeResult, Decision, PrecheckPayload } from '@kyc/shared';
 import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
 import { forwardFrame, viewWithAgent } from './agent.ts';
-import { recordChallenge } from './challenges.ts';
+import { cleanMetrics, recordChallenge } from './challenges.ts';
 import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 
@@ -58,12 +58,16 @@ app.post('/api/sessions/:id/challenges', async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
 
-  const { challengeId, result, durationMs } = req.body as {
+  const { challengeId, result, durationMs, metrics } = req.body as {
     challengeId: string;
     result: ChallengeResult;
     durationMs: number;
+    metrics?: unknown;
   };
-  if (!recordChallenge(session, challengeId, result, durationMs)) return res.status(400).json({ error: 'défi inconnu' });
+  if (!['passed', 'failed', 'inconclusive'].includes(result)) return res.status(400).json({ error: 'résultat inconnu' });
+  if (!recordChallenge(session, challengeId, result, Number(durationMs) || 0, 'live', cleanMetrics(metrics))) {
+    return res.status(400).json({ error: 'défi inconnu' });
+  }
   res.json(await viewWithAgent(session));
 });
 

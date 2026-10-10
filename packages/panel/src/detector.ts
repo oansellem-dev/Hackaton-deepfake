@@ -1,13 +1,20 @@
 import type { Challenge, ChallengeResult } from '@kyc/shared';
 
+// Verdict accompagné de mesures brutes (affichées au rapport, utiles pour régler les seuils).
+export interface DetectorOutcome {
+  result: ChallengeResult;
+  metrics?: Record<string, number>;
+}
+
 // Point de branchement de la brique B (moteur de défis).
 // Le détecteur lit les images de `video` (le flux capturé, rien n'est enregistré)
 // et renvoie son verdict avant `challenge.timeoutMs`, ou « inconclusive » à l'annulation.
+// L'implémentation MediaPipe est dans le site (apps/web/src/lib/liveDetector.ts), passée au panneau en propriété.
 export type ChallengeDetector = (
   video: HTMLVideoElement,
   challenge: Challenge,
   signal: AbortSignal,
-) => Promise<ChallengeResult>;
+) => Promise<ChallengeResult | DetectorOutcome>;
 
 // Bouchon en attendant MediaPipe : lit les images comme le fera le vrai détecteur,
 // puis répond « inconclusive », sans effet sur le score (règle n°1).

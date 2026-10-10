@@ -13,6 +13,22 @@ const RESULT_LABEL = { passed: 'réussi', failed: 'non exécuté ou image défor
 
 const PRECHECK_SOURCES: Signal['source'][] = ['identity', 'precheck', 'face'];
 
+// Mesures brutes des défis en direct : sans effet sur le score, elles servent à régler les seuils sur nos tests.
+const METRIC_LABEL: Record<string, (v: number) => string> = {
+  trackedRatio: (v) => `visage suivi ${Math.round(v * 100)} %`,
+  coverFrames: (v) => `${v} image(s) main sur le visage`,
+  faceUnderHandRatio: (v) => `visage encore détecté sous la main ${Math.round(v * 100)} %`,
+  maxTurnDeg: (v) => `rotation max ${Math.round(v)}°`,
+  mouthRange: (v) => `mouvement des lèvres ${v.toFixed(2)}`,
+  mouthCycles: (v) => `${v} ouverture(s) de la bouche`,
+};
+
+function formatMetrics(metrics?: Record<string, number>): string {
+  if (!metrics) return '';
+  const parts = Object.entries(metrics).map(([k, v]) => METRIC_LABEL[k]?.(v) ?? `${k} ${v}`);
+  return parts.length ? ` · ${parts.join(', ')}` : '';
+}
+
 function SignalList({ signals }: { signals: Signal[] }) {
   if (signals.length === 0) return <p className="muted">Aucun signal.</p>;
   return (
@@ -168,8 +184,9 @@ export function Report() {
         />
         <ul className="status-list">
           {liveChallenges.map((c) => (
-            <li key={c.at}>
+            <li key={c.at} className={c.result === 'passed' ? 'status-ok' : c.result === 'failed' ? 'status-contradiction' : 'status-unknown'}>
               {getChallenge(c.challengeId)?.label ?? c.challengeId} : {RESULT_LABEL[c.result]} ({(c.durationMs / 1000).toFixed(1)} s)
+              <span className="muted">{formatMetrics(c.metrics)}</span>
             </li>
           ))}
           {liveChallenges.length === 0 && <li className="muted">Aucun défi proposé pour l’instant.</li>}

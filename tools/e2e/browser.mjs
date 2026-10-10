@@ -1,5 +1,5 @@
 // Test de bout en bout dans un vrai Chrome (profil temporaire, sans interface), caméra simulée par une vidéo.
-// Usage : node browser.mjs <candidat.y4m> <autre.y4m> <dossier captures> [precheck|visio|all]
+// Usage : node browser.mjs <candidat.y4m> <autre.y4m> <dossier captures> [precheck|visio|all|live [fige.y4m]]
 // playwright-core pilote le Chrome installé (CHROME_PATH), sans télécharger de navigateur.
 import { chromium } from 'playwright-core';
 
@@ -86,6 +86,33 @@ async function visio(candidateBrowser, recruiterBrowser, id, seconds) {
 }
 
 const sig = (v, id) => v.signals.find((s) => s.id === id);
+
+// Défis en direct : le recruteur clique sur « J'ai proposé : … » trois fois de suite (défi recommandé par l'agent).
+async function liveChallenges(candidateBrowser, recruiterBrowser, id, tag) {
+  const cand = await newPage(candidateBrowser, 'visio-candidat');
+  const rec = await newPage(recruiterBrowser, 'visio-recruteur');
+  await cand.goto(`${BASE}/visio/${id}?role=candidate`);
+  await rec.goto(`${BASE}/visio/${id}?role=recruiter`);
+  await rec.waitForSelector('text=Connecté', { timeout: 30000 });
+  await rec.waitForTimeout(4000);
+  const results = [];
+  for (let i = 0; i < 3; i++) {
+    const btn = rec.locator('.kyc-actions button').first();
+    const label = (await btn.textContent())?.replace("J'ai proposé : ", '');
+    const t0 = Date.now();
+    await btn.click();
+    await rec.waitForFunction(() => !document.querySelector('.kyc-actions button')?.textContent?.includes('Analyse en cours'), null, { timeout: 40000 });
+    const v = await api(`/api/sessions/${id}`);
+    const last = v.challenges.filter((c) => c.phase !== 'precheck').at(-1);
+    console.log(`     ${label} → ${last?.result} en ${((Date.now() - t0) / 1000).toFixed(1)} s ${JSON.stringify(last?.metrics)}`);
+    results.push({ id: last?.challengeId, result: last?.result });
+    await rec.waitForTimeout(2500);
+  }
+  await rec.screenshot({ path: `${shots}/6-defis-${tag}.png` });
+  await cand.context().close();
+  await rec.context().close();
+  return results;
+}
 const candidateBrowser = await launch(candidateVideo);
 const recruiterBrowser = await launch(candidateVideo);
 
@@ -122,6 +149,32 @@ if (mode === 'visio' || mode === 'all') {
   ok(c?.status === 'contradiction', `continuité : ${c?.label} — ${c?.detail}`);
   console.log(`     score : ${v.score.value} (${v.score.level})`);
   await otherBrowser.close();
+}
+
+if (mode === 'live') {
+  const staticVideo = process.argv[6];
+  const id = (await api('/api/sessions', { candidateLabel: 'Défis en direct' })).id;
+  console.log(`--- Défis en direct, candidat qui fait les gestes (session ${id})`);
+  const r = await liveChallenges(candidateBrowser, recruiterBrowser, id, 'gestes');
+  ok(r.find((x) => x.id === 'hand-over-face')?.result === 'passed', 'main devant le visage : réussi');
+  ok(r.find((x) => x.id === 'head-turn')?.result === 'passed', 'rotation de la tête : réussi');
+  ok(r.find((x) => x.id === 'random-phrase')?.result === 'inconclusive', 'phrase (photo, lèvres immobiles) : non concluant, sans pénalité');
+  let v = await api(`/api/sessions/${id}`);
+  console.log(`     score : ${v.score.value} (${v.score.level})`);
+  ok(v.score.level === 'green', 'candidat qui fait les gestes : vert');
+
+  if (staticVideo) {
+    const id2 = (await api('/api/sessions', { candidateLabel: 'Image figée' })).id;
+    console.log(`--- Défis en direct, image figée qui ne bouge pas (session ${id2})`);
+    const frozen = await launch(staticVideo);
+    const r2 = await liveChallenges(frozen, recruiterBrowser, id2, 'fige');
+    ok(r2.find((x) => x.id === 'hand-over-face')?.result === 'failed', 'main devant le visage : non exécuté');
+    ok(r2.find((x) => x.id === 'head-turn')?.result === 'failed', 'rotation de la tête : non exécutée');
+    v = await api(`/api/sessions/${id2}`);
+    console.log(`     score : ${v.score.value} (${v.score.level}) — ${v.score.explanation.join(' / ')}`);
+    ok(v.score.level === 'red', 'image figée : rouge');
+    await frozen.close();
+  }
 }
 
 await candidateBrowser.close();

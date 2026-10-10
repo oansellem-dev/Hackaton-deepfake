@@ -139,8 +139,15 @@ export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDete
     setRunning(true);
     const start = performance.now();
     try {
-      const result = await detector(videoRef.current, challenge, controller.signal);
-      const updated = await api.sendChallenge(sessionId, challenge.id, result, Math.round(performance.now() - start));
+      const outcome = await detector(videoRef.current, challenge, controller.signal);
+      const { result, metrics } = typeof outcome === 'string' ? { result: outcome, metrics: undefined } : outcome;
+      const updated = await api.sendChallenge(
+        sessionId,
+        challenge.id,
+        result,
+        Math.round(performance.now() - start),
+        metrics,
+      );
       setSession(updated);
       setChallenge(nextChallenge(updated));
     } catch (e) {

@@ -14,6 +14,16 @@ GOTCHA_DEGRADATION = {
     ChallengeType.RANDOM_PHRASE: 0.0,  # pas évalué par GOTCHA ; sert à vérifier la réactivité
 }
 
+# Nom des défis tel qu'il s'affiche au recruteur.
+CHALLENGE_LABEL = {
+    ChallengeType.HAND_OCCLUSION: "main devant le visage",
+    ChallengeType.HEAD_TURN: "rotation de la tête",
+    ChallengeType.FINGER_PRESS: "doigt sur la joue",
+    ChallengeType.SUNGLASSES: "lunettes de soleil",
+    ChallengeType.FACEMASK: "bas du visage couvert",
+    ChallengeType.RANDOM_PHRASE: "phrase aléatoire",
+}
+
 MAX_CHALLENGE_PENALTY = 45
 VIRTUAL_CAMERA_PENALTY = 25
 LOCATION_MISMATCH_PENALTY = 10
@@ -45,6 +55,7 @@ def degradation(c: ChallengeResult) -> float:
 def _challenge_signals(inp: AssessmentInput) -> list[Signal]:
     out = []
     for c in inp.challenges:
+        where = " (pré-vérification)" if c.phase == "precheck" else ""
         if c.status == ChallengeStatus.FAILED:
             m = degradation(c)
             # Un défi qui trahit fort les deepfakes (main, déformation) pèse plus qu'un défi faible (rotation).
@@ -52,12 +63,12 @@ def _challenge_signals(inp: AssessmentInput) -> list[Signal]:
             penalty = round(MAX_CHALLENGE_PENALTY * max(m, 0.5) * weight)
             out.append(Signal(
                 id=f"challenge_failed.{c.type.value}", severity=Severity.STRONG, penalty=penalty,
-                message=f"Défi « {c.type.value} » non exécuté ou image déformée pendant le défi : signal à vérifier.",
+                message=f"Défi « {CHALLENGE_LABEL[c.type]} »{where} non exécuté ou image déformée : signal à vérifier.",
                 evidence={"degradation": round(m, 2), "compliance": c.compliance, "fidelity_loss": c.fidelity_loss},
             ))
         elif c.status == ChallengeStatus.PASSED:
             out.append(Signal(id=f"challenge_passed.{c.type.value}", severity=Severity.INFO, penalty=0,
-                              message=f"Défi « {c.type.value} » exécuté normalement."))
+                              message=f"Défi « {CHALLENGE_LABEL[c.type]} »{where} exécuté normalement."))
         if c.response_delay_ms is not None and c.response_delay_ms > SLOW_RESPONSE_MS:
             out.append(Signal(id=f"slow_response.{c.type.value}", severity=Severity.MEDIUM, penalty=SLOW_RESPONSE_PENALTY,
                               message="Délai de réponse inhabituellement long : signal à vérifier.",

@@ -1,21 +1,30 @@
 """Fabrique une vidéo Y4M servant de fausse caméra à Chrome (--use-file-for-fake-video-capture).
 
-Usage : python make_video.py <visage.jpg> <sortie.y4m> [main.jpg] [apercu_dir]
-Séquence en boucle (15 i/s) : de face, tête tournée d'un côté, de face, de l'autre côté, de face, main devant le visage.
+Usage : python make_video.py <visage.jpg> <sortie.y4m> [--hand main.jpg] [--mode precheck|live|static] [--preview dossier]
+
+Modes (vidéo jouée en boucle, 15 i/s) :
+- precheck : 3 s de face (cadrage), tête tournée d'un côté puis de l'autre, puis main devant le visage ;
+- live     : gestes plus rapprochés (la main revient toutes les ~6 s), pour les défis en direct ;
+- static   : visage de face immobile, sans aucun geste (cas « défi non exécuté »).
 La rotation est simulée par une déformation cylindrique de l'image ; la main est une photo collée par-dessus.
 """
+import argparse
 import math
-import sys
 
 import cv2
 import numpy as np
 
 W, H, FPS = 640, 480, 15
-face_path, out_path = sys.argv[1], sys.argv[2]
-hand_path = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] != "-" else None
-preview_dir = sys.argv[4] if len(sys.argv) > 4 else None
 
-src = cv2.imread(face_path)
+parser = argparse.ArgumentParser()
+parser.add_argument("face")
+parser.add_argument("out")
+parser.add_argument("--hand")
+parser.add_argument("--mode", choices=["precheck", "live", "static"], default="precheck")
+parser.add_argument("--preview")
+args = parser.parse_args()
+
+src = cv2.imread(args.face)
 cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 faces = cascade.detectMultiScale(cv2.cvtColor(src, cv2.COLOR_BGR2GRAY), 1.1, 5, minSize=(60, 60))
 x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
@@ -36,10 +45,10 @@ def turned(img, theta_deg):
     xs = np.arange(W, dtype=np.float32)
     u = (xs - cx) / R
     inside = np.abs(u) < 1
-    phi = np.arcsin(np.clip(u, -1, 1)) - theta
-    src_x = np.where(inside, cx + R * np.sin(np.clip(phi, -math.pi / 2, math.pi / 2)), xs)
+    phi = np.clip(np.arcsin(np.clip(u, -1, 1)) - theta, -math.pi / 2, math.pi / 2)
+    src_x = np.where(inside, cx + R * np.sin(phi), xs)
     # Le côté qui se rapproche grossit un peu, l'autre rapetisse (perspective).
-    depth = np.where(inside, np.cos(np.clip(phi, -math.pi / 2, math.pi / 2)) - np.cos(np.arcsin(np.clip(u, -1, 1))), 0)
+    depth = np.where(inside, np.cos(phi) - np.cos(np.arcsin(np.clip(u, -1, 1))), 0)
     yscale = 1 + 0.08 * depth
     map_x = np.tile(src_x, (H, 1)).astype(np.float32)
     ys = np.arange(H, dtype=np.float32)[:, None]
@@ -48,8 +57,8 @@ def turned(img, theta_deg):
 
 
 hand = None
-if hand_path:
-    hand_img = cv2.imread(hand_path)
+if args.hand:
+    hand_img = cv2.imread(args.hand)
     target_h = int(face_h * 1.5)
     hand = cv2.resize(hand_img, (int(hand_img.shape[1] * target_h / hand_img.shape[0]), target_h))
 
@@ -67,28 +76,35 @@ def with_hand(img, progress):
     return out
 
 
-frames = []
-ramp = lambda n: [i / (n - 1) for i in range(n)]
-frames += [base] * 45
-for side in (1, -1):
-    frames += [turned(base, side * 32 * t) for t in ramp(8)]
-    frames += [turned(base, side * 32)] * 15
-    frames += [turned(base, side * 32 * (1 - t)) for t in ramp(8)]
-    frames += [base] * 10
-if hand is not None:
-    frames += [with_hand(base, t) for t in ramp(8)]
-    frames += [with_hand(base, 1)] * 15
-    frames += [with_hand(base, 1 - t) for t in ramp(8)]
-    frames += [base] * 10
+def ramp(n):
+    return [i / (n - 1) for i in range(n)]
 
-with open(out_path, "wb") as f:
+
+def turn(side):
+    return ([turned(base, side * 32 * t) for t in ramp(8)] + [turned(base, side * 32)] * 15
+            + [turned(base, side * 32 * (1 - t)) for t in ramp(8)])
+
+
+def hand_pass():
+    if hand is None:
+        return []
+    return [with_hand(base, t) for t in ramp(8)] + [with_hand(base, 1)] * 15 + [with_hand(base, 1 - t) for t in ramp(8)]
+
+
+if args.mode == "static":
+    frames = [base] * 45
+elif args.mode == "live":
+    frames = [base] * 20 + hand_pass() + [base] * 10 + turn(1) + [base] * 20 + hand_pass() + [base] * 10 + turn(-1)
+else:
+    frames = [base] * 45 + turn(1) + [base] * 10 + turn(-1) + [base] * 10 + hand_pass() + [base] * 10
+
+with open(args.out, "wb") as f:
     f.write(f"YUV4MPEG2 W{W} H{H} F{FPS}:1 Ip A1:1 C420jpeg\n".encode())
     for fr in frames:
         f.write(b"FRAME\n")
         f.write(cv2.cvtColor(fr, cv2.COLOR_BGR2YUV_I420).tobytes())
 
-if preview_dir:
-    for name, idx in [("face", 10), ("turn_a", 45 + 15), ("turn_b", 45 + 41 + 15), ("hand", len(frames) - 25)]:
-        if idx < len(frames):
-            cv2.imwrite(f"{preview_dir}/{name}.jpg", frames[idx])
-print(f"{out_path} : {len(frames)} images ({len(frames) / FPS:.1f} s), visage {face_w:.0f}x{face_h:.0f} px")
+if args.preview:
+    for name, idx in [("face", 10), ("milieu", len(frames) // 2), ("fin", len(frames) - 20)]:
+        cv2.imwrite(f"{args.preview}/{name}.jpg", frames[idx])
+print(f"{args.out} : {len(frames)} images ({len(frames) / FPS:.1f} s, mode {args.mode}), visage {face_w:.0f}x{face_h:.0f} px")

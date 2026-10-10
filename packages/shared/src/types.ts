@@ -28,6 +28,7 @@ export interface ChallengeRun {
   durationMs: number;
   at: number;
   phase?: 'precheck' | 'live'; // absent = pendant l'entretien
+  metrics?: Record<string, number>; // mesures brutes du détecteur, affichées au rapport, sans effet sur le score
 }
 
 // Règle n°2 : le recruteur décide, l'outil éclaire.

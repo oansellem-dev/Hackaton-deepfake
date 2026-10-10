@@ -31,10 +31,16 @@ export function createApi(base: string = DEFAULT_API_BASE) {
         `/api/sessions/${id}/precheck`,
         { method: 'POST', body: JSON.stringify(payload) },
       ),
-    sendChallenge: (id: string, challengeId: string, result: ChallengeResult, durationMs: number) =>
+    sendChallenge: (
+      id: string,
+      challengeId: string,
+      result: ChallengeResult,
+      durationMs: number,
+      metrics?: Record<string, number>,
+    ) =>
       call<SessionView>(`/api/sessions/${id}/challenges`, {
         method: 'POST',
-        body: JSON.stringify({ challengeId, result, durationMs }),
+        body: JSON.stringify({ challengeId, result, durationMs, metrics }),
       }),
     // Pré-vérification : nom, prénom et consentement explicite, puis parcours Face ID.
     sendIdentity: (id: string, payload: IdentityPayload) =>

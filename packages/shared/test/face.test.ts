@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   angleProfiles, boundingBox, combineContinuity, computeRatios, cosine, estimateYawDeg, handPointsOverFace,
-  isValidEmbedding, isValidRatios, judgeContinuity, judgeIdentity, meanEmbedding, medianRatios, ratioDistance,
+  isValidEmbedding, isValidRatios, judgeContinuity, judgeIdentity, meanEmbedding, medianRatios, mouthOpenness, ratioDistance,
   referenceFor, type FaceProfile, type Point,
 } from '../src/face.ts';
 
@@ -108,4 +108,13 @@ test('verdict combiné : un écart suffit, l’empreinte prime pour « même per
   assert.equal(combineContinuity('consistent', 'unknown'), 'consistent');
   assert.equal(combineContinuity('unknown', 'consistent'), 'consistent');
   assert.equal(combineContinuity('unknown', 'unknown'), 'unknown');
+});
+
+test('ouverture de la bouche : ~0 fermée, nette quand elle s’ouvre', () => {
+  const closed = fakeFace();
+  closed[13] = { x: 0.5, y: 0.62, z: 0 }; closed[14] = { x: 0.5, y: 0.62, z: 0 };
+  const open = fakeFace();
+  open[13] = { x: 0.5, y: 0.6, z: 0 }; open[14] = { x: 0.5, y: 0.66, z: 0 };
+  assert.ok(mouthOpenness(closed, 640, 480) < 0.01);
+  assert.ok(mouthOpenness(open, 640, 480) > 0.1);
 });

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { RecruiterPanel } from '@kyc/panel';
 import { API_BASE, WS_URL } from '../config.ts';
+import { createLiveDetector } from '../lib/liveDetector.ts';
 import { sampleFace } from '../lib/tracker.ts';
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -17,6 +18,7 @@ export function Visio() {
   const remoteRef = useRef<HTMLVideoElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState('Connexion…');
+  const detector = useMemo(() => createLiveDetector(id), [id]);
 
   useEffect(() => {
     let closed = false;
@@ -124,6 +126,7 @@ export function Visio() {
             apiBase={API_BASE}
             reportUrl={`/report/${id}`}
             faceSampler={sampleFace}
+            detector={detector}
           />
         </aside>
       )}

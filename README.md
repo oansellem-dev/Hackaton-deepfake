@@ -128,10 +128,21 @@ BRAVE_API_KEY=... BIOMETRIC_KEY=$(openssl rand -hex 32) npm run dev
 
 Au premier appel, l'agent télécharge ses modèles (DeepfakeGuard, YuNet, SFace : environ 70 Mo) depuis Hugging Face.
 
+## Défis en direct (brique B)
+
+Dans la visio de secours, le bouton « J'ai proposé : … » du panneau lance la même détection MediaPipe que la pré-vérification, sur le flux du candidat (`apps/web/src/lib/liveDetector.ts`) :
+
+- **main devant le visage** : au moins 8 points de la main dans le visage pendant 4 images ; une capture part vers l'agent quand la main repart (c'est là qu'un face-swap se trahit) ;
+- **rotation de la tête** : 14° par rapport à l'angle de départ (la caméra n'est pas toujours bien en face) ;
+- **phrase aléatoire** : au moins deux ouvertures-fermetures de la bouche, mesurées de face et sans main près du visage. Jamais « non exécuté » : une parole peut ne pas se voir.
+
+Délai 12 s (15 s pour la phrase). Au-delà, « non exécuté » seulement si le visage était bien suivi, sinon « non concluant », sans effet sur le score. Des mesures brutes (visage suivi, images main sur le visage, rotation max, mouvement des lèvres) sont enregistrées avec chaque défi et affichées au rapport, pour régler les seuils sur nos 20 tests. L'extension Chrome utilise encore le détecteur bouchon : il faudra y embarquer MediaPipe (WASM et modèles).
+
 ## Tests de bout en bout (`tools/e2e/`)
 
 - `node tools/e2e/server.mjs <dossier de données>` : 30 contrôles sur l'API (consentement, caméra virtuelle, sources publiques, chiffrement, comparaison, effacement). Lancer le serveur avec `KYC_DATA_DIR=<dossier de données>`.
-- `python tools/e2e/make_video.py <visage.jpg> <sortie.y4m> [main.jpg]` : fabrique une fausse caméra (de face, tête tournée, main devant le visage).
+- `python tools/e2e/make_video.py <visage.jpg> <sortie.y4m> --hand main.jpg --mode precheck|live|static` : fabrique une fausse caméra (de face, tête tournée, main devant le visage ; `static` = image figée).
 - `node tools/e2e/browser.mjs <candidat.y4m> <autre.y4m> <captures> all` : parcours complet dans Chrome sans interface (`npm i playwright-core` dans un dossier à part, `CHROME_PATH` si Chrome n'est pas au chemin Windows par défaut) : pré-vérification, visio avec la même personne, puis substitution par une autre personne.
+- `node tools/e2e/browser.mjs <live.y4m> <autre.y4m> <captures> live <fige.y4m>` : défis en direct, avec un candidat qui fait les gestes (vert) puis une image figée (rouge).
 
 À régler sur nos 20 tests : seuils de continuité (`packages/shared/src/face.ts`) et de rotation (`TURN_YAW_DEG` dans `FaceId.tsx`). Le panneau de l'extension Chrome ne mesure pas encore les proportions du visage, mais ses captures alimentent déjà l'empreinte.

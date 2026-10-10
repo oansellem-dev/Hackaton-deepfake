@@ -42,6 +42,7 @@ class Environment(BaseModel):
     virtual_camera_detected: bool | None = None
     camera_labels: list[str] = []
     vpn_suspected: bool | None = None
+    timezone_consistent: bool | None = None  # fuseau du navigateur cohérent avec le pays déclaré
     browser_timezone: str | None = None
     declared_timezone: str | None = None
     ip_country: str | None = None
@@ -73,6 +74,7 @@ class AssessmentInput(BaseModel):
     cv_contradictions: list[CvContradiction] = []  # uniquement du texte fourni par le candidat
     media: Media = Media()
     passive: PassiveSummary | None = None  # rempli par le serveur depuis /frame si absent
+    available_challenges: list[ChallengeType] | None = None  # défis que le panneau sait détecter ; None = tous
 
 
 class Severity(str, Enum):

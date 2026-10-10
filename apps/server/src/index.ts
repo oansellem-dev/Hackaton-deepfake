@@ -7,7 +7,8 @@ import express from 'express';
 import { getChallenge, type ChallengeResult, type Decision, type PrecheckPayload } from '@kyc/shared';
 import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
-import { createSession, getSession, upsertSignals, view } from './store.ts';
+import { forwardFrame, viewWithAgent } from './agent.ts';
+import { createSession, getSession, upsertSignals } from './store.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -20,15 +21,15 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/sessions', (req, res) => {
+app.post('/api/sessions', async (req, res) => {
   const session = createSession(String(req.body?.candidateLabel ?? 'Candidat'));
-  res.status(201).json(view(session));
+  res.status(201).json(await viewWithAgent(session));
 });
 
-app.get('/api/sessions/:id', (req, res) => {
+app.get('/api/sessions/:id', async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
-  res.json(view(session));
+  res.json(await viewWithAgent(session));
 });
 
 // Brique A : la page candidat envoie ses signaux d'environnement.
@@ -46,7 +47,7 @@ app.post('/api/sessions/:id/precheck', (req, res) => {
 });
 
 // Brique B : résultat d'un défi exécuté pendant l'entretien.
-app.post('/api/sessions/:id/challenges', (req, res) => {
+app.post('/api/sessions/:id/challenges', async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
 
@@ -79,17 +80,31 @@ app.post('/api/sessions/:id/challenges', (req, res) => {
             : 'Résultat non concluant, sans effet sur le score.',
     },
   ]);
-  res.json(view(session));
+  res.json(await viewWithAgent(session));
+});
+
+// Détecteur passif : le panneau envoie une capture du visage (JPEG) toutes les ~2 s.
+// Elle est transmise à l'agent local, analysée en mémoire, jamais conservée.
+app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' }), async (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'session inconnue' });
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'image manquante' });
+  try {
+    const { status, body } = await forwardFrame(session.id, req.body, req.headers['content-type'] ?? 'image/jpeg');
+    res.status(status).json(body);
+  } catch {
+    res.status(503).json({ error: 'agent injoignable' });
+  }
 });
 
 // Règle n°2 : la décision appartient au recruteur, on la trace pour le rapport (brique E).
-app.post('/api/sessions/:id/decision', (req, res) => {
+app.post('/api/sessions/:id/decision', async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
 
   const { value, note } = req.body as { value: Decision; note?: string };
   session.decision = { value, note, at: Date.now() };
-  res.json(view(session));
+  res.json(await viewWithAgent(session));
 });
 
 // Mode partage : le serveur sert aussi le site construit (apps/web/dist), donc un seul tunnel suffit.

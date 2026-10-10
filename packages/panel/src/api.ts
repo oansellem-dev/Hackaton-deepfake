@@ -26,6 +26,15 @@ export function createApi(base: string = DEFAULT_API_BASE) {
         method: 'POST',
         body: JSON.stringify({ challengeId, result, durationMs }),
       }),
+    // Détecteur passif : une capture JPEG du visage. Analysée en mémoire côté agent, jamais conservée.
+    sendFrame: async (id: string, image: Blob): Promise<void> => {
+      const res = await fetch(`${base}/api/sessions/${id}/frame`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: image,
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+    },
     sendDecision: (id: string, value: Decision, note?: string) =>
       call<SessionView>(`/api/sessions/${id}/decision`, { method: 'POST', body: JSON.stringify({ value, note }) }),
   };

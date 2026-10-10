@@ -74,7 +74,8 @@ def _environment_signals(inp: AssessmentInput) -> list[Signal]:
     mismatch = []
     if e.ip_country and e.declared_country and e.ip_country.upper() != e.declared_country.upper():
         mismatch.append("pays de l'IP")
-    if e.browser_timezone and e.declared_timezone and e.browser_timezone != e.declared_timezone:
+    if e.timezone_consistent is False or (
+            e.browser_timezone and e.declared_timezone and e.browser_timezone != e.declared_timezone):
         mismatch.append("fuseau horaire")
     if mismatch:
         vpn = " Un VPN est signalé, ce qui peut l'expliquer (VPN d'entreprise légitime)." if e.vpn_suspected else ""
@@ -117,7 +118,7 @@ def evaluate(inp: AssessmentInput) -> tuple[int | None, Level, list[Signal]]:
     if not has_challenge_evidence and penalty == 0:
         return None, Level.INSUFFICIENT, signals
     score = max(0, 100 - penalty)
-    level = Level.GREEN if score >= 75 else Level.ORANGE if score >= 45 else Level.RED
+    level = Level.GREEN if score >= 80 else Level.ORANGE if score >= 50 else Level.RED
     # Sans aucun défi concluant, on ne peut pas affirmer le vert.
     if not has_challenge_evidence and level == Level.GREEN:
         level = Level.INSUFFICIENT

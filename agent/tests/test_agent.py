@@ -50,3 +50,16 @@ def test_recommendations_skip_done_challenges_and_excluded_types():
     out = post({"challenges": [{"type": "hand_occlusion", "status": "passed", "compliance": 1.0}]})
     types = [r["challenge"] for r in out["recommendations"]]
     assert "hand_occlusion" not in types and "alter_expression" not in types
+
+
+def test_virtual_camera_alone_is_orange_not_green():
+    out = post({"environment": {"virtual_camera_detected": True}})
+    assert out["level"] == "orange" and out["score"] == 75
+
+
+def test_timezone_flag_and_available_challenges():
+    out = post({"environment": {"timezone_consistent": False},
+                "challenges": [{"type": "head_turn", "status": "passed"}],
+                "available_challenges": ["hand_occlusion", "head_turn", "random_phrase"]})
+    assert any(s["id"] == "location_mismatch" for s in out["signals"])
+    assert {r["challenge"] for r in out["recommendations"]} <= {"hand_occlusion", "random_phrase"}

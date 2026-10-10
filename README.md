@@ -74,3 +74,23 @@ Si les deux vidéos ne se connectent pas (Wi-Fi d'école ou d'entreprise qui blo
 - `getUserMedia` exige HTTPS en dehors de `localhost`. Pour une visio de secours entre deux machines, passer par un tunnel HTTPS (ngrok, cloudflared) ou `@vitejs/plugin-basic-ssl`. Mettre aussi `VITE_API_URL` et `host_permissions` à jour.
 - Géolocalisation de l'IP : pas encore branchée (signal `unknown`).
 - Le stockage est en mémoire : un redémarrage du serveur efface les entretiens.
+
+## Agent de score et détecteur passif (dossier `agent/`)
+
+Service FastAPI (Python) branché sur le serveur Node : il calcule le score à partir de tous les signaux, rédige
+l'explication, recommande le prochain défi et analyse localement des captures du visage (détecteur de face-swap,
+DeepfakeGuard V2 en ONNX, rien n'est envoyé à un tiers ni conservé).
+
+```bash
+cd agent
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt     # Linux/macOS : .venv/bin/pip
+export ANTHROPIC_API_KEY=sk-ant-...                # optionnel : explication reformulée par Claude Haiku
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
+```
+
+- Le serveur Node appelle `AGENT_URL` (défaut `http://localhost:8000`). Si l'agent est arrêté, il retombe sur `computeScore` : rien ne casse.
+- Le panneau envoie une capture réduite du flux toutes les 2 s (`POST /api/sessions/:id/frame`), que le serveur transmet à l'agent. Après 5 captures, le détecteur peut ajouter un signal moyen (au plus 15 points).
+- La première recommandation de l'agent remplace le tirage aléatoire du premier défi, puis chaque défi suivant.
+- Doc interactive de l'agent : `http://localhost:8000/docs`. Tests : `cd agent && .venv/Scripts/python -m pytest`.
+- Licence du modèle passif : recherche / non commercial. À remplacer avant un produit commercial.

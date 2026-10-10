@@ -1,0 +1,95 @@
+import { computeScore, getChallenge, type AgentInfo, type Session, type SessionView } from '@kyc/shared';
+
+// Agent de score et de recommandation (agent/, FastAPI). S'il est injoignable, on retombe sur computeScore.
+const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:8000';
+const TIMEOUT_MS = 15000;
+
+// Défis de la bibliothèque ↔ types de l'agent.
+const TO_AGENT: Record<string, string> = {
+  'hand-over-face': 'hand_occlusion',
+  'head-turn': 'head_turn',
+  'random-phrase': 'random_phrase',
+};
+const FROM_AGENT = Object.fromEntries(Object.entries(TO_AGENT).map(([id, type]) => [type, id]));
+
+interface AgentOutput {
+  score: number | null;
+  level: 'green' | 'orange' | 'red' | 'insufficient_data';
+  explanation: string;
+  recommendations: { challenge: string; phrase: string; rationale: string }[];
+}
+
+function statusOf(session: Session, id: string) {
+  return session.signals.find((s) => s.id === id)?.status;
+}
+
+// Traduit une session en entrée de l'agent. Un signal « unknown » devient null : il ne compte jamais.
+function toAgentInput(session: Session) {
+  const cam = statusOf(session, 'precheck.virtual-camera');
+  const tz = statusOf(session, 'precheck.timezone');
+  return {
+    session_id: session.id,
+    environment: {
+      virtual_camera_detected: cam === 'contradiction' ? true : cam === 'ok' ? false : null,
+      timezone_consistent: tz === 'ok' ? true : tz === 'contradiction' ? false : null,
+    },
+    challenges: session.challenges
+      .filter((c) => TO_AGENT[c.challengeId])
+      .map((c) => ({
+        type: TO_AGENT[c.challengeId],
+        status: c.result === 'passed' ? 'passed' : c.result === 'failed' ? 'failed' : 'inconclusive',
+      })),
+    available_challenges: Object.values(TO_AGENT),
+  };
+}
+
+// Vue de session avec le score de l'agent ; repli sur le score local si l'agent ne répond pas.
+export async function viewWithAgent(session: Session): Promise<SessionView> {
+  const local = computeScore(session.signals);
+  try {
+    const res = await fetch(`${AGENT_URL}/assess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toAgentInput(session)),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`agent ${res.status}`);
+    const out = (await res.json()) as AgentOutput;
+
+    // Données insuffisantes côté agent : le score et le niveau restent ceux des signaux de pré-vérification.
+    const insufficient = out.level === 'insufficient_data';
+    const explanation = out.explanation
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const recommendations = out.recommendations
+      .filter((r) => FROM_AGENT[r.challenge] && getChallenge(FROM_AGENT[r.challenge]))
+      .map((r) => ({ challengeId: FROM_AGENT[r.challenge], phrase: r.phrase, rationale: r.rationale }));
+    const agent: AgentInfo = { available: true, recommendations };
+    return {
+      ...session,
+      score: {
+        value: out.score ?? local.value,
+        level: out.level === 'insufficient_data' ? local.level : out.level,
+        explanation: insufficient ? local.explanation : explanation,
+      },
+      agent,
+    };
+  } catch (err) {
+    console.warn('Agent de score injoignable, score local utilisé :', String(err));
+    return { ...session, score: local, agent: { available: false, recommendations: [] } };
+  }
+}
+
+// Transmet une capture du visage au détecteur passif local. L'image n'est ni stockée ni journalisée.
+export async function forwardFrame(sessionId: string, image: Buffer, contentType: string) {
+  const form = new FormData();
+  form.append('image', new Blob([new Uint8Array(image)], { type: contentType }), 'frame.jpg');
+  const res = await fetch(`${AGENT_URL}/frame/${encodeURIComponent(sessionId)}`, {
+    method: 'POST',
+    body: form,
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}

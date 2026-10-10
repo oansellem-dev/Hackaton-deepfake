@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { pickChallenge, type Challenge, type Decision, type SessionView } from '@kyc/shared';
+import { getChallenge, pickChallenge, type Challenge, type Decision, type SessionView } from '@kyc/shared';
 import { createApi } from './api.ts';
 import { stubDetector, type ChallengeDetector } from './detector.ts';
 import { Mascot } from './Mascot.tsx';
@@ -25,6 +25,17 @@ const DECISIONS: { value: Decision; label: string }[] = [
   { value: 'stop', label: "Mettre fin à l'entretien" },
 ];
 
+const FRAME_INTERVAL_MS = 2000;
+const FRAME_MAX_WIDTH = 640;
+
+// Prochain défi : celui que recommande l'agent s'il est connu du panneau, sinon un tirage au hasard.
+function nextChallenge(session: SessionView): Challenge {
+  const done = session.challenges.map((c) => c.challengeId);
+  const rec = session.agent?.recommendations.find((r) => getChallenge(r.challengeId));
+  if (rec) return { ...getChallenge(rec.challengeId)!, mascotLine: rec.phrase };
+  return pickChallenge(done);
+}
+
 export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDetector, reportUrl }: Props) {
   const api = useMemo(() => createApi(apiBase), [apiBase]);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,18 +44,58 @@ export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDete
   const [error, setError] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<Challenge>(() => pickChallenge());
   const [running, setRunning] = useState(false);
+  const followedRec = useRef(false);
 
   // Flux capturé → <video> local. Analysé dans le navigateur, jamais enregistré.
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = stream;
   }, [stream]);
 
+  // Détecteur passif : une capture réduite du flux toutes les 2 s, envoyée à l'agent local.
+  // Si l'agent est arrêté, on ignore l'erreur : les défis et le score local continuent de fonctionner.
+  useEffect(() => {
+    if (!stream) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    let busy = false;
+    const timer = setInterval(() => {
+      const video = videoRef.current;
+      if (busy || !ctx || !video || video.readyState < 2 || video.videoWidth === 0) return;
+      const scale = Math.min(1, FRAME_MAX_WIDTH / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      busy = true;
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return void (busy = false);
+          api
+            .sendFrame(sessionId, blob)
+            .catch(() => undefined)
+            .finally(() => (busy = false));
+        },
+        'image/jpeg',
+        0.8,
+      );
+    }, FRAME_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [api, sessionId, stream]);
+
   useEffect(() => {
     let alive = true;
     const refresh = () =>
       api
         .getSession(sessionId)
-        .then((s) => alive && (setSession(s), setError(null)))
+        .then((s) => {
+          if (!alive) return;
+          setSession(s);
+          setError(null);
+          // Première recommandation de l'agent : tant qu'aucun défi n'a été lancé, on la suit.
+          if (!followedRec.current && s.challenges.length === 0 && s.agent?.recommendations[0]) {
+            followedRec.current = true;
+            setChallenge(nextChallenge(s));
+          }
+        })
         .catch((e) => alive && setError(String(e)));
     refresh();
     const timer = setInterval(refresh, 2000);
@@ -65,7 +116,7 @@ export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDete
       const result = await detector(videoRef.current, challenge, controller.signal);
       const updated = await api.sendChallenge(sessionId, challenge.id, result, Math.round(performance.now() - start));
       setSession(updated);
-      setChallenge(pickChallenge(updated.challenges.map((c) => c.challengeId)));
+      setChallenge(nextChallenge(updated));
     } catch (e) {
       setError(String(e));
     } finally {

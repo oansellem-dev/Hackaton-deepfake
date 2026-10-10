@@ -48,8 +48,21 @@ export interface Session {
   decision?: { value: Decision; note?: string; at: number };
 }
 
+// Recommandation de l'agent de score (service Python) : prochain défi à proposer, phrase naturelle.
+export interface AgentRecommendation {
+  challengeId: string; // id de la bibliothèque de défis (ex. « hand-over-face »)
+  phrase: string;
+  rationale: string;
+}
+
+export interface AgentInfo {
+  available: boolean; // false : agent injoignable, le score local (computeScore) est utilisé
+  recommendations: AgentRecommendation[];
+}
+
 export interface SessionView extends Session {
   score: Score;
+  agent?: AgentInfo;
 }
 
 export interface PrecheckPayload {

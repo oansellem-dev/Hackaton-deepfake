@@ -81,3 +81,8 @@ code { background: #ecebfa; padding: 2px 6px; border-radius: 4px; word-break: br
 .cv-links { list-style: none; padding: 0; columns: 2; column-gap: 24px; font-size: 14px; }
 .cv-links li { padding: 3px 0; break-inside: avoid; }
 @media (max-width: 560px) { .cv-links { columns: 1; } }
+
+.panel-page { max-width: 420px; margin: 0 auto; padding: 16px; }
+.panel-header h1 { font-size: 20px; margin: 0 0 8px; }
+.panel-header ol { padding-left: 20px; font-size: 14px; }
+button.link { background: none; border: none; color: #6c5ce7; cursor: pointer; padding: 0; font-size: inherit; text-decoration: underline; }

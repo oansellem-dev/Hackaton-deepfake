@@ -1,5 +1,5 @@
 // Test de bout en bout dans un vrai Chrome (profil temporaire, sans interface), caméra simulée par une vidéo.
-// Usage : node browser.mjs <candidat.y4m> <autre.y4m> <dossier captures> [precheck|visio|all|live [fige.y4m]]
+// Usage : node browser.mjs <candidat.y4m> <autre.y4m> <dossier captures> [precheck|visio|all|live [fige.y4m]|teams <teams.y4m> <teams-autre.y4m>]
 // playwright-core pilote le Chrome installé (CHROME_PATH), sans télécharger de navigateur.
 import { chromium } from 'playwright-core';
 
@@ -161,6 +161,53 @@ if (mode === 'visio' || mode === 'all') {
   ok(c?.status === 'contradiction', `continuité : ${c?.label} — ${c?.detail}`);
   console.log(`     score : ${v.score.value} (${v.score.level})`);
   await otherBrowser.close();
+}
+
+// Visio Teams/Meet/Zoom : le recruteur partage la fenêtre de l'appel avec /panel. Le partage d'écran est simulé
+// par la fausse caméra (vidéo d'une « fenêtre Teams » : candidat en grand, vignette du recruteur en bas à droite).
+async function teamsPanel(video, id, seconds, withChallenge) {
+  const browser = await launch(video);
+  const page = await newPage(browser, 'panneau-teams');
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getDisplayMedia = () => navigator.mediaDevices.getUserMedia({ video: true });
+  });
+  await page.goto(`${BASE}/panel/${id}?key=${keys.get(id)}`);
+  await page.click('text=Partager la fenêtre de la visio');
+  let challenge;
+  if (withChallenge) {
+    await page.waitForTimeout(6000);
+    const btn = page.locator('.kyc-actions button').first();
+    const label = (await btn.textContent())?.replace("J'ai proposé : ", '');
+    await btn.click();
+    await page.waitForFunction(() => !document.querySelector('.kyc-actions button')?.textContent?.includes('Analyse en cours'), null, { timeout: 40000 });
+    const v = await api(`/api/sessions/${id}`);
+    challenge = v.challenges.filter((c) => c.phase !== 'precheck').at(-1);
+    console.log(`     défi dans Teams : ${label} → ${challenge?.result} ${JSON.stringify(challenge?.metrics)}`);
+  }
+  await page.waitForTimeout(seconds * 1000);
+  await page.screenshot({ path: `${shots}/8-teams-${id}.png` });
+  await browser.close();
+  return challenge;
+}
+
+if (mode === 'teams') {
+  const [teamsSame, teamsOther] = process.argv.slice(6);
+  const id = (await api('/api/sessions', { candidateLabel: 'Visio Teams' })).id;
+  console.log(`--- Teams : pré-vérification, puis panneau sur la fenêtre partagée (session ${id})`);
+  await precheck(candidateBrowser, id, { first: 'Eileen', last: 'Collins', email: 'eileen@example.org', phone: '+33 6 12 34 56 78' });
+  const challenge = await teamsPanel(teamsSame, id, 35, true);
+  ok(challenge?.result === 'passed', 'défi détecté sur la fenêtre Teams partagée');
+  let v = await api(`/api/sessions/${id}`);
+  ok(sig(v, 'face.continuity')?.status === 'ok', `continuité dans Teams (grand visage, vignette ignorée) : ${sig(v, 'face.continuity')?.detail}`);
+  console.log(`     score : ${v.score.value} (${v.score.level})`);
+
+  const id2 = (await api('/api/sessions', { candidateLabel: 'Substitution Teams' })).id;
+  console.log(`--- Teams : substitution (session ${id2})`);
+  await precheck(candidateBrowser, id2, { first: 'Eileen', last: 'Collins', email: 'eileen@example.org', phone: '+33 6 12 34 56 78' });
+  await teamsPanel(teamsOther, id2, 40, false);
+  v = await api(`/api/sessions/${id2}`);
+  ok(sig(v, 'face.continuity')?.status === 'contradiction', `substitution dans Teams : ${sig(v, 'face.continuity')?.detail}`);
+  console.log(`     score : ${v.score.value} (${v.score.level})`);
 }
 
 if (mode === 'live') {

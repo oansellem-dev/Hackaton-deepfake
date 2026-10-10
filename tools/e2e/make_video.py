@@ -1,6 +1,10 @@
 """Fabrique une vidéo Y4M servant de fausse caméra à Chrome (--use-file-for-fake-video-capture).
 
-Usage : python make_video.py <visage.jpg> <sortie.y4m> [--hand main.jpg] [--mode precheck|live|static] [--preview dossier]
+Usage : python make_video.py <visage.jpg> <sortie.y4m> [--hand main.jpg] [--mode precheck|live|static]
+                             [--thumb autre_visage.jpg] [--preview dossier]
+
+--thumb : ajoute en bas à droite une petite vignette d'un autre visage, comme l'image du recruteur dans une
+fenêtre Teams ou Meet partagée (le panneau doit analyser le plus grand visage, pas la vignette).
 
 Modes (vidéo jouée en boucle, 15 i/s) :
 - precheck : 3 s de face (cadrage), puis tête tournée et main devant le visage, deux fois chacune ;
@@ -21,6 +25,7 @@ parser.add_argument("face")
 parser.add_argument("out")
 parser.add_argument("--hand")
 parser.add_argument("--mode", choices=["precheck", "live", "static"], default="precheck")
+parser.add_argument("--thumb")
 parser.add_argument("--preview")
 args = parser.parse_args()
 
@@ -98,6 +103,18 @@ elif args.mode == "live":
 else:
     frames = ([base] * 45 + turn(1) + [base] * 10 + hand_pass() + [base] * 10 + turn(-1) + [base] * 10
               + hand_pass() + [base] * 10)
+
+if args.thumb:
+    other = cv2.imread(args.thumb)
+    ox, oy, ow, oh = max(cascade.detectMultiScale(cv2.cvtColor(other, cv2.COLOR_BGR2GRAY), 1.1, 5, minSize=(60, 60)),
+                         key=lambda f: f[2] * f[3])
+    m = int(0.4 * ow)
+    crop = other[max(0, oy - m):oy + oh + m, max(0, ox - m):ox + ow + m]
+    thumb = cv2.resize(crop, (150, int(150 * crop.shape[0] / crop.shape[1])))
+    th, tw = thumb.shape[:2]
+    frames = [f.copy() for f in frames]
+    for f in frames:
+        f[H - th - 12:H - 12, W - tw - 12:W - 12] = thumb
 
 with open(args.out, "wb") as f:
     f.write(f"YUV4MPEG2 W{W} H{H} F{FPS}:1 Ip A1:1 C420jpeg\n".encode())

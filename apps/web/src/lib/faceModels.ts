@@ -5,7 +5,7 @@ import { boundingBox, type Point } from '@kyc/shared';
 // ONNX Runtime : l'image du visage ne quitte jamais l'appareil, seuls des nombres partent au serveur.
 ort.env.wasm.wasmPaths = '/ort/';
 ort.env.wasm.numThreads = 1; // sans isolation cross-origin, le WASM multi-fils n'est pas disponible
-ort.env.logLevel = 'error'; // SFace déclenche des avertissements d'optimisation sans conséquence
+ort.env.logLevel = 'error';
 
 interface Models {
   sface: ort.InferenceSession;
@@ -16,7 +16,8 @@ let loading: Promise<Models> | null = null;
 
 export function loadFaceModels(): Promise<Models> {
   loading ??= (async () => {
-    const options: ort.InferenceSession.SessionOptions = { executionProviders: ['wasm'] };
+    // logSeverityLevel 3 : erreurs seulement (SFace déclenche des avertissements d'optimisation sans conséquence).
+    const options: ort.InferenceSession.SessionOptions = { executionProviders: ['wasm'], logSeverityLevel: 3 };
     const [sface, guard] = await Promise.all([
       ort.InferenceSession.create('/models/face_recognition_sface_2021dec.onnx', options),
       ort.InferenceSession.create('/models/deepfakeguard_v2.onnx', options),

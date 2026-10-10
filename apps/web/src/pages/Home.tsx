@@ -47,17 +47,25 @@ export function Home() {
             <code>{`${origin}/check/${session.id}`}</code>
           </p>
           <p>
-            2. Visio de secours, côté candidat :<br />
+            2. Pendant l’entretien sur <strong>Teams, Meet ou Zoom</strong> :{' '}
+            <a href={`/panel/${session.id}?key=${session.recruiterKey}`} target="_blank" rel="noreferrer">
+              ouvrir le panneau de vérification
+            </a>{' '}
+            puis partager la fenêtre de la visio.
+          </p>
+          <p className="muted">Sans outil de visio, notre visio de secours :</p>
+          <p>
+            Visio de secours, côté candidat :<br />
             <code>{`${origin}/visio/${session.id}?role=candidate`}</code>
           </p>
           <p>
-            3. Visio de secours, côté recruteur :{' '}
+            Visio de secours, côté recruteur :{' '}
             <a href={`/visio/${session.id}?role=recruiter&key=${session.recruiterKey}`} target="_blank" rel="noreferrer">
               ouvrir
             </a>
           </p>
           <p>
-            4. <a href={`/report/${session.id}?key=${session.recruiterKey}`}>Résultat de la pré-vérification et rapport</a>{' '}
+            3. <a href={`/report/${session.id}?key=${session.recruiterKey}`}>Résultat de la pré-vérification et rapport</a>{' '}
             (se met à jour tout seul)
           </p>
         </div>

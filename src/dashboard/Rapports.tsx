@@ -10,7 +10,7 @@ export function Rapports() {
   useEffect(() => { getEntretiens().then((l) => setListe(l.filter((e) => e.statut === "termine"))); }, []);
   return (
     <>
-      <header className="hero rise"><h1 className="hero__hi">Rapports</h1><div className="hero__center">{liste.length} entretiens terminés</div><div /></header>
+      <header className="hero-h rise"><h1 className="hero-h__hi">Rapports</h1><div className="hero-h__center">{liste.length} entretiens terminés</div><div /></header>
       <div className="card rise">
         <table className="table">
           <thead><tr><th>Candidat</th><th>Quand</th><th>Fiabilité</th><th>Statut</th><th>Décision</th><th /></tr></thead>

@@ -19,10 +19,10 @@ export function Rapport({ id }: { id: string }) {
 
   return (
     <>
-      <header className="hero rise">
-        <h1 className="hero__hi">Rapport d'entretien</h1>
-        <div className="hero__center">{e.candidat.prenom} {e.candidat.nom}</div>
-        <div className="hero__team"><Statut e={e} /></div>
+      <header className="hero-h rise">
+        <h1 className="hero-h__hi">Rapport d'entretien</h1>
+        <div className="hero-h__center">{e.candidat.prenom} {e.candidat.nom}</div>
+        <div className="hero-h__right"><Statut e={e} /></div>
       </header>
 
       <div className="rapport">
@@ -34,7 +34,7 @@ export function Rapport({ id }: { id: string }) {
             </div>
             {score ? (
               <>
-                <div className="big-number" style={{ fontSize: 96, marginTop: 10 }}>{score.valeur}<span style={{ fontSize: 28, color: "var(--ink-3)" }}> / 100</span></div>
+                <div className="dot-num" style={{ fontSize: 96, marginTop: 10 }}>{score.valeur}<span style={{ fontSize: 28, color: "var(--ink-3)" }}> / 100</span></div>
                 <div className="card__rule" />
                 <ul className="explications">{score.explications.map((l, i) => <li key={i}>{l}</li>)}</ul>
               </>

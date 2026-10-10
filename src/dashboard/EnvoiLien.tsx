@@ -27,7 +27,7 @@ export function EnvoiLien() {
 
   return (
     <>
-      <header className="hero rise"><h1 className="hero__hi">Pré-vérifications</h1><div className="hero__center">Un contrôle technique de deux minutes</div><div /></header>
+      <header className="hero-h rise"><h1 className="hero-h__hi">Pré-vérifications</h1><div className="hero-h__center">Un contrôle technique de deux minutes</div><div /></header>
       <div className="rapport">
         <div className="col">
           <form className="card form rise" onSubmit={envoyer}>

@@ -144,6 +144,7 @@ export function Panel() {
 
   return (
     <div className="panel">
+      <div className="panel__blob" aria-hidden />
       <div className="panel__top">
         <span className="logo"><span className="logo__o" aria-hidden />val</span>
         <span className="pill pill--gris">{entretien.candidat.prenom} {entretien.candidat.nom}</span>

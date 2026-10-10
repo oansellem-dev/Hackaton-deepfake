@@ -1,7 +1,7 @@
 export function Reglages() {
   return (
     <>
-      <header className="hero rise"><h1 className="hero__hi">Réglages</h1><div className="hero__center">Ce que l'outil fait, et ne fait pas</div><div /></header>
+      <header className="hero-h rise"><h1 className="hero-h__hi">Réglages</h1><div className="hero-h__center">Ce que l'outil fait, et ne fait pas</div><div /></header>
       <div className="rapport">
         <div className="card rise">
           <h2 className="card__title">Engagements</h2>

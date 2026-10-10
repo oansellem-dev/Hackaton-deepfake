@@ -25,6 +25,7 @@ export function App() {
 
   return (
     <div className="surface dash">
+      {p0 !== undefined && <div className="photo photo--soft" aria-hidden><img src="/img/hero.jpg" alt="" /></div>}
       <Nav onglet={onglet} />
       <div className="page" key={path} style={{ display: "contents" }}>{ecran}</div>
     </div>

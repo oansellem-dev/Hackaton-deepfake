@@ -4,6 +4,7 @@ import { enregistrerDecision, getEntretien } from "../shared/api";
 import { DECISIONS, DEFI_NOMS, DEFI_RESULTATS, LUMIERE_RESULTATS, PREVERIF_STATUTS } from "../shared/texts";
 import { heure, quand } from "../shared/format";
 import { Statut } from "./Statut";
+import { Jauge } from "./charts";
 
 export function Rapport({ id }: { id: string }) {
   const [e, setE] = useState<Entretien | null | undefined>(undefined);
@@ -20,8 +21,8 @@ export function Rapport({ id }: { id: string }) {
   return (
     <>
       <header className="hero-h rise">
-        <h1 className="hero-h__hi">Rapport d'entretien</h1>
-        <div className="hero-h__center">{e.candidat.prenom} {e.candidat.nom}</div>
+        <h1 className="hero-h__hi">Rapport · <b>{e.candidat.prenom} {e.candidat.nom}</b></h1>
+        <div className="hero-h__center">{e.score ? <span className="dot-num" style={{ fontSize: 34 }}>{e.score.valeur}<small> /100</small></span> : "Entretien à venir"}</div>
         <div className="hero-h__right"><Statut e={e} /></div>
       </header>
 
@@ -34,7 +35,7 @@ export function Rapport({ id }: { id: string }) {
             </div>
             {score ? (
               <>
-                <div className="dot-num" style={{ fontSize: 96, marginTop: 10 }}>{score.valeur}<span style={{ fontSize: 28, color: "var(--ink-3)" }}> / 100</span></div>
+                <Jauge valeur={score.valeur} />
                 <div className="card__rule" />
                 <ul className="explications">{score.explications.map((l, i) => <li key={i}>{l}</li>)}</ul>
               </>

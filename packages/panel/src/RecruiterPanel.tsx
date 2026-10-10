@@ -44,7 +44,10 @@ const SAMPLE_INTERVAL_MS = 2000;
 function nextChallenge(session: SessionView): Challenge {
   // Les défis de la pré-vérification restent utiles en direct : seuls ceux de l'entretien sont écartés.
   const done = session.challenges.filter((c) => c.phase !== 'precheck').map((c) => c.challengeId);
-  const rec = session.agent?.recommendations.find((r) => getChallenge(r.challengeId));
+  // Ordre imprévisible pour le candidat : l'un des deux défis les plus utiles, tiré au hasard
+  // (une vidéo préparée ou un trucage réglé à l'avance ne peut pas anticiper le prochain geste).
+  const recs = session.agent?.recommendations.filter((r) => getChallenge(r.challengeId)) ?? [];
+  const rec = recs[Math.floor(Math.random() * Math.min(2, recs.length))];
   if (rec) return { ...getChallenge(rec.challengeId)!, mascotLine: rec.phrase };
   return pickChallenge(done);
 }

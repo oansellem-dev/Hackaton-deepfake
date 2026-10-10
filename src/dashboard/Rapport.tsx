@@ -3,7 +3,6 @@ import type { Decision, Entretien } from "../shared/types";
 import { enregistrerDecision, getEntretien } from "../shared/api";
 import { DECISIONS, DEFI_NOMS, DEFI_RESULTATS, LUMIERE_RESULTATS, PREVERIF_STATUTS } from "../shared/texts";
 import { heure, quand } from "../shared/format";
-import { Manta } from "../manta/Manta";
 import { Statut } from "./Statut";
 
 export function Rapport({ id }: { id: string }) {
@@ -11,7 +10,7 @@ export function Rapport({ id }: { id: string }) {
   useEffect(() => { getEntretien(id).then((x) => setE(x ?? null)); }, [id]);
 
   if (e === undefined) return <p className="muted">Chargement…</p>;
-  if (e === null) return <div className="card"><p>Cet entretien n'existe pas. <a href="#/">Retour</a></p></div>;
+  if (e === null) return <div className="card rise"><p>Cet entretien n'existe pas. <a href="#/">Retour</a></p></div>;
 
   const decider = async (d: Decision) => { await enregistrerDecision(e.id, d); setE({ ...e, decision: d }); };
   const score = e.score;
@@ -20,7 +19,7 @@ export function Rapport({ id }: { id: string }) {
 
   return (
     <>
-      <header className="hero">
+      <header className="hero rise">
         <h1 className="hero__hi">Rapport d'entretien</h1>
         <div className="hero__center">{e.candidat.prenom} {e.candidat.nom}</div>
         <div className="hero__team"><Statut e={e} /></div>
@@ -28,7 +27,7 @@ export function Rapport({ id }: { id: string }) {
 
       <div className="rapport">
         <div className="col">
-          <div className="card">
+          <div className="card rise">
             <div className="card__head">
               <h2 className="card__title">Fiabilité</h2>
               <span className="pill pill--gris">consultatif</span>
@@ -43,17 +42,10 @@ export function Rapport({ id }: { id: string }) {
               <p className="muted" style={{ marginTop: 12 }}>Pas encore de score : l'entretien n'a pas eu lieu. Ce n'est pas un signal.</p>
             )}
           </div>
-
-          <div className="card mantacard">
-            <Manta state={score ? (ok ? "verifie" : "signal") : "neutre"} size={80} />
-            <p className="mantacard__text" style={{ fontSize: 17 }}>
-              {score ? (ok ? "Présence humaine vérifiée. Rien ne contredit ce que le candidat a déclaré." : "Un ou plusieurs signaux à vérifier. Ils méritent une conversation, pas une conclusion.") : "Je serai là pendant l'entretien."}
-            </p>
-          </div>
         </div>
 
         <div className="col">
-          <div className="card">
+          <div className="card rise">
             <h2 className="card__title">Entretien</h2>
             <div className="card__rule" />
             <div className="cols">
@@ -63,7 +55,7 @@ export function Rapport({ id }: { id: string }) {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card rise">
             <div className="card__head">
               <h2 className="card__title">Pré-vérification</h2>
               <span className="pill pill--gris">{PREVERIF_STATUTS[e.preVerification.statut]}</span>
@@ -82,7 +74,7 @@ export function Rapport({ id }: { id: string }) {
             )}
           </div>
 
-          <div className="card">
+          <div className="card rise">
             <h2 className="card__title">Défis proposés</h2>
             <div className="card__rule" />
             {e.defis.length === 0 ? <p className="muted">Aucun défi proposé pour l'instant.</p> : (
@@ -99,7 +91,7 @@ export function Rapport({ id }: { id: string }) {
           </div>
 
           {signaux.length > 0 && (
-            <div className="card">
+            <div className="card rise">
               <h2 className="card__title">Signaux à vérifier</h2>
               <div className="card__rule" />
               <ul className="signaux" style={{ gap: 14 }}>
@@ -113,7 +105,7 @@ export function Rapport({ id }: { id: string }) {
             </div>
           )}
 
-          <div className="card">
+          <div className="card rise">
             <div className="card__head">
               <h2 className="card__title">Décision du recruteur</h2>
               <span className="pill pill--gris">{DECISIONS[e.decision]}</span>

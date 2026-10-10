@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Manta } from "../manta/Manta";
 import { Accord } from "./steps/Accord";
 import { Signaux } from "./steps/Signaux";
 import { TestLumiere } from "./steps/TestLumiere";
@@ -43,24 +42,13 @@ export function PreVerif({ token }: { token: string }) {
             {TITRES.map((_, i) => <span key={i} className={`cand__step ${i < etape ? "cand__step--done" : i === etape ? "cand__step--now" : ""}`} />)}
           </div>
         </div>
-
-        {etape !== 2 && (
-          <div className="card mantacard">
-            <Manta state={etape === 4 ? "verifie" : etape === 3 ? "defi" : "neutre"} size={72} />
-            <p className="mantacard__text">
-              {etape === 0 && "Bonjour ! Deux minutes pour vérifier que tout fonctionne avant votre entretien. Aucune vidéo n'est enregistrée."}
-              {etape === 1 && "Je relève quelques informations sur votre ordinateur. Rien d'autre."}
-              {etape === 3 && "Un petit geste, et c'est fini."}
-              {etape === 4 && "Merci, à tout à l'heure !"}
-            </p>
-          </div>
-        )}
-
-        {etape === 0 && <Accord onAccepter={demanderCamera} />}
-        {etape === 1 && <Signaux stream={stream} onSuivant={suivant} />}
-        {etape === 2 && <TestLumiere stream={stream} onFin={suivant} />}
-        {etape === 3 && <DefiGestuel stream={stream} onSuivant={suivant} />}
-        {etape === 4 && <Fin token={token} />}
+        <div className="page" key={etape} style={{ display: "contents" }}>
+          {etape === 0 && <Accord onAccepter={demanderCamera} />}
+          {etape === 1 && <Signaux stream={stream} onSuivant={suivant} />}
+          {etape === 2 && <TestLumiere stream={stream} onFin={suivant} />}
+          {etape === 3 && <DefiGestuel stream={stream} onSuivant={suivant} />}
+          {etape === 4 && <Fin token={token} />}
+        </div>
       </div>
     </div>
   );

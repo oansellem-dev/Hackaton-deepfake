@@ -11,10 +11,10 @@ export function Attente({ entretien, onProposer }: { entretien: Entretien; onPro
 
   return (
     <>
-      <div className="card">
+      <div className="card rise">
         <div className="card__head">
           <h2 className="card__title">Entretien détecté</h2>
-          <span className="pill pill--bleu">{heure(entretien.date)}</span>
+          <span className="pill pill--jaune">{heure(entretien.date)}</span>
         </div>
         <div className="card__rule" />
         <div className="cols">
@@ -24,7 +24,7 @@ export function Attente({ entretien, onProposer }: { entretien: Entretien; onPro
         </div>
       </div>
 
-      <div className="card">
+      <div className="card rise">
         <div className="card__head">
           <h2 className="card__title">Avant l'entretien</h2>
           <span className={`pill ${pillClass}`}>{resume}</span>

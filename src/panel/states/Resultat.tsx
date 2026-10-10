@@ -4,7 +4,7 @@ export function Resultat({ score, onNouveauDefi, onTerminer }: { score: Score; o
   const ok = score.signaux.length === 0;
   return (
     <>
-      <div className="card">
+      <div className="card rise">
         <div className="card__head">
           <div className="score">
             <span className="score__value">{score.valeur}</span>
@@ -19,7 +19,7 @@ export function Resultat({ score, onNouveauDefi, onTerminer }: { score: Score; o
       </div>
 
       {score.signaux.length > 0 && (
-        <div className="card">
+        <div className="card rise">
           <h2 className="card__title">Signaux relevés</h2>
           <div className="card__rule" />
           <ul className="signaux">

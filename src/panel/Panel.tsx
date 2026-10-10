@@ -3,7 +3,6 @@ import type { Decision, Defi, DefiType, Entretien, Score } from "../shared/types
 import { abonnerPanneau, emettre, enregistrerDecision, getEntretiens } from "../shared/api";
 import { DEFI_PHRASES } from "../shared/texts";
 import { SIGNAUX_EXEMPLE } from "../shared/mock";
-import { Manta, type MantaState } from "../manta/Manta";
 import { Attente } from "./states/Attente";
 import { DefiEnCours } from "./states/DefiEnCours";
 import { Resultat } from "./states/Resultat";
@@ -122,24 +121,24 @@ export function Panel() {
     setEtape(cible);
   };
 
-  // Triple-clic sur Manta = barre démo
+  // Triple-clic sur la ligne de statut = barre démo
   const clicManta = () => {
     const now = Date.now();
     clics.current = [...clics.current.filter((t) => now - t < 700), now];
     if (clics.current.length >= 3) { setDemo((v) => !v); clics.current = []; }
   };
 
-  // État de Manta et phrase, selon l'étape
+  // Ligne de statut, selon l'étape (un mot à côté de la couleur, jamais la couleur seule)
   const aDesSignaux = (entretien?.preVerification.signaux.length ?? 0) > 0;
-  let mantaState: MantaState = "neutre";
-  let phrase = "Tout va bien. Je regarde avec vous.";
-  if (etape === "attente" && aDesSignaux) { mantaState = "neutre"; phrase = "Deux points à vérifier pendant l'entretien. Je vous propose des défis adaptés."; }
-  if (etape === "defi") { mantaState = analyse ? "analyse" : "defi"; phrase = analyse ? "Je vérifie le geste…" : "Demandez-lui, naturellement :"; }
+  let dot = "";
+  let phrase = "Tout va bien. L'outil regarde avec vous.";
+  if (etape === "attente" && aDesSignaux) { dot = "panel__dot--orange"; phrase = "Deux points à vérifier pendant l'entretien. Des défis adaptés vous sont proposés."; }
+  if (etape === "defi") { dot = analyse ? "panel__dot--gris" : ""; phrase = analyse ? "Vérification du geste en cours…" : "Demandez-lui, naturellement :"; }
   if (etape === "resultat" && score) {
-    mantaState = score.signaux.length ? "signal" : "verifie";
+    dot = score.signaux.length ? "panel__dot--orange" : "";
     phrase = score.signaux.length ? "Signal à vérifier : " + score.signaux[0].libelle.toLowerCase() + "." : "Présence humaine vérifiée.";
   }
-  if (etape === "fin") { mantaState = "neutre"; phrase = "C'est à vous de décider. Je garde la trace."; }
+  if (etape === "fin") { dot = "panel__dot--gris"; phrase = "C'est à vous de décider. La trace est conservée."; }
 
   if (!entretien) return <div className="panel"><p className="muted">Chargement…</p></div>;
 
@@ -150,9 +149,9 @@ export function Panel() {
         <span className="pill pill--gris">{entretien.candidat.prenom} {entretien.candidat.nom}</span>
       </div>
 
-      <div className="panel__manta" onClick={clicManta}>
-        <Manta state={mantaState} size={64} />
-        <div className="panel__bubble">{phrase}</div>
+      <div className="panel__status" onClick={clicManta}>
+        <span className={`panel__dot ${dot}`} aria-hidden />
+        <span>{phrase}</span>
       </div>
 
       {etape === "attente" && <Attente entretien={entretien} onProposer={() => allerA("defi")} />}

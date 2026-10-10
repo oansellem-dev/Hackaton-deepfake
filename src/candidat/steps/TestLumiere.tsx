@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Manta } from "../../manta/Manta";
 
 /**
  * Test de lumière — réglages imposés par le contexte :
@@ -54,15 +53,12 @@ export function TestLumiere({ stream, onFin }: { stream: MediaStream | null; onF
   if (phase === "avert") {
     return (
       <>
-        <div className="card mantacard">
-          <Manta state="lumiere" size={72} haloColor="#3b6cf0" />
-          <p className="mantacard__text">Je vais éclairer votre visage quelques secondes avec des couleurs douces.</p>
-        </div>
         <h1>Test de lumière</h1>
+        <p className="cand__intro">L'écran va éclairer votre visage quelques secondes avec des couleurs douces.</p>
         <div className="card">
           <ul className="liste-check">
-            <li><span className="pill pill--bleu">7 s</span>L'écran passe par cinq couleurs, en fondu, sans flash.</li>
-            <li><span className="pill pill--bleu">Conseil</span>Approchez-vous de l'écran et montez sa luminosité.</li>
+            <li><span className="pill pill--jaune">7 s</span>L'écran passe par cinq couleurs, en fondu, sans flash.</li>
+            <li><span className="pill pill--jaune">Conseil</span>Approchez-vous de l'écran et montez sa luminosité.</li>
             <li><span className="pill pill--gris">Attention</span>Si les changements de lumière vous gênent, passez cette étape : ça ne compte pas contre vous.</li>
           </ul>
         </div>

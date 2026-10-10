@@ -2,16 +2,17 @@ export function Accord({ onAccepter }: { onAccepter: () => void }) {
   return (
     <>
       <h1>Ce que nous vérifions, et ce que nous ne vérifions pas</h1>
-      <div className="card">
+      <p className="cand__intro">Deux minutes pour vérifier que tout fonctionne avant votre entretien. Aucune vidéo n'est enregistrée.</p>
+      <div className="card rise">
         <h2 className="card__title">Vérifié</h2>
         <div className="card__rule" />
         <ul className="liste-check">
-          <li><span className="pill pill--bleu">Oui</span>Les caméras que votre navigateur déclare, votre fuseau horaire et votre langue.</li>
-          <li><span className="pill pill--bleu">Oui</span>Que votre visage réagit à la lumière de l'écran (quelques secondes de couleurs douces).</li>
-          <li><span className="pill pill--bleu">Oui</span>Qu'un geste simple, la main devant le visage, s'affiche normalement à l'image.</li>
+          <li><span className="pill pill--jaune">Oui</span>Les caméras que votre navigateur déclare, votre fuseau horaire et votre langue.</li>
+          <li><span className="pill pill--jaune">Oui</span>Que votre visage réagit à la lumière de l'écran (quelques secondes de couleurs douces).</li>
+          <li><span className="pill pill--jaune">Oui</span>Qu'un geste simple, la main devant le visage, s'affiche normalement à l'image.</li>
         </ul>
       </div>
-      <div className="card">
+      <div className="card rise">
         <h2 className="card__title">Jamais</h2>
         <div className="card__rule" />
         <ul className="liste-check">

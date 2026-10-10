@@ -1,28 +1,28 @@
 /* Page candidat — une colonne, même langage visuel */
-.cand { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
+.cand { position: relative; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding-top: 8px; }
 .cand__top { display: flex; align-items: center; justify-content: space-between; }
 .cand__steps { display: flex; gap: 6px; }
-.cand__step { width: 28px; height: 6px; border-radius: 999px; background: rgba(20,31,61,.12); }
+.cand__step { width: 28px; height: 6px; border-radius: 999px; background: rgba(20,20,20,.12); transition: background .4s, transform .4s var(--spring); }
 .cand__step--done { background: var(--ink); }
-.cand__step--now { background: var(--halo-bleu); }
-.cand h1 { font-size: 32px; font-weight: 400; letter-spacing: -0.03em; line-height: 1.15; }
-.cand .mantacard__text { font-size: 17px; }
-.liste-check { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.liste-check li { display: flex; gap: 10px; align-items: flex-start; }
-.liste-check .pill { flex-shrink: 0; }
+.cand__step--now { background: var(--green); transform: scaleX(1.3); }
+.cand h1 { font-size: 36px; font-weight: 400; letter-spacing: -0.035em; line-height: 1.1; }
+.cand__intro { font-size: 18px; color: var(--ink-2); }
+.liste-check { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.liste-check li { display: flex; gap: 12px; align-items: flex-start; }
+.liste-check .pill { flex-shrink: 0; min-width: 48px; justify-content: center; }
 .cand__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.cam { width: 100%; aspect-ratio: 4/3; border-radius: 20px; background: #0f1630; overflow: hidden; position: relative; display: grid; place-items: center; color: #fff; }
+.cam { width: 100%; aspect-ratio: 4/3; border-radius: 24px; background: #141414; overflow: hidden; position: relative; display: grid; place-items: center; color: #fff; box-shadow: var(--shadow-float); }
 .cam video { width: 100%; height: 100%; object-fit: cover; }
-.cam__ovale { position: absolute; inset: 0; margin: auto; width: 46%; aspect-ratio: 3/4; border: 3px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 0 999px rgba(15,22,48,.35); pointer-events: none; }
-.cam__ovale--ok { border-color: var(--halo-vert); }
-.signaux-tech { display: grid; gap: 12px; }
+.cam__ovale { position: absolute; inset: 0; margin: auto; width: 46%; aspect-ratio: 3/4; border: 3px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 0 999px rgba(20,20,20,.4); pointer-events: none; transition: border-color .4s, transform .4s var(--spring); }
+.cam__ovale--ok { border-color: var(--green); transform: scale(1.04); }
+.signaux-tech { display: grid; gap: 12px; margin: 0; }
 .signaux-tech div { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .signaux-tech div:last-child { border-bottom: 0; }
 .signaux-tech dt { color: var(--ink-2); } .signaux-tech dd { margin: 0; font-weight: 500; }
 
 /* Test de lumière : plein écran, fondus, jamais de flash */
 .lumiere { position: fixed; inset: 0; z-index: 50; background: var(--lum, #fff); transition: background .3s linear; display: grid; place-items: center; }
-.lumiere__ovale { width: min(44vw, 240px); aspect-ratio: 3/4; border-radius: 50%; overflow: hidden; border: 4px solid rgba(255,255,255,.7); background: #0f1630; display: grid; place-items: center; color: #fff; }
+.lumiere__ovale { width: min(44vw, 240px); aspect-ratio: 3/4; border-radius: 50%; overflow: hidden; border: 4px solid rgba(255,255,255,.7); background: #141414; display: grid; place-items: center; color: #fff; }
 .lumiere__ovale video { width: 100%; height: 100%; object-fit: cover; }
 .lumiere__foot { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--lum-ink, var(--ink)); }
 .lumiere__foot .btn--secondary { background: rgba(255,255,255,.85); }

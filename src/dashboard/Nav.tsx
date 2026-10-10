@@ -23,7 +23,7 @@ export function Nav({ onglet }: { onglet: string }) {
         ))}
       </div>
       <div className="nav__right">
-        <div className="toggle" role="group" aria-label="Vue">
+        <div className="toggle" role="group" aria-label="Vue" data-pos={vue === "moi" ? "0" : "1"}>
           <button aria-pressed={vue === "moi"} onClick={() => setVue("moi")}>Moi</button>
           <button aria-pressed={vue === "equipe"} onClick={() => setVue("equipe")}>Équipe</button>
         </div>

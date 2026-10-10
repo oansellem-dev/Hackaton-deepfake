@@ -3,7 +3,6 @@ import type { Entretien } from "../shared/types";
 import { envoyerLien, getEntretiens } from "../shared/api";
 import { PREVERIF_STATUTS } from "../shared/texts";
 import { quand } from "../shared/format";
-import { Manta } from "../manta/Manta";
 
 export function EnvoiLien() {
   const [liste, setListe] = useState<Entretien[]>([]);
@@ -28,10 +27,10 @@ export function EnvoiLien() {
 
   return (
     <>
-      <header className="hero"><h1 className="hero__hi">Pré-vérifications</h1><div className="hero__center">Un contrôle technique de deux minutes</div><div /></header>
+      <header className="hero rise"><h1 className="hero__hi">Pré-vérifications</h1><div className="hero__center">Un contrôle technique de deux minutes</div><div /></header>
       <div className="rapport">
         <div className="col">
-          <form className="card form" onSubmit={envoyer}>
+          <form className="card form rise" onSubmit={envoyer}>
             <h2 className="card__title">Envoyer un lien</h2>
             <div className="field"><label htmlFor="email">E-mail du candidat</label><input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom.nom@exemple.fr" /></div>
             <div className="field"><label htmlFor="date">Date de l'entretien</label><input id="date" type="datetime-local" required value={date} onChange={(e) => setDate(e.target.value)} /></div>
@@ -43,12 +42,8 @@ export function EnvoiLien() {
             <button className="btn btn--primary" type="submit">Envoyer</button>
             {lien && <p className="small muted">Pour la démo, le lien s'ouvre ici : <a href={lien} target="_blank" rel="noreferrer">page candidat</a></p>}
           </form>
-          <div className="card mantacard">
-            <Manta state="neutre" size={72} />
-            <p className="mantacard__text" style={{ fontSize: 16 }}>Le candidat voit ce qui est vérifié, ce qui ne l'est pas, et qu'aucune vidéo n'est enregistrée. Il peut passer une étape sans pénalité.</p>
-          </div>
         </div>
-        <div className="card">
+        <div className="card rise">
           <h2 className="card__title">Liens envoyés</h2>
           <div className="card__rule" />
           <table className="table">
@@ -61,7 +56,7 @@ export function EnvoiLien() {
                   <tr key={e.id}>
                     <td>{e.candidat.prenom ? `${e.candidat.prenom} ${e.candidat.nom}` : e.candidat.email}</td>
                     <td className="muted">{quand(e.date)}</td>
-                    <td><span className={`pill ${st === "faite" ? "pill--bleu" : "pill--gris"}`}>{PREVERIF_STATUTS[st]}</span></td>
+                    <td><span className={`pill ${st === "faite" ? "pill--jaune" : "pill--gris"}`}>{PREVERIF_STATUTS[st]}</span></td>
                     <td>{st !== "faite" ? <span className="muted">Pas d'information, ce n'est pas un signal</span> : n === 0 ? <span className="pill pill--vert">Rien à signaler</span> : <span className="pill pill--orange">{n} point{n > 1 ? "s" : ""} à vérifier pendant l'entretien</span>}</td>
                   </tr>
                 );

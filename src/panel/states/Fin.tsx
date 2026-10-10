@@ -6,7 +6,7 @@ export function Fin({ entretien, score, onDecider }: { entretien: Entretien; sco
   const lienRapport = `${location.origin}/index.html#/rapport/${entretien.id}`;
   return (
     <>
-      <div className="card">
+      <div className="card rise">
         <div className="card__head">
           <h2 className="card__title">Votre décision</h2>
           {score && <span className="pill pill--gris">{score.valeur} / 100</span>}

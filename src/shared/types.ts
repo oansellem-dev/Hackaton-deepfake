@@ -46,7 +46,7 @@ export type DefiResultat =
 export interface Defi {
   id: string;
   type: DefiType;
-  /** La phrase naturelle que Manta suggère au recruteur de dire. */
+  /** La phrase naturelle suggérée au recruteur. */
   phrase: string;
   resultat: DefiResultat;
   horodatage?: string;

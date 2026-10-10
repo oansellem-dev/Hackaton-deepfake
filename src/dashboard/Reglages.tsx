@@ -1,9 +1,9 @@
 export function Reglages() {
   return (
     <>
-      <header className="hero"><h1 className="hero__hi">Réglages</h1><div className="hero__center">Ce que l'outil fait, et ne fait pas</div><div /></header>
+      <header className="hero rise"><h1 className="hero__hi">Réglages</h1><div className="hero__center">Ce que l'outil fait, et ne fait pas</div><div /></header>
       <div className="rapport">
-        <div className="card">
+        <div className="card rise">
           <h2 className="card__title">Engagements</h2>
           <div className="card__rule" />
           <ul className="explications">
@@ -14,7 +14,7 @@ export function Reglages() {
             <li>Le score est consultatif. Le recruteur décide.</li>
           </ul>
         </div>
-        <div className="card">
+        <div className="card rise">
           <h2 className="card__title">Défis actifs</h2>
           <div className="card__rule" />
           <ul className="explications">

@@ -9,11 +9,15 @@ const [candidateVideo, otherVideo, shots, mode = 'all'] = process.argv.slice(2);
 let failures = 0;
 const ok = (cond, msg) => { console.log(cond ? 'OK  ' : 'FAIL', msg); if (!cond) failures++; };
 const keys = new Map(); // jetons recruteur, reçus à la création des entretiens
+const links = new Map(); // jetons des liens de pré-vérification (/check/<jeton>)
 const api = async (path, body) => {
   const headers = { 'Content-Type': 'application/json', 'X-Recruiter-Key': keys.get(path.split('/')[3]) ?? '' };
   const r = await fetch(BASE + path, body ? { method: 'POST', headers, body: JSON.stringify(body) } : { headers });
   const json = await r.json();
-  if (path === '/api/sessions' && json.recruiterKey) keys.set(json.id, json.recruiterKey);
+  if (path === '/api/sessions' && json.recruiterKey) {
+    keys.set(json.id, json.recruiterKey);
+    links.set(json.id, json.candidateLink.token);
+  }
   return json;
 };
 
@@ -42,13 +46,22 @@ async function newPage(browser, tag) {
     if (type.startsWith('image/') || type.startsWith('multipart/') || r.url().includes('/frame')) imageUploads.push(`${tag} ${r.url()}`);
   });
   page.on('pageerror', (e) => console.log(`[${tag}] erreur page :`, e.message));
+  page.on('response', (r) => { if (r.url().includes('/device') || r.url().includes('/presence')) console.log(`     [${tag}] ${r.request().method()} ${new URL(r.url()).pathname.replace(/[A-Za-z0-9_-]{24,}/, '…')} → ${r.status()}`); });
   page.on('console', (m) => { if (m.type() === 'error') console.log(`[${tag}] console :`, m.text().slice(0, 200)); });
   return page;
 }
 
-async function precheck(browser, id, who) {
+async function precheck(browser, id, who, withPasskey = false) {
   const page = await newPage(browser, 'candidat');
-  await page.goto(`${BASE}/check/${id}`);
+  if (withPasskey) {
+    // Authentificateur virtuel de Chrome : la clé d'accès est réellement créée puis présentée, sans matériel.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('WebAuthn.enable');
+    await cdp.send('WebAuthn.addVirtualAuthenticator', {
+      options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+    });
+  }
+  await page.goto(`${BASE}/check/${links.get(id)}`);
   await page.fill('input[autocomplete="given-name"]', who.first);
   await page.fill('input[autocomplete="family-name"]', who.last);
   await page.fill('input[type="email"]', who.email);
@@ -56,6 +69,12 @@ async function precheck(browser, id, who) {
   await page.check('.consent input');
   await page.screenshot({ path: `${shots}/1-informations.png`, fullPage: true });
   await page.click('button[type="submit"]');
+  // Écran de consentement biométrique : case non cochée, bouton bloqué tant qu'elle ne l'est pas.
+  await page.waitForSelector('text=Vérification du visage : votre accord', { timeout: 30000 });
+  ok(await page.locator('text=Continuer vers la caméra').isDisabled(), 'caméra bloquée tant que l’accord biométrique n’est pas donné');
+  await page.screenshot({ path: `${shots}/1b-consentement.png`, fullPage: true });
+  await page.check('.consent input');
+  await page.click('text=Continuer vers la caméra');
   await page.click('text=Activer la caméra et commencer', { timeout: 30000 });
 
   const t0 = Date.now();
@@ -63,6 +82,18 @@ async function precheck(browser, id, who) {
   let shot = false;
   while (Date.now() - t0 < 180000) {
     if (await page.locator('text=Merci, c’est terminé').count()) break;
+    if (await page.locator('text=Dernière étape, facultative').count()) {
+      await page.click(withPasskey ? 'button:has-text("Associer cet appareil")' : 'button:has-text("Passer")');
+      const outcome = await Promise.race([
+        page.waitForSelector('text=Merci, c’est terminé', { timeout: 30000 }).then(() => 'fini'),
+        page.waitForSelector('.card .faceid-error', { timeout: 30000 }).then(async (e) => `erreur : ${await e.textContent()}`),
+      ]).catch(() => 'rien en 30 s');
+      if (outcome !== 'fini') {
+        console.log(`     association d'appareil : ${outcome}`);
+        break;
+      }
+      continue;
+    }
     const err = await page.locator('.faceid-error').allTextContents();
     if (err.length) { console.log('     erreur affichée :', err.join(' ')); break; }
     const state = await page.evaluate(() => {
@@ -81,8 +112,10 @@ async function precheck(browser, id, who) {
   await page.screenshot({ path: `${shots}/3-fin-${id}.png`, fullPage: true });
   const done = (await page.locator('text=Merci, c’est terminé').count()) > 0;
   ok(done, `pré-vérification terminée en ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  // Avec une clé d'accès, la page reste ouverte : c'est le même « appareil » qui confirmera pendant la visio.
+  if (withPasskey) return page;
   await page.context().close();
-  return done;
+  return null;
 }
 
 async function visio(candidateBrowser, recruiterBrowser, id, seconds) {
@@ -130,8 +163,8 @@ const recruiterBrowser = await launch(candidateVideo);
 
 if (mode === 'precheck' || mode === 'all') {
   const id = (await api('/api/sessions', { candidateLabel: 'Test navigateur' })).id;
-  console.log(`--- Pré-vérification (session ${id})`);
-  await precheck(candidateBrowser, id, { first: 'Eileen', last: 'Collins', email: 'eileen@example.org', phone: '+33 6 12 34 56 78' });
+  console.log(`--- Pré-vérification avec association d'appareil (session ${id})`);
+  const device = await precheck(candidateBrowser, id, { first: 'Eileen', last: 'Collins', email: 'eileen@example.org', phone: '+33 6 12 34 56 78' }, true);
   await new Promise((r) => setTimeout(r, 2000));
   const v = await api(`/api/sessions/${id}`);
   console.log('     défis :', v.challenges.map((c) => `${c.challengeId}=${c.result}`).join(', '));
@@ -139,6 +172,17 @@ if (mode === 'precheck' || mode === 'all') {
   ok(v.hasFaceProfile, 'profil du visage enregistré');
   ok(sig(v, 'face.profile')?.status === 'ok', `profil : ${sig(v, 'face.profile')?.detail}`);
   ok(v.challenges.length >= 3, 'défis de la pré-vérification enregistrés');
+  ok(v.deviceBound && sig(v, 'device.bound')?.status === 'ok', 'appareil associé (clé d’accès créée par le navigateur)');
+
+  // Pendant la visio, le recruteur demande une confirmation : le candidat ouvre le lien sur le même appareil.
+  const { path } = await (await fetch(`${BASE}/api/sessions/${id}/presence`, { method: 'POST', headers: { 'X-Recruiter-Key': keys.get(id) } })).json();
+  await device.goto(`${BASE}${path}`);
+  await device.click('button:has-text("Confirmer avec ma clé d’accès")');
+  await device.waitForSelector('text=c’est confirmé', { timeout: 30000 }).catch(() => undefined);
+  const vp = await api(`/api/sessions/${id}`);
+  ok(sig(vp, 'device.presence')?.status === 'ok', `confirmation d’appareil : ${sig(vp, 'device.presence')?.label}`);
+  ok((await fetch(`${BASE}/api/presence/${path.split('/').pop()}`)).status === 410, 'lien de confirmation à usage unique');
+  await device.context().close();
 
   if (mode === 'all') {
     console.log('--- Visio, même personne');

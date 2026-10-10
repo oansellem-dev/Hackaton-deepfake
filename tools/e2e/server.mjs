@@ -5,22 +5,45 @@ import { join } from 'node:path';
 
 const API = process.env.API ?? 'http://localhost:8787';
 const DATA = process.argv[2];
-// Jetons des recruteurs, reçus à la création de chaque entretien.
-const keys = new Map();
-const keyFor = (path) => keys.get(path.split('/')[3]);
-const send = async (path, body, key) => {
-  const headers = { 'Content-Type': 'application/json', ...(key ? { 'X-Recruiter-Key': key } : {}) };
-  const r = await fetch(API + path, { method: 'POST', headers, body: JSON.stringify(body ?? {}) });
-  const json = await r.json().catch(() => ({}));
-  if (path === '/api/sessions' && json.recruiterKey) keys.set(json.id, json.recruiterKey);
-  return { status: r.status, json };
-};
-const post = (path, body) => send(path, body); // le candidat : aucun jeton
-const rpost = (path, body) => send(path, body, keyFor(path)); // le recruteur : avec son jeton
-const get = async (path) => (await fetch(API + path, { headers: { 'X-Recruiter-Key': keyFor(path) ?? '' } })).json();
 let failures = 0;
 const ok = (cond, msg) => { console.log(cond ? 'OK  ' : 'FAIL', msg); if (!cond) failures++; };
 const sig = (view, id) => view.signals.find((s) => s.id === id);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Le recruteur : son jeton est remis à la création de l'entretien. Le candidat : seulement le jeton de son lien.
+const keys = new Map();
+const links = new Map();
+async function send(method, path, body, headers = {}) {
+  const r = await fetch(API + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...headers },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  return { status: r.status, json: await r.json().catch(() => ({})) };
+}
+async function create(extra = {}) {
+  const { json } = await send('POST', '/api/sessions', { candidateLabel: 'x', ...extra });
+  keys.set(json.id, json.recruiterKey);
+  links.set(json.id, json.candidateLink?.token);
+  return json;
+}
+const rec = (id) => ({ 'X-Recruiter-Key': keys.get(id) });
+const get = async (id) => (await send('GET', `/api/sessions/${id}`, undefined, rec(id))).json;
+const rpost = (id, path, body) => send('POST', `/api/sessions/${id}${path}`, body, rec(id));
+const cand = (id, path, body) => send(body === undefined && path === '' ? 'GET' : 'POST', `/api/check/${links.get(id)}${path}`, body);
+
+const unit = (v) => { const n = Math.hypot(...v); return v.map((x) => x / n); };
+const E = unit(Array.from({ length: 128 }, (_, i) => Math.sin(i + 1)));
+const nearE = unit(E.map((x, i) => x + 0.05 * Math.cos(3 * i)));
+const otherE = unit(Array.from({ length: 128 }, (_, i) => Math.cos(7 * i + 2)));
+const base = [1.2, 1.3, 0.6, 0.9, 0.35, 0.8, 0.55, 0.3];
+const angles = [{ yawDeg: -26, ratios: base.map((x) => x * 1.03), samples: 6 }, { yawDeg: 27, ratios: base.map((x) => x * 0.97), samples: 5 }];
+
+async function faceId(id, embedding = E) {
+  const plan = (await cand(id, '/faceid/start', { cameraLabel: 'Integrated Camera', biometricConsent: true })).json;
+  const results = plan.steps.map((step) => ({ step, result: 'passed', durationMs: 1500 }));
+  return { plan, sub: await cand(id, '/faceid/submit', { nonce: plan.nonce, results, ratios: base, samples: 16, angles, embedding, passive: [0.2, 0.3] }) };
+}
 
 // Petit PDF texte (une page, Helvetica), pour tester la lecture du CV.
 function makePdf(lines) {
@@ -36,141 +59,110 @@ function makePdf(lines) {
   ];
   let out = '%PDF-1.4\n';
   const offsets = [];
-  objs.forEach((o, i) => {
-    offsets.push(Buffer.byteLength(out, 'latin1'));
-    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
-  });
+  objs.forEach((o, i) => { offsets.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
   const xref = Buffer.byteLength(out, 'latin1');
   out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('');
   out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(out, 'latin1');
 }
 
-// --- Session 1 : candidat cohérent
-const created = (await post('/api/sessions', { candidateLabel: 'x' })).json;
-const id = created.id;
-ok(typeof created.recruiterKey === 'string' && created.recruiterKey.length > 20, 'jeton recruteur remis à la création');
-ok((await fetch(`${API}/api/sessions/${id}`)).status === 403, 'sans jeton : signaux illisibles');
-ok((await fetch(`${API}/api/sessions/${id}`, { headers: { 'X-Recruiter-Key': 'faux' } })).status === 403, 'mauvais jeton : refusé');
-ok((await post(`/api/sessions/${id}/decision`, { value: 'stop' })).status === 403, 'sans jeton : pas de décision');
-ok((await post(`/api/sessions/${id}/challenges`, { challengeId: 'hand-over-face', result: 'passed', durationMs: 1 })).status === 403, 'sans jeton : pas de défi enregistré');
-// Aucune image du visage n'est acceptée par le serveur : ni route d'envoi, ni mesure sous forme d'image.
+// ---------- D2, D1 : jetons, liens, accès
+const s1 = await create({ controllerName: 'ESN Exemple', controllerContact: 'dpo@exemple.fr' });
+const id = s1.id;
+ok(s1.recruiterKey?.length > 20 && s1.candidateLink?.token?.length >= 32, 'jeton recruteur et jeton de lien non devinables (32 caractères)');
+ok(s1.candidateLink.expiresAt > Date.now(), 'le lien candidat a une date d’expiration');
+ok((await send('GET', `/api/sessions/${id}`)).status === 403, 'sans jeton recruteur : fiche illisible');
+ok((await send('GET', `/api/check/${'x'.repeat(32)}`)).status === 404, 'lien inventé : refusé');
+const info = (await cand(id, '')).json;
+ok(info.status === 'open' && info.controller?.name === 'ESN Exemple', 'le candidat voit le responsable du traitement');
+ok(!('signals' in info) && !('score' in info), 'le candidat ne voit ni les signaux ni le score');
+const headers = (await fetch(`${API}/api/health`)).headers;
+ok(headers.get('referrer-policy') === 'no-referrer' && headers.get('x-content-type-options') === 'nosniff', 'en-têtes de sécurité (pas de fuite de jeton par le Referer)');
+
+// ---------- A1 : aucune image du visage n'est acceptée
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46]);
-ok((await fetch(`${API}/api/sessions/${id}/frame`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpeg })).status === 404, 'aucune route pour envoyer une image');
-ok((await fetch(`${API}/api/sessions/${id}/live-sample`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Recruiter-Key': keys.get(id) }, body: jpeg })).status === 415, 'mesures en direct : image refusée (415)');
-ok((await post(`/api/sessions/${id}/live-sample`, { fakeProbability: 0.1 })).status === 403, 'mesures en direct : réservées au recruteur');
-ok((await post(`/api/sessions/${id}/identity`, { firstName: 'Ada', lastName: 'Lovelace', consent: false })).status === 400, 'refus sans consentement');
-ok((await post(`/api/sessions/${id}/faceid/start`, { cameraLabel: 'Integrated Camera' })).status === 409, 'caméra refusée avant le consentement');
-const t0 = Date.now();
-const idt = await post(`/api/sessions/${id}/identity`, {
-  firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.org', phone: '+33 6 12 34 56 78', country: 'FR', city: 'Paris',
-  jobTitle: 'Développeuse', company: 'Analytical Engines', linkedinUrl: 'https://www.linkedin.com/in/ada', consent: true,
-});
-ok(idt.status === 200, `informations enregistrées (${Date.now() - t0} ms, sources publiques interrogées)`);
-let v = await get(`/api/sessions/${id}`);
-ok(sig(v, 'identity.web-presence')?.status === 'ok', `présence publique : ${sig(v, 'identity.web-presence')?.detail}`);
-ok(sig(v, 'identity.email')?.status === 'ok', 'e-mail normal');
-ok(sig(v, 'identity.phone')?.status === 'ok', 'indicatif +33 cohérent avec FR');
-ok(sig(v, 'identity.linkedin')?.status === 'unknown', 'LinkedIn déclaré mais non vérifié (pas de scraping)');
-ok(v.candidateLabel === 'Ada Lovelace' && v.identity.city === 'Paris', 'identité visible du recruteur');
+ok((await fetch(`${API}/api/sessions/${id}/frame`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', ...rec(id) }, body: jpeg })).status === 404, 'aucune route pour envoyer une image');
+ok((await fetch(`${API}/api/sessions/${id}/live-sample`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', ...rec(id) }, body: jpeg })).status === 415, 'mesures en direct : image refusée (415)');
 
-// CV chargé par le recruteur : e-mail différent de celui déclaré, le reste concorde
+// ---------- C : consentement
+ok((await cand(id, '/identity', { firstName: 'Ada', lastName: 'Lovelace', consent: false })).status === 400, 'refus sans accord pour les informations');
+ok((await cand(id, '/faceid/start', { cameraLabel: 'Integrated Camera', biometricConsent: true })).status === 409, 'caméra refusée avant les informations');
+await cand(id, '/identity', { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.org', phone: '+33 6 12 34 56 78', country: 'FR', city: 'Paris', company: 'Analytical Engines', consent: true });
+ok((await cand(id, '/faceid/start', { cameraLabel: 'Integrated Camera' })).status === 400, 'refus sans consentement biométrique explicite');
+let v = await get(id);
+ok(sig(v, 'identity.web-presence')?.status === 'ok' && sig(v, 'identity.phone')?.status === 'ok', 'informations vérifiées (sources publiques, indicatif)');
+
+// ---------- CV chargé par le recruteur
 const cvPdf = makePdf(['Ada LOVELACE', 'ada.l@autre-domaine.fr | +33 6 12 34 56 78', 'Eugenia School - Bachelor AI 2025', 'Analytical Engines - Developpeuse 2024']);
-ok((await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: cvPdf })).status === 403, 'CV : réservé au recruteur');
-const cvRes = await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'X-Recruiter-Key': keys.get(id) }, body: cvPdf });
+const cvRes = await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf', ...rec(id) }, body: cvPdf });
 const cvView = await cvRes.json();
-ok(cvRes.status === 200 && sig(cvView, 'cv.email')?.status === 'contradiction', `CV : ${sig(cvView, 'cv.email')?.label}`);
-ok(['nom', 'téléphone', 'entreprise'].every((x) => sig(cvView, 'cv.consistent')?.detail.includes(x)), `CV : ${sig(cvView, 'cv.consistent')?.detail}`);
-ok(cvView.cv?.links?.length > 5 && cvView.cv.found.schools.includes('Eugenia School'), `CV : ${cvView.cv?.links?.length} liens de vérification, école repérée`);
-const badPdf = await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'X-Recruiter-Key': keys.get(id) }, body: Buffer.from('pas un pdf') });
-ok(badPdf.status === 422, 'CV illisible : refusé proprement');
+ok(cvRes.status === 200 && sig(cvView, 'cv.email')?.status === 'contradiction' && cvView.cv?.links?.length > 5, 'CV : écart d’e-mail signalé, liens de vérification');
 
-ok((await post(`/api/sessions/${id}/faceid/start`, { cameraLabel: 'OBS Virtual Camera' })).json.error === 'camera-virtuelle', 'caméra virtuelle refusée');
-v = await get(`/api/sessions/${id}`);
-ok(sig(v, 'precheck.virtual-camera')?.status === 'contradiction', 'tentative avec caméra virtuelle tracée');
+// ---------- Face ID, gabarit séparé, usage unique
+ok((await cand(id, '/faceid/start', { cameraLabel: 'OBS Virtual Camera', biometricConsent: true })).json.error === 'camera-virtuelle', 'caméra virtuelle refusée');
+const { plan, sub } = await faceId(id);
+ok(sub.json.profileStored === true, 'gabarit créé (empreinte calculée par le navigateur)');
+ok((await cand(id, '/identity', { firstName: 'Ada', lastName: 'Lovelace', consent: true })).status === 410, 'lien à usage unique : refusé après utilisation');
+ok((await cand(id, '')).json.status === 'used', 'lien marqué « utilisé »');
+v = await get(id);
+ok(v.consent?.biometricAt && v.consent?.version, 'consentement biométrique horodaté avec la version du texte');
+ok(v.hasFaceProfile && !('templateId' in v) && !('faceProfile' in v), 'le gabarit ne sort jamais du serveur');
+await wait(700);
+const templatesRaw = readFileSync(join(DATA, 'templates.json'), 'utf8');
+const sessionsRaw = readFileSync(join(DATA, 'sessions.json'), 'utf8');
+ok(!/Lovelace|ada@|Ada/.test(templatesRaw) && !templatesRaw.includes('"ratios"') && templatesRaw.includes('"sealed"'), 'gabarits : chiffrés, sans nom, e-mail ni identifiant d’entretien');
+ok(!templatesRaw.includes(`"${id}"`), 'gabarits : aucun lien direct avec l’entretien dans leur fichier');
+ok(!sessionsRaw.includes('"ratios"') && !sessionsRaw.includes('"embedding"') && !sessionsRaw.includes('faceProfileSealed'), 'fiches d’entretien : aucune donnée biométrique');
 
-// Session 1 bis, sans la tentative OBS, pour le parcours normal
-const id1 = (await post('/api/sessions', {})).json.id;
-await post(`/api/sessions/${id1}/identity`, { firstName: 'Ada', lastName: 'Lovelace', country: 'FR', consent: true });
-await post(`/api/sessions/${id1}/precheck`, { cameras: ['Integrated Camera'], timezone: 'Europe/Paris', languages: ['fr'], declaredCountry: 'FR' });
-const start = (await post(`/api/sessions/${id1}/faceid/start`, { cameraLabel: 'Integrated Camera' })).json;
-ok(start.steps?.[0] === 'center' && start.steps.length === 4 && !start.hardened, `parcours normal : ${start.steps?.join(', ')}`);
+// ---------- Comparaison pendant la visio (mesures du navigateur)
+ok((await send('POST', `/api/sessions/${id}/live-sample`, { fakeProbability: 0.1 })).status === 403, 'mesures en direct : réservées au recruteur');
+for (let i = 0; i < 5; i++) await rpost(id, '/live-sample', { ratios: base.map((x) => x * 1.01), yawDeg: 3, embedding: nearE, fakeProbability: 0.2 });
+v = await get(id);
+ok(sig(v, 'face.continuity')?.status === 'ok', `même personne : ${sig(v, 'face.continuity')?.detail}`);
+const id2 = (await create()).id;
+await cand(id2, '/identity', { firstName: 'Bob', lastName: 'Martin', consent: true });
+await faceId(id2);
+for (let i = 0; i < 5; i++) await rpost(id2, '/live-sample', { ratios: base.map((x) => x * 1.02), yawDeg: 2, embedding: otherE });
+ok(sig(await get(id2), 'face.continuity')?.status === 'contradiction', 'autre personne : visage différent signalé');
 
-const base = [1.2, 1.3, 0.6, 0.9, 0.35, 0.8, 0.55, 0.3];
-const unit = (v) => { const n = Math.hypot(...v); return v.map((x) => x / n); };
-const E = unit(Array.from({ length: 128 }, (_, i) => Math.sin(i + 1)));
-const nearE = unit(E.map((x, i) => x + 0.05 * Math.cos(3 * i)));
-const otherE = unit(Array.from({ length: 128 }, (_, i) => Math.cos(7 * i + 2)));
-const right = base.map((x) => x * 1.03);
-const angles = [{ yawDeg: -26, ratios: right, samples: 6 }, { yawDeg: 27, ratios: base.map((x) => x * 0.97), samples: 5 }];
-const results = start.steps.map((step) => ({ step, result: 'passed', durationMs: 1500 }));
-ok((await post(`/api/sessions/${id1}/faceid/submit`, { nonce: 'faux', results, ratios: base, samples: 16 })).status === 409, 'mauvais nonce refusé');
-const sub = await post(`/api/sessions/${id1}/faceid/submit`, { nonce: start.nonce, results, ratios: base, samples: 16, angles, embedding: E, passive: [0.2, 0.3, 0.25] });
-ok(sub.json.profileStored === true, 'profil enregistré (empreinte du navigateur, face + 2 angles)');
-ok((await post(`/api/sessions/${id1}/faceid/start`, { cameraLabel: 'Integrated Camera' })).status === 409, 'pas de second passage après la fin');
-v = await get(`/api/sessions/${id1}`);
-ok(!('faceProfile' in v) && v.hasFaceProfile, 'le profil ne sort jamais du serveur');
-ok(!('recruiterKey' in v), 'le jeton ne figure pas dans la vue');
-ok(v.challenges.every((c) => c.phase === 'precheck'), 'défis marqués « pré-vérification »');
-ok(v.agent?.recommendations?.[0]?.challengeId === 'hand-over-face', `en direct, l'agent recommande encore la main (${v.agent?.recommendations?.[0]?.challengeId})`);
+// ---------- B3 : suppression manuelle, retrait, décision
+const del = await send('DELETE', `/api/sessions/${id2}/biometrics`, undefined, rec(id2));
+ok(del.status === 200 && del.json.hasFaceProfile === false, 'suppression manuelle par le recruteur');
+ok((await send('DELETE', `/api/sessions/${id2}/biometrics`)).status === 403, 'suppression manuelle : réservée au recruteur');
+const w = await cand(id, '/withdraw', {});
+v = await get(id);
+ok(w.status === 200 && !v.hasFaceProfile && v.consent?.withdrawnAt && sig(v, 'face.withdrawn'), 'retrait du consentement (même après utilisation du lien) : gabarit supprimé');
+for (let i = 0; i < 3; i++) await rpost(id, '/live-sample', { embedding: otherE, ratios: base, yawDeg: 0 });
+v = await get(id);
+ok(sig(v, 'face.continuity')?.status !== 'contradiction', 'après retrait : plus aucune comparaison');
 
-await new Promise((r) => setTimeout(r, 600));
-const raw = readFileSync(join(DATA, 'sessions.json'), 'utf8');
-ok(raw.includes('faceProfileSealed') && !raw.includes('"ratios"'), 'profil chiffré sur disque');
+// ---------- C2 : alternative sans biométrie, sans pénalité
+const id3 = (await create()).id;
+await cand(id3, '/identity', { firstName: 'Zorglub', lastName: 'Kwyxtrandel', consent: true });
+ok((await cand(id3, '/optout', {})).status === 200, 'vérification sans biométrie choisie');
+v = await get(id3);
+ok(!v.hasFaceProfile && sig(v, 'face.optout')?.status === 'unknown' && v.score.level === 'green', 'sans biométrie : aucun gabarit, aucune pénalité');
+ok((await cand(id3, '/faceid/start', { cameraLabel: 'Integrated Camera', biometricConsent: true })).status === 410, 'sans biométrie : le lien ne peut plus lancer la caméra');
 
-for (let i = 0; i < 3; i++) await rpost(`/api/sessions/${id1}/live-sample`, { ratios: base.map((x) => x * 1.01), yawDeg: 3, embedding: nearE, fakeProbability: 0.2 });
-for (let i = 0; i < 3; i++) await rpost(`/api/sessions/${id1}/live-sample`, { ratios: right, yawDeg: -24, embedding: nearE });
-const measures = (view) => Number(sig(view, 'face.continuity')?.detail.match(/sur (\d+) mesure/)?.[1] ?? 0);
-const before = measures(await get(`/api/sessions/${id1}`));
-await rpost(`/api/sessions/${id1}/live-sample`, { ratios: base, yawDeg: 55 });
-v = await get(`/api/sessions/${id1}`);
-ok(measures(v) === before, 'angle sans profil de référence : proportions ignorées');
-ok(sig(v, 'face.continuity')?.status === 'ok', `même visage, de face et tourné : ${sig(v, 'face.continuity')?.detail}`);
-ok(v.agent?.passive?.frames === 6, `détecteur passif : ${v.agent?.passive?.frames} probabilité(s) reçue(s) du navigateur`);
+// ---------- E1 : confirmation d'appareil sans appareil associé
+ok((await rpost(id3, '/presence', {})).status === 409, 'confirmation d’appareil : refusée sans appareil associé');
 
-// --- Session 2 : informations incohérentes → parcours durci, visage différent pendant l'entretien
-const id2 = (await post('/api/sessions', {})).json.id;
-await post(`/api/sessions/${id2}/identity`, {
-  firstName: 'Zorglub', lastName: 'Kwyxtrandel', email: 'zk@yopmail.com', phone: '+44 7700 900123', country: 'FR',
-  githubUrl: 'https://github.com/torvalds', consent: true,
-});
-v = await get(`/api/sessions/${id2}`);
-ok(sig(v, 'identity.web-presence')?.status === 'unknown', 'nom introuvable = inconnu, sans effet sur le score');
-ok(sig(v, 'identity.email')?.status === 'contradiction', 'e-mail jetable signalé');
-ok(sig(v, 'identity.phone')?.status === 'contradiction', 'indicatif +44 pour la France signalé');
-ok(sig(v, 'identity.github')?.status === 'contradiction', `GitHub : ${sig(v, 'identity.github')?.detail}`);
-const st2 = (await post(`/api/sessions/${id2}/faceid/start`, { cameraLabel: 'Integrated Camera' })).json;
-ok(st2.hardened && st2.steps.length === 7, `parcours renforcé (${st2.steps.length} étapes)`);
-await post(`/api/sessions/${id2}/faceid/submit`, { nonce: st2.nonce, results: st2.steps.map((step) => ({ step, result: 'passed', durationMs: 1 })), ratios: base, samples: 16, embedding: E });
-// Proportions presque identiques, mais empreinte d'une autre personne : l'empreinte suffit à lever le signal.
-for (let i = 0; i < 6; i++) await rpost(`/api/sessions/${id2}/live-sample`, { ratios: base.map((x) => x * 1.02), yawDeg: 2, embedding: otherE });
-v = await get(`/api/sessions/${id2}`);
-ok(sig(v, 'face.continuity')?.status === 'contradiction', `visage différent détecté : ${sig(v, 'face.continuity')?.detail}`);
-console.log(`     score session 2 : ${v.score.value} (${v.score.level})`);
+// ---------- Décision : clôture et suppression
+const id4 = (await create()).id;
+await cand(id4, '/identity', { firstName: 'Eve', lastName: 'Dupont', consent: true });
+await faceId(id4);
+v = (await rpost(id4, '/decision', { value: 'continue' })).json;
+ok(v.hasFaceProfile === false, 'décision du recruteur : gabarit supprimé');
 
-// --- OBS installé mais vraie caméra utilisée : information, pas contradiction, et parcours normal
-const id4 = (await post('/api/sessions', {})).json.id;
-await post(`/api/sessions/${id4}/identity`, { firstName: 'Ada', lastName: 'Lovelace', consent: true });
-await post(`/api/sessions/${id4}/precheck`, { cameras: ['OBS Virtual Camera', 'HD Webcam'], timezone: 'Europe/Paris', languages: ['fr'], declaredCountry: 'FR' });
-const st4 = (await post(`/api/sessions/${id4}/faceid/start`, { cameraLabel: 'HD Webcam' })).json;
-v = await get(`/api/sessions/${id4}`);
-ok(sig(v, 'precheck.virtual-camera')?.status === 'unknown' && !st4.hardened, `OBS installé, non utilisé : ${sig(v, 'precheck.virtual-camera')?.label}, parcours normal`);
-const id5 = (await post('/api/sessions', {})).json.id;
-await post(`/api/sessions/${id5}/live-camera`, { cameraLabel: 'OBS Virtual Camera' });
-v = await get(`/api/sessions/${id5}`);
-ok(sig(v, 'live.virtual-camera')?.status === 'contradiction', 'caméra virtuelle utilisée pendant la visio : signalée');
-
-// --- Absence de trace : ne pénalise jamais
-const id3 = (await post('/api/sessions', {})).json.id;
-await post(`/api/sessions/${id3}/identity`, { firstName: 'Zorglub', lastName: 'Kwyxtrandel', consent: true });
-v = await get(`/api/sessions/${id3}`);
-ok(v.signals.every((s) => s.status !== 'contradiction'), 'rien de déclaré, rien trouvé : aucune contradiction');
-
-// --- Décision = effacement
-await rpost(`/api/sessions/${id1}/decision`, { value: 'continue' });
-ok((await get(`/api/sessions/${id1}`)).hasFaceProfile === false, 'profil effacé à la décision');
-await new Promise((r) => setTimeout(r, 600));
-ok(!JSON.parse(readFileSync(join(DATA, 'sessions.json'), 'utf8')).find((x) => x.id === id1).faceProfileSealed, 'effacé aussi sur disque');
+// ---------- F1 : journal d'audit sans donnée biométrique
+v = await get(id4);
+const actions = (v.audit ?? []).map((a) => a.action);
+ok(['Entretien créé', 'Consentement biométrique donné', 'Gabarit biométrique créé', 'Décision', 'Gabarit biométrique supprimé'].every((a) => actions.includes(a)), `journal : ${actions.join(' → ')}`);
+await wait(300);
+const auditRaw = readFileSync(join(DATA, 'audit.jsonl'), 'utf8');
+const longNumberList = /\[(?:-?\d+(?:\.\d+)?,){8,}/;
+ok(!auditRaw.includes('embedding') && !auditRaw.includes('"ratios"') && !longNumberList.test(auditRaw), 'journal : aucune empreinte ni proportion');
+ok(auditRaw.includes('suppression manuelle') && auditRaw.includes('retrait du consentement') && auditRaw.includes('décision du recruteur'), 'journal : chaque suppression est tracée avec sa raison');
 
 console.log(failures ? `${failures} échec(s)` : 'Tout est OK');
 process.exitCode = failures ? 1 : 0;

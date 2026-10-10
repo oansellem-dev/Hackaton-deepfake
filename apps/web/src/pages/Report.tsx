@@ -52,6 +52,30 @@ export function Report() {
   const api = useMemo(() => createApi(API_BASE, key), [key]);
   const [session, setSession] = useState<SessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cvBusy, setCvBusy] = useState(false);
+  const [cvError, setCvError] = useState<string | null>(null);
+
+  async function uploadCv(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCvBusy(true);
+    setCvError(null);
+    try {
+      setSession(await api.uploadCv(id, file));
+    } catch (err) {
+      const text = String(err);
+      setCvError(
+        text.includes('422')
+          ? 'Ce PDF ne contient pas de texte lisible (CV scanné ?) : comparaison impossible.'
+          : text.includes('409')
+            ? 'Le candidat n’a pas encore rempli ses informations : le CV sera comparé à ce qu’il déclare.'
+            : `Envoi impossible : ${text}`,
+      );
+    } finally {
+      setCvBusy(false);
+      e.target.value = '';
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -68,7 +92,7 @@ export function Report() {
     };
   }, [api, id]);
 
-  if (error?.startsWith('403') && !session) {
+  if (error?.includes('403') && !session) {
     return (
       <div className="page">
         Ce rapport est réservé au recruteur : ouvrez-le avec le lien donné à la création de l’entretien.
@@ -84,8 +108,10 @@ export function Report() {
   );
   const precheckChallenges = session.challenges.filter((c) => c.phase === 'precheck');
   const liveChallenges = session.challenges.filter((c) => c.phase !== 'precheck');
+  const cvSignals = session.signals.filter((s) => s.source === 'cv');
   const precheckToCheck = [
     ...precheckSignals.filter((s) => s.status === 'contradiction'),
+    ...cvSignals.filter((s) => s.status === 'contradiction'),
     ...session.signals.filter((s) => s.source === 'challenge' && s.status === 'contradiction' && s.label.includes('pré-vérification')),
   ];
   const faceDone = Boolean(session.faceId?.completedAt);
@@ -178,6 +204,50 @@ export function Report() {
           )}
         </div>
       )}
+
+      <div className="card">
+        <h2>CV du candidat</h2>
+        {!identity ? (
+          <p className="muted">
+            Disponible quand le candidat aura rempli ses informations : le CV est comparé à ce qu’il déclare.
+          </p>
+        ) : (
+          <>
+            <p className="muted">
+              Chargez le CV reçu (PDF). Il est lu en mémoire puis oublié : seuls les écarts et les liens de vérification
+              sont gardés.
+            </p>
+            <label className="cv-upload">
+              {session.cv ? 'Charger un autre CV (PDF)' : 'Choisir le CV (PDF)'}
+              <input type="file" accept="application/pdf" onChange={uploadCv} disabled={cvBusy} />
+            </label>
+            {cvBusy && <p className="muted">Lecture du CV…</p>}
+            {cvError && <p className="faceid-error">{cvError}</p>}
+            {session.cv && (
+              <>
+                <SignalList signals={cvSignals} />
+                {session.cv.found.schools.length > 0 && (
+                  <p className="muted">Écoles repérées dans le CV : {session.cv.found.schools.join(', ')}.</p>
+                )}
+                <h3>Vérifier en un clic</h3>
+                <p className="muted">
+                  Recherches préparées à partir du CV et des déclarations : vous les ouvrez vous-même, rien n’est aspiré.
+                </p>
+                <ul className="cv-links">
+                  {session.cv.links.map((l) => (
+                    <li key={l.url}>
+                      <span className="muted">{l.categorie}</span>{' '}
+                      <a href={l.url} target="_blank" rel="noreferrer">
+                        {l.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </div>
 
       <div className="card">
         <h2>Score consultatif : {session.score.value}/100</h2>

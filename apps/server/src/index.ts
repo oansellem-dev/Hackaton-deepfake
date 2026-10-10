@@ -7,7 +7,7 @@ import express from 'express';
 import type { ChallengeResult, Decision, PrecheckPayload } from '@kyc/shared';
 import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
-import { forwardFrame, viewWithAgent } from './agent.ts';
+import { analyzeCv, forwardFrame, viewWithAgent, type CvResult } from './agent.ts';
 import { hasRecruiterKey, recruiterOnly } from './auth.ts';
 import { cleanMetrics, recordChallenge } from './challenges.ts';
 import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
@@ -96,6 +96,51 @@ app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' 
     if (typeof p === 'number' && Number.isFinite(p)) session.passiveScores = [...(session.passiveScores ?? []), p].slice(-15);
     // L'empreinte reste sur le serveur : le navigateur ne reçoit que le résultat du détecteur passif.
     res.status(status).json(rest);
+  } catch {
+    res.status(503).json({ error: 'agent injoignable' });
+  }
+});
+
+// CV chargé par le recruteur (jamais par le candidat : son parcours reste léger). Comparé à ses déclarations,
+// puis oublié : on garde seulement les écarts, les éléments concordants et les liens de vérification.
+app.post('/api/sessions/:id/cv', recruiterOnly, express.raw({ type: 'application/pdf', limit: '8mb' }), async (req, res) => {
+  const session = getSession(req.params.id)!;
+  if (!session.identity) {
+    return res.status(409).json({ error: "le candidat n'a pas encore rempli ses informations" });
+  }
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'PDF manquant' });
+  try {
+    const { status, body } = await analyzeCv(session, req.body);
+    if (status !== 200) return res.status(status).json({ error: (body as { detail?: string }).detail ?? 'CV illisible' });
+    const cv = body as CvResult;
+    session.cv = { analyzedAt: Date.now(), found: cv.found, consistent: cv.consistent, links: cv.links };
+    session.signals = session.signals.filter((s) => s.source !== 'cv');
+    const at = Date.now();
+    upsertSignals(session, [
+      ...cv.inconsistencies.map((i) => ({
+        id: i.field,
+        source: 'cv' as const,
+        severity: 'medium' as const,
+        status: 'contradiction' as const,
+        label: i.label,
+        detail: i.detail,
+        at,
+      })),
+      ...(cv.consistent.length
+        ? [
+            {
+              id: 'cv.consistent',
+              source: 'cv' as const,
+              severity: 'medium' as const,
+              status: 'ok' as const,
+              label: 'Concordant avec le CV',
+              detail: `Identique dans le CV et la pré-vérification : ${cv.consistent.join(', ')}.`,
+              at,
+            },
+          ]
+        : []),
+    ]);
+    res.json(await viewWithAgent(session));
   } catch {
     res.status(503).json({ error: 'agent injoignable' });
   }

@@ -1,10 +1,13 @@
+import json
 import logging
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from . import face_identity, passive_detector
+from .cv import compare as cv_compare
+from .cv.extract_pdf import extract_text_from_pdf
 from .recommend import assess
 from .schemas import AssessmentInput, AssessmentOutput, PassiveSummary
 
@@ -57,6 +60,18 @@ def post_frame(session_id: str, image: UploadFile = File(...)) -> dict:
     # Empreinte faciale pour la comparaison 1:1 avec la pré-vérification ; renvoyée au serveur, jamais conservée ici.
     return {"frame": result, "summary": passive_detector.record(session_id, result),
             "embedding": face_identity.embed_bytes(data)}
+
+
+@app.post("/cv/analyze")
+def cv_analyze(file: UploadFile = File(...), declared: str = Form("{}"), country: str = Form("FR")) -> dict:
+    """CV chargé par le recruteur : lu en mémoire, comparé aux déclarations du candidat, puis oublié."""
+    try:
+        text = extract_text_from_pdf(file.file.read())
+    except Exception:  # PDF malformé, chiffré ou tronqué : on le dit au recruteur plutôt que d'échouer
+        raise HTTPException(status_code=422, detail="PDF illisible")
+    if not text.strip():
+        raise HTTPException(status_code=422, detail="PDF sans texte (CV scanné ?) : comparaison impossible")
+    return cv_compare.analyze(text, json.loads(declared or "{}"), country)
 
 
 @app.delete("/session/{session_id}")

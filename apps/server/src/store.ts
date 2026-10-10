@@ -18,13 +18,18 @@ type Stored = Omit<Session, 'faceProfile'> & { faceProfileSealed?: string };
 function load(): void {
   if (!existsSync(FILE)) return;
   try {
+    let migrated = false;
     for (const { faceProfileSealed, ...rest } of JSON.parse(readFileSync(FILE, 'utf8')) as Stored[]) {
       const session: Session = rest;
       if (faceProfileSealed) session.faceProfile = unseal(faceProfileSealed);
       // Entretiens créés avant les jetons : on leur en donne un (lisible dans le fichier par l'hôte).
-      session.recruiterKey ??= newRecruiterKey();
+      if (!session.recruiterKey) {
+        session.recruiterKey = newRecruiterKey();
+        migrated = true;
+      }
       sessions.set(session.id, session);
     }
+    if (migrated) schedulePersist();
     purgeExpiredBiometrics();
   } catch (err) {
     console.warn('Sessions existantes illisibles, démarrage à vide :', String(err));

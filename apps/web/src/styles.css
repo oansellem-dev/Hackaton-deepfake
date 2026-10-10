@@ -75,3 +75,9 @@ code { background: #ecebfa; padding: 2px 6px; border-radius: 4px; word-break: br
 .facts { border-collapse: collapse; width: 100%; font-size: 14px; }
 .facts th { text-align: left; color: #666; font-weight: normal; padding: 4px 12px 4px 0; width: 30%; vertical-align: top; }
 .facts td { padding: 4px 0; word-break: break-word; }
+
+.cv-upload { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; padding: 10px 14px; border: 1px dashed #6c5ce7; border-radius: 8px; cursor: pointer; color: #6c5ce7; font-weight: 600; }
+.cv-upload input { font-weight: normal; color: #444; }
+.cv-links { list-style: none; padding: 0; columns: 2; column-gap: 24px; font-size: 14px; }
+.cv-links li { padding: 3px 0; break-inside: avoid; }
+@media (max-width: 560px) { .cv-links { columns: 1; } }

@@ -75,6 +75,16 @@ export function createApi(base: string = DEFAULT_API_BASE, recruiterKey?: string
     // Page candidat de la visio de secours : nom de la caméra réellement utilisée.
     reportLiveCamera: (id: string, cameraLabel: string) =>
       call<{ checked: boolean }>(`/api/sessions/${id}/live-camera`, { method: 'POST', body: JSON.stringify({ cameraLabel }) }),
+    // Rapport : CV chargé par le recruteur (PDF).
+    uploadCv: async (id: string, pdf: Blob): Promise<SessionView> => {
+      const res = await fetch(`${base}/api/sessions/${id}/cv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/pdf', ...auth },
+        body: pdf,
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      return res.json() as Promise<SessionView>;
+    },
     sendDecision: (id: string, value: Decision, note?: string) =>
       call<SessionView>(`/api/sessions/${id}/decision`, { method: 'POST', body: JSON.stringify({ value, note }) }),
   };

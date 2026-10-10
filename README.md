@@ -107,7 +107,7 @@ Le recruteur crée un entretien sur `/` et envoie `/check/<id>` au candidat. Il 
 
 Ne rien trouver ou laisser un champ vide ne pénalise jamais : seul un écart entre deux informations devient un signal à vérifier.
 
-**Page 2 — Vérification du visage.** Caméra de l'appareil uniquement : une caméra virtuelle (OBS, ManyCam…) est remplacée par la vraie caméra si l'appareil en a une, sinon refusée et tracée. La vérification d'environnement (caméras, fuseau horaire, IP) se fait au même moment. Puis, dans un ovale de cadrage (distance, lumière, visage de face) : tête tournée d'un côté puis de l'autre (retour de face obligatoire entre les deux, « Dans l'autre sens » si besoin), main devant le visage. Le serveur tire l'ordre au hasard et ajoute des étapes si un signal à vérifier existe déjà. Analyse MediaPipe dans le navigateur ; une dizaine d'images, surtout pendant les défis, partent vers l'agent local (détecteur passif et empreinte), analysées en mémoire puis jetées.
+**Page 2 — Vérification du visage.** Caméra de l'appareil uniquement : une caméra virtuelle (OBS, ManyCam…) est remplacée par la vraie caméra si l'appareil en a une, sinon refusée et tracée. Une caméra virtuelle seulement installée (OBS pour le streaming) n'est qu'une information, sans effet sur le score ; pendant la visio, la page du candidat signale une caméra virtuelle réellement utilisée. La vérification d'environnement (caméras, fuseau horaire, IP) se fait au même moment. Puis, dans un ovale de cadrage (distance, lumière, visage de face) : tête tournée d'un côté puis de l'autre (retour de face obligatoire entre les deux, « Dans l'autre sens » si besoin), main devant le visage. Le serveur tire l'ordre au hasard et ajoute des étapes si un signal à vérifier existe déjà. Analyse MediaPipe dans le navigateur ; une dizaine d'images, surtout pendant les défis, partent vers l'agent local (détecteur passif et empreinte), analysées en mémoire puis jetées.
 
 **Ce qui est conservé** (jamais d'image), chiffré en AES-256-GCM dans `apps/server/data/sessions.json`, effacé dès la décision du recruteur et au plus tard après 24 h :
 
@@ -127,6 +127,20 @@ BRAVE_API_KEY=... BIOMETRIC_KEY=$(openssl rand -hex 32) npm run dev
 ```
 
 Au premier appel, l'agent télécharge ses modèles (DeepfakeGuard, YuNet, SFace : environ 70 Mo) depuis Hugging Face.
+
+## Accès recruteur (jeton)
+
+À la création d'un entretien, le serveur remet un **jeton recruteur**, une seule fois. Il est intégré aux liens recruteur affichés sur `/` (visio `?role=recruiter&key=…`, rapport `?key=…`) et au code à coller dans l'extension (`identifiant:jeton`). Sans lui, impossible de lire les signaux, de décider, d'enregistrer un défi ou d'envoyer des captures en dehors de la vérification du visage. Le lien du candidat (`/check/<id>`, `/visio/<id>?role=candidate`) ne contient que l'identifiant. Le navigateur du recruteur garde le jeton pour les visites suivantes.
+
+## CV du candidat (dans le rapport, chargé par le recruteur)
+
+Le candidat n'envoie pas son CV : son parcours reste léger. Le recruteur charge le PDF reçu dans le rapport. L'agent le lit en mémoire (module d'Hector, `agent/app/cv/`, avec pdfplumber), le compare à ce que le candidat a déclaré en page 1, puis l'oublie :
+
+- **écarts signalés** (à vérifier, jamais une preuve) : nom absent du CV, e-mail, téléphone, GitHub ou LinkedIn différents, entreprise déclarée absente du CV ; on ne compare que ce qui existe des deux côtés ;
+- **concordances** affichées (« Identique dans le CV et la pré-vérification : nom, téléphone… ») ;
+- **vérifier en un clic** : recherches préparées par le module d'Hector (école, entreprise, poste, plateformes pro), que le recruteur ouvre lui-même. Rien n'est aspiré automatiquement.
+
+Un CV scanné (sans texte) est refusé avec un message clair. Les écarts comptent dans le score comme les autres incohérences déclarées (signal moyen, plafonné).
 
 ## Défis en direct (brique B)
 

@@ -55,7 +55,7 @@ function toAgentInput(session: Session) {
       })),
     // Incohérences dans ce que le candidat a écrit (e-mail jetable, indicatif, profil GitHub…).
     cv_contradictions: session.signals
-      .filter((s) => s.source === 'identity' && s.status === 'contradiction')
+      .filter((s) => (s.source === 'identity' || s.source === 'cv') && s.status === 'contradiction')
       .map((s) => ({ field: s.id, detail: s.label })),
     available_challenges: Object.values(TO_AGENT),
   };
@@ -116,4 +116,22 @@ export async function forwardFrame(sessionId: string, image: Buffer, contentType
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+export interface CvResult {
+  found: { emails: string[]; phones: string[]; github: string[]; linkedin: string[]; schools: string[] };
+  inconsistencies: { field: string; label: string; detail: string }[];
+  consistent: string[];
+  links: { categorie: string; label: string; url: string }[];
+}
+
+// CV chargé par le recruteur : l'agent le lit en mémoire et le compare à ce que le candidat a déclaré.
+export async function analyzeCv(session: Session, pdf: Buffer): Promise<{ status: number; body: CvResult | { detail?: string } }> {
+  const { consentAt, ...declared } = session.identity ?? { consentAt: 0 };
+  const form = new FormData();
+  form.append('file', new Blob([new Uint8Array(pdf)], { type: 'application/pdf' }), 'cv.pdf');
+  form.append('declared', JSON.stringify(declared));
+  form.append('country', session.identity?.country ?? 'FR');
+  const res = await fetch(`${AGENT_URL}/cv/analyze`, { method: 'POST', body: form, signal: AbortSignal.timeout(30000) });
+  return { status: res.status, body: (await res.json().catch(() => ({}))) as CvResult | { detail?: string } };
 }

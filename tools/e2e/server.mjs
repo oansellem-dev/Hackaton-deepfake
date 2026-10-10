@@ -22,6 +22,30 @@ let failures = 0;
 const ok = (cond, msg) => { console.log(cond ? 'OK  ' : 'FAIL', msg); if (!cond) failures++; };
 const sig = (view, id) => view.signals.find((s) => s.id === id);
 
+// Petit PDF texte (une page, Helvetica), pour tester la lecture du CV.
+function makePdf(lines) {
+  const BS = String.fromCharCode(92); // barre oblique inverse
+  const esc = (t) => t.split(BS).join(BS + BS).split('(').join(BS + '(').split(')').join(BS + ')');
+  const stream = 'BT /F1 11 Tf 50 800 Td 14 TL ' + lines.map((l) => `(${esc(l)}) Tj T*`).join(' ') + ' ET';
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((o, i) => {
+    offsets.push(Buffer.byteLength(out, 'latin1'));
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(out, 'latin1');
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('');
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
 // --- Session 1 : candidat cohérent
 const created = (await post('/api/sessions', { candidateLabel: 'x' })).json;
 const id = created.id;
@@ -45,6 +69,17 @@ ok(sig(v, 'identity.email')?.status === 'ok', 'e-mail normal');
 ok(sig(v, 'identity.phone')?.status === 'ok', 'indicatif +33 cohérent avec FR');
 ok(sig(v, 'identity.linkedin')?.status === 'unknown', 'LinkedIn déclaré mais non vérifié (pas de scraping)');
 ok(v.candidateLabel === 'Ada Lovelace' && v.identity.city === 'Paris', 'identité visible du recruteur');
+
+// CV chargé par le recruteur : e-mail différent de celui déclaré, le reste concorde
+const cvPdf = makePdf(['Ada LOVELACE', 'ada.l@autre-domaine.fr | +33 6 12 34 56 78', 'Eugenia School - Bachelor AI 2025', 'Analytical Engines - Developpeuse 2024']);
+ok((await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: cvPdf })).status === 403, 'CV : réservé au recruteur');
+const cvRes = await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'X-Recruiter-Key': keys.get(id) }, body: cvPdf });
+const cvView = await cvRes.json();
+ok(cvRes.status === 200 && sig(cvView, 'cv.email')?.status === 'contradiction', `CV : ${sig(cvView, 'cv.email')?.label}`);
+ok(['nom', 'téléphone', 'entreprise'].every((x) => sig(cvView, 'cv.consistent')?.detail.includes(x)), `CV : ${sig(cvView, 'cv.consistent')?.detail}`);
+ok(cvView.cv?.links?.length > 5 && cvView.cv.found.schools.includes('Eugenia School'), `CV : ${cvView.cv?.links?.length} liens de vérification, école repérée`);
+const badPdf = await fetch(`${API}/api/sessions/${id}/cv`, { method: 'POST', headers: { 'Content-Type': 'application/pdf', 'X-Recruiter-Key': keys.get(id) }, body: Buffer.from('pas un pdf') });
+ok(badPdf.status === 422, 'CV illisible : refusé proprement');
 
 ok((await post(`/api/sessions/${id}/faceid/start`, { cameraLabel: 'OBS Virtual Camera' })).json.error === 'camera-virtuelle', 'caméra virtuelle refusée');
 v = await get(`/api/sessions/${id}`);

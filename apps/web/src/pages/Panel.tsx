@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { RecruiterPanel } from '@kyc/panel';
+import { RecruiterPanel, createApi } from '@kyc/panel';
 import { API_BASE, recruiterKeyFor } from '../config.ts';
 import { loadFaceModels } from '../lib/faceModels.ts';
 import { createLiveDetector } from '../lib/liveDetector.ts';
@@ -14,8 +14,22 @@ export function Panel() {
   const [params] = useSearchParams();
   const recruiterKey = recruiterKeyFor(id, params.get('key'));
   const detector = useMemo(() => createLiveDetector(id, recruiterKey), [id, recruiterKey]);
+  const api = useMemo(() => createApi(API_BASE, recruiterKey), [recruiterKey]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [presenceUrl, setPresenceUrl] = useState<string | null>(null);
+
+  // Confirmation d'appareil : lien à usage unique à coller dans la discussion Teams ; le candidat confirme avec la
+  // clé d'accès créée à la pré-vérification.
+  async function requestPresence() {
+    setError(null);
+    try {
+      const { path } = await api.requestPresence(id);
+      setPresenceUrl(`${window.location.origin}${path}`);
+    } catch (e) {
+      setError(String(e).includes('409') ? 'Le candidat n’a pas associé d’appareil à la pré-vérification.' : String(e));
+    }
+  }
 
   // Analyse chargée dès l'ouverture : mesures et défis prêts quand le partage commence.
   useEffect(() => {
@@ -67,6 +81,17 @@ export function Panel() {
             </button>
           </p>
         )}
+        <p className="presence-link">
+          <button className="link" onClick={requestPresence}>
+            Demander la confirmation d’appareil
+          </button>
+          {presenceUrl && (
+            <span>
+              À coller dans la discussion de la visio : <code>{presenceUrl}</code>
+            </span>
+          )}
+        </p>
+        {stream && error && <p className="faceid-error">{error}</p>}
       </header>
       <RecruiterPanel
         sessionId={id}

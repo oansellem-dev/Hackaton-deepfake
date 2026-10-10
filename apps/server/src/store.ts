@@ -1,36 +1,58 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { computeScore, type Session, type SessionView, type Signal } from '@kyc/shared';
-import { DATA_DIR, seal, unseal } from './biometric.ts';
+import {
+  computeScore,
+  type AuditEntry,
+  type Controller,
+  type FaceProfile,
+  type Session,
+  type SessionView,
+  type Signal,
+} from '@kyc/shared';
+import { audit } from './audit.ts';
+import { DATA_DIR, unseal } from './biometric.ts';
+import { retention } from './config.ts';
+import { deleteTemplate, expiredTemplateIds, getTemplate, hasTemplate, putTemplate } from './templates.ts';
 
-// Aucune image ni vidéo n'est conservée : seulement les signaux, les résultats de défis, la décision du recruteur
-// et, avec le consentement du candidat, les proportions de son visage (chiffrées, effacées à la décision).
+// Fiches d'entretien : identité déclarée, signaux, défis, décision, journal. Aucune image, et aucun gabarit
+// biométrique : il est rangé à part (templates.ts), la fiche ne garde que son identifiant aléatoire.
 const FILE = join(DATA_DIR, 'sessions.json');
-export const BIOMETRIC_MAX_AGE_MS = 24 * 3600 * 1000;
 
 const sessions = new Map<string, Session>();
+const byCandidateToken = new Map<string, string>();
+const byPresenceToken = new Map<string, string>();
 
-const newRecruiterKey = () => randomBytes(18).toString('base64url');
+const newToken = (bytes: number) => randomBytes(bytes).toString('base64url');
 
-type Stored = Omit<Session, 'faceProfile'> & { faceProfileSealed?: string };
+type Stored = Session & { faceProfileSealed?: string }; // ancien format : gabarit chiffré dans la fiche
+
+function index(session: Session): void {
+  if (session.candidateLink) byCandidateToken.set(session.candidateLink.token, session.id);
+  if (session.presence) byPresenceToken.set(session.presence.token, session.id);
+}
 
 function load(): void {
   if (!existsSync(FILE)) return;
   try {
     let migrated = false;
-    for (const { faceProfileSealed, ...rest } of JSON.parse(readFileSync(FILE, 'utf8')) as Stored[]) {
-      const session: Session = rest;
-      if (faceProfileSealed) session.faceProfile = unseal(faceProfileSealed);
+    for (const { faceProfileSealed, ...session } of JSON.parse(readFileSync(FILE, 'utf8')) as Stored[]) {
+      // Ancien format : on déplace le gabarit dans le stockage séparé, pour la durée qui lui reste.
+      if (faceProfileSealed) {
+        const profile = unseal(faceProfileSealed);
+        const left = profile ? retention.biometricTtlMs - (Date.now() - profile.createdAt) : 0;
+        if (profile && left > 0) session.templateId = putTemplate(profile, left);
+        migrated = true;
+      }
       // Entretiens créés avant les jetons : on leur en donne un (lisible dans le fichier par l'hôte).
       if (!session.recruiterKey) {
-        session.recruiterKey = newRecruiterKey();
+        session.recruiterKey = newToken(18);
         migrated = true;
       }
       sessions.set(session.id, session);
+      index(session);
     }
     if (migrated) schedulePersist();
-    purgeExpiredBiometrics();
   } catch (err) {
     console.warn('Sessions existantes illisibles, démarrage à vide :', String(err));
   }
@@ -44,28 +66,54 @@ export function schedulePersist(): void {
 
 export function persistNow(): void {
   mkdirSync(DATA_DIR, { recursive: true });
-  const out: Stored[] = [...sessions.values()].map(({ faceProfile, ...rest }) => ({
-    ...rest,
-    ...(faceProfile ? { faceProfileSealed: seal(faceProfile) } : {}),
-  }));
-  writeFileSync(FILE, JSON.stringify(out));
+  writeFileSync(FILE, JSON.stringify([...sessions.values()]));
 }
 
-export function purgeBiometrics(session: Session): void {
-  delete session.faceProfile;
+// --- Gabarit biométrique de l'entretien (stocké à part) ---
+
+export function setFaceProfile(session: Session, profile: FaceProfile): void {
+  deleteTemplate(session.templateId);
+  session.templateId = putTemplate(profile, retention.biometricTtlMs);
   schedulePersist();
 }
 
-export function purgeExpiredBiometrics(now = Date.now()): void {
+export function getFaceProfile(session: Session): FaceProfile | undefined {
+  return getTemplate(session.templateId);
+}
+
+export type PurgeReason =
+  | 'décision du recruteur'
+  | 'suppression manuelle'
+  | 'retrait du consentement'
+  | 'durée maximale atteinte';
+
+export function purgeBiometrics(session: Session, reason: PurgeReason, actor: AuditEntry['actor']): boolean {
+  if (!session.templateId) return false;
+  deleteTemplate(session.templateId);
+  delete session.templateId;
+  audit(session, actor, 'Gabarit biométrique supprimé', reason);
+  schedulePersist();
+  return true;
+}
+
+// Tâche planifiée : supprime les gabarits expirés, filet de sécurité si l'entretien n'est jamais clos.
+export function sweepExpiredBiometrics(now = Date.now()): void {
+  const expired = new Set(expiredTemplateIds(now));
   for (const s of sessions.values()) {
-    if (s.faceProfile && now - s.faceProfile.createdAt > BIOMETRIC_MAX_AGE_MS) purgeBiometrics(s);
+    if (s.templateId && (expired.has(s.templateId) || !hasTemplate(s.templateId))) {
+      purgeBiometrics(s, 'durée maximale atteinte', 'système');
+    }
   }
+  for (const id of expired) deleteTemplate(id); // gabarits sans entretien
 }
 
 load();
-setInterval(purgeExpiredBiometrics, 10 * 60 * 1000).unref();
+sweepExpiredBiometrics();
+setInterval(sweepExpiredBiometrics, retention.sweepMs).unref();
 
-export function createSession(candidateLabel: string): Session {
+// --- Entretiens et liens ---
+
+export function createSession(candidateLabel: string, controller?: Controller): Session {
   const session: Session = {
     id: randomUUID().slice(0, 8),
     createdAt: Date.now(),
@@ -73,9 +121,14 @@ export function createSession(candidateLabel: string): Session {
     precheckDone: false,
     signals: [],
     challenges: [],
-    recruiterKey: newRecruiterKey(),
+    recruiterKey: newToken(18),
+    // Lien de pré-vérification : jeton de 32 caractères, valable peu de temps, utilisable une seule fois.
+    candidateLink: { token: newToken(24), expiresAt: Date.now() + retention.candidateLinkTtlMs },
+    ...(controller ? { controller } : {}),
   };
   sessions.set(session.id, session);
+  index(session);
+  audit(session, 'recruteur', 'Entretien créé', controller ? `Responsable du traitement : ${controller.name}` : undefined);
   schedulePersist();
   return session;
 }
@@ -84,15 +137,56 @@ export function getSession(id: string): Session | undefined {
   return sessions.get(id);
 }
 
-// Le profil du visage et le jeton du recruteur ne quittent jamais le serveur : la vue n'indique que leur présence.
+export function getSessionByCandidateToken(token: string): Session | undefined {
+  const id = byCandidateToken.get(token);
+  return id ? sessions.get(id) : undefined;
+}
+
+export function linkStatus(session: Session, now = Date.now()): 'open' | 'used' | 'expired' {
+  const link = session.candidateLink;
+  if (!link) return 'expired';
+  if (link.usedAt) return 'used';
+  return now > link.expiresAt ? 'expired' : 'open';
+}
+
+export function markLinkUsed(session: Session): void {
+  if (session.candidateLink && !session.candidateLink.usedAt) {
+    session.candidateLink.usedAt = Date.now();
+    audit(session, 'système', 'Lien de pré-vérification utilisé', 'il ne peut plus servir');
+  }
+}
+
+export function createPresence(session: Session): string {
+  if (session.presence) byPresenceToken.delete(session.presence.token);
+  session.presence = { token: newToken(24), expiresAt: Date.now() + retention.presenceTtlMs };
+  index(session);
+  schedulePersist();
+  return session.presence.token;
+}
+
+export function getSessionByPresenceToken(token: string): Session | undefined {
+  const id = byPresenceToken.get(token);
+  const session = id ? sessions.get(id) : undefined;
+  return session?.presence?.token === token ? session : undefined;
+}
+
+export function clearPresence(session: Session): void {
+  if (session.presence) byPresenceToken.delete(session.presence.token);
+  delete session.presence;
+  schedulePersist();
+}
+
+// Vue du recruteur : jamais le gabarit, ni le jeton, ni les clés d'appareil ; seulement leur présence.
 export function stripBiometrics(session: Session): Omit<SessionView, 'score'> {
-  const { faceProfile, recruiterKey, ...rest } = session;
+  const { recruiterKey, templateId, device, deviceChallenge, presence, ...rest } = session;
+  const profile = getTemplate(templateId);
   return {
     ...rest,
-    hasFaceProfile: Boolean(faceProfile),
-    faceProfileSummary: faceProfile
-      ? { samples: faceProfile.samples, angles: faceProfile.angles?.length ?? 0, embedding: Boolean(faceProfile.embedding) }
+    hasFaceProfile: Boolean(profile),
+    faceProfileSummary: profile
+      ? { samples: profile.samples, angles: profile.angles?.length ?? 0, embedding: Boolean(profile.embedding) }
       : undefined,
+    deviceBound: Boolean(device),
   };
 }
 

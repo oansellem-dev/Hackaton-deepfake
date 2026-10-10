@@ -61,7 +61,7 @@ export interface FaceIdOutcome {
 }
 
 interface Props {
-  sessionId: string;
+  token: string; // jeton du lien de pré-vérification
   declaredCountry: string;
   onDone: (outcome: FaceIdOutcome) => void;
 }
@@ -78,7 +78,8 @@ function openCamera(deviceId?: string): Promise<MediaStream> {
   });
 }
 
-export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
+// À n'afficher qu'après le consentement biométrique explicite (écran précédent).
+export function FaceId({ token, declaredCountry, onDone }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const stopRef = useRef<() => void>(() => undefined);
@@ -123,7 +124,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
       await video.play();
 
       // Vérification de l'environnement en même temps : caméras, fuseau horaire, adresse IP.
-      const env = await api.sendPrecheck(sessionId, {
+      const env = await api.sendPrecheck(token, {
         cameras: devices.map((d) => d.label),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         languages: [...navigator.languages],
@@ -133,7 +134,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
 
       let newPlan: FaceIdPlan;
       try {
-        newPlan = await api.startFaceId(sessionId, label);
+        newPlan = await api.startFaceId(token, label, true);
       } catch (e) {
         if (errorText(e).includes('déjà terminée')) {
           stopCamera();
@@ -353,7 +354,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
       try {
         await Promise.all([...pending]); // dernières analyses en cours
         const profileOk = ratioSamples.length >= MIN_PROFILE_SAMPLES;
-        const res = await api.submitFaceId(sessionId, {
+        const res = await api.submitFaceId(token, {
           nonce: p.nonce,
           results,
           ratios: profileOk ? medianRatios(ratioSamples) : [],

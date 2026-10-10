@@ -55,6 +55,28 @@ export function Report() {
   const [cvBusy, setCvBusy] = useState(false);
   const [cvError, setCvError] = useState<string | null>(null);
 
+  const [presenceUrl, setPresenceUrl] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function deleteBiometrics() {
+    setActionError(null);
+    try {
+      setSession(await api.deleteBiometrics(id));
+    } catch (err) {
+      setActionError(String(err));
+    }
+  }
+
+  async function requestPresence() {
+    setActionError(null);
+    try {
+      const { path } = await api.requestPresence(id);
+      setPresenceUrl(`${window.location.origin}${path}`);
+    } catch (err) {
+      setActionError(String(err).includes('409') ? 'Le candidat n’a pas associé d’appareil.' : String(err));
+    }
+  }
+
   async function uploadCv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -175,7 +197,16 @@ export function Report() {
               {identity.linkedinUrl && <tr><th>LinkedIn</th><td>{identity.linkedinUrl}</td></tr>}
             </tbody>
           </table>
-          <p className="muted">Consentement donné le {new Date(identity.consentAt).toLocaleString('fr-FR')}.</p>
+          <p className="muted">
+            Accord pour la vérification des informations le{' '}
+            {new Date(session.consent?.infoAt ?? identity.consentAt).toLocaleString('fr-FR')}
+            {session.consent?.biometricAt &&
+              ` · accord biométrique le ${new Date(session.consent.biometricAt).toLocaleString('fr-FR')} (texte version ${session.consent.version})`}
+            {session.biometricOptOut && ' · vérification sans biométrie choisie'}
+            {session.consent?.withdrawnAt &&
+              ` · accord retiré le ${new Date(session.consent.withdrawnAt).toLocaleString('fr-FR')}`}
+            .
+          </p>
         </div>
       )}
 
@@ -275,6 +306,38 @@ export function Report() {
       </div>
 
       <div className="card">
+        <h2>Données biométriques et appareil</h2>
+        <p>
+          {session.hasFaceProfile
+            ? 'Gabarit du visage enregistré (chiffré, stocké à part, sans lien avec le nom). Il sera supprimé à votre décision, et au plus tard à son expiration.'
+            : 'Aucun gabarit du visage enregistré (pas encore fait, vérification sans biométrie, accord retiré ou déjà supprimé).'}
+        </p>
+        {session.hasFaceProfile && (
+          <button className="danger" onClick={deleteBiometrics}>
+            Supprimer maintenant le gabarit du visage
+          </button>
+        )}
+        <p>
+          {session.deviceBound
+            ? 'Le candidat a associé son appareil : vous pouvez lui demander de le confirmer pendant la visio.'
+            : 'Aucun appareil associé.'}
+        </p>
+        {session.deviceBound && (
+          <div className="presence-link">
+            <button className="secondary" onClick={requestPresence}>
+              Demander une confirmation d’appareil
+            </button>
+            {presenceUrl && (
+              <span>
+                Lien à coller dans la discussion de la visio (10 min, une fois) : <code>{presenceUrl}</code>
+              </span>
+            )}
+          </div>
+        )}
+        {actionError && <p className="faceid-error">{actionError}</p>}
+      </div>
+
+      <div className="card">
         <h2>Décision du recruteur</h2>
         <p>
           {session.decision
@@ -282,6 +345,21 @@ export function Report() {
             : 'Pas encore de décision.'}
         </p>
         <p className="muted">Le score est une aide. La décision appartient au recruteur.</p>
+      </div>
+
+      <div className="card">
+        <h2>Journal d’audit</h2>
+        <p className="muted">Qui a fait quoi, quand, avec quel résultat. Aucune donnée biométrique.</p>
+        <ul className="audit">
+          {[...(session.audit ?? [])].reverse().map((a, i) => (
+            <li key={`${a.at}-${i}`}>
+              <time>{new Date(a.at).toLocaleString('fr-FR')}</time>
+              <strong>{a.actor}</strong> — {a.action}
+              {a.detail ? ` : ${a.detail}` : ''}
+            </li>
+          ))}
+          {!session.audit?.length && <li className="muted">Aucune entrée.</li>}
+        </ul>
       </div>
 
       <button className="primary" onClick={() => window.print()}>

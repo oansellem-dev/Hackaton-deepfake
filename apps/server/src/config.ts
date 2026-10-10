@@ -24,3 +24,25 @@ if (thresholds.differentPersonMax >= thresholds.samePersonMin) {
 if (thresholds.sameShapeMax >= thresholds.differentShapeMin) {
   throw new Error('FACE_SHAPE_SAME_MAX doit rester sous FACE_SHAPE_DIFFERENT_MIN');
 }
+
+// Durées de conservation et de validité, réglables (les variables en secondes servent aux tests).
+function duration(secondsVar: string, hoursVar: string, defaultHours: number): number {
+  const s = process.env[secondsVar];
+  if (s) return Number(s) * 1000;
+  const h = process.env[hoursVar];
+  return (h ? Number(h) : defaultHours) * 3600 * 1000;
+}
+
+export const retention = {
+  // Gabarit biométrique : supprimé à la fin de l'entretien, et au plus tard après cette durée.
+  biometricTtlMs: duration('BIOMETRIC_TTL_SECONDS', 'BIOMETRIC_TTL_HOURS', 24),
+  // Fréquence de la tâche qui supprime les gabarits expirés.
+  sweepMs: Number(process.env.BIOMETRIC_SWEEP_SECONDS ?? 600) * 1000,
+  // Lien de pré-vérification : valable peu de temps, et une seule fois.
+  candidateLinkTtlMs: duration('CANDIDATE_LINK_TTL_SECONDS', 'CANDIDATE_LINK_TTL_HOURS', 24),
+  // Lien de confirmation d'appareil envoyé pendant l'entretien.
+  presenceTtlMs: 10 * 60 * 1000,
+};
+
+// Derrière un proxy TLS (déploiement) : redirection vers HTTPS et en-tête HSTS.
+export const forceHttps = process.env.FORCE_HTTPS === '1';

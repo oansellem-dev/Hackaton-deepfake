@@ -61,20 +61,38 @@ export async function simulerGeste(_stream: MediaStream | null): Promise<Resulta
 /** Pendant la visio : remplace la vérification réelle d'un défi. `avecSignal` sert au mode démo. */
 export async function simulerDefi(defi: Defi, avecSignal: boolean): Promise<Defi> {
   await attendre(1800);
-  return { ...defi, resultat: avecSignal ? "a_verifier" : "reussi", detail: avecSignal ? "Image déformée 1,4 s" : "Geste exécuté", finMin: (defi.debutMin ?? 0) + 2 };
+  const detail = avecSignal
+    ? (defi.type === "main_devant_visage" ? "Image déformée au passage de la main" : defi.type === "rotation_tete" ? "Image déformée 1,4 s" : "Lèvres et son décalés")
+    : (defi.type === "phrase_aleatoire" ? "Lèvres et son alignés" : "Geste exécuté");
+  return { ...defi, resultat: avecSignal ? "a_verifier" : "reussi", detail, finMin: (defi.debutMin ?? 0) + 4 };
+}
+
+/** Signal associé à un défi « à vérifier » (le moteur vidéo enverra le sien). */
+export function signalDefi(d: Defi): Signal {
+  const levres = d.type === "phrase_aleatoire";
+  return {
+    id: `s-${Date.now().toString(36)}`, type: levres ? "levres_son" : "image_deformee", poids: "fort",
+    libelle: levres ? "Lèvres et son décalés" : SIGNAL_LIBELLES.image_deformee,
+    explication: levres ? "Le mouvement des lèvres et le son se sont décalés pendant la phrase. Une connexion lente peut l'expliquer : un autre défi suffit à lever le doute." : "Pendant le geste, le contour du visage s'est déformé. Ça peut venir d'une connexion instable : un second défi suffit à lever le doute.",
+    resultat: "a_verifier", source: "entretien", a: new Date().toISOString(), minute: d.debutMin,
+  };
 }
 
 // ── Brique D : score consultatif ────────────────────────────────────────
 /** Remplacer par l'appel au serveur de score. Règles pondérées, résumé sans rien inventer. */
 export function calculerScore(x: Entretien): Score {
-  const tous = [...x.preVerification.signaux, ...x.signaux];
-  const forts = tous.filter((s) => s.resultat === "a_verifier" && s.poids === "fort").length + x.defis.filter((d) => d.resultat === "a_verifier").length;
-  const moyens = tous.filter((s) => s.resultat === "a_verifier" && s.poids === "moyen").length;
+  const pre = x.preVerification.signaux;
+  // Un défi « à vérifier » et le signal qu'il produit sont le même incident : on ne le compte qu'une fois.
+  const defisSignal = x.defis.filter((d) => d.resultat === "a_verifier");
+  const fortsPre = pre.filter((s) => s.resultat === "a_verifier" && s.poids === "fort");
+  const moyens = pre.filter((s) => s.resultat === "a_verifier" && s.poids === "moyen").length;
+  const forts = defisSignal.length + fortsPre.length;
   const reussis = x.defis.filter((d) => d.resultat === "reussi").length;
-  const valeur = Math.max(5, Math.min(99, 60 + reussis * 12 - forts * 25 - moyens * 10 + (x.preVerification.statut === "faite" && tous.every((s) => s.resultat !== "a_verifier") ? 8 : 0)));
+  const preOk = x.preVerification.statut === "faite" && pre.every((s) => s.resultat !== "a_verifier");
+  const valeur = Math.max(5, Math.min(99, 60 + reussis * 12 - forts * 22 - moyens * 8 + (preOk ? 10 : 0)));
   const phrases: string[] = [];
   if (reussis) phrases.push(`${reussis} défi${reussis > 1 ? "s" : ""} réussi${reussis > 1 ? "s" : ""} sans déformation de l'image.`);
-  if (forts) phrases.push(`${forts} point${forts > 1 ? "s" : ""} à vérifier : ${[...x.defis.filter((d) => d.resultat === "a_verifier").map((d) => d.detail?.toLowerCase() ?? "défi à vérifier"), ...tous.filter((s) => s.resultat === "a_verifier" && s.poids === "fort").map((s) => s.libelle.toLowerCase())].join(", ")}.`);
+  if (forts) phrases.push(`${forts} point${forts > 1 ? "s" : ""} à vérifier : ${[...defisSignal.map((d) => d.detail?.toLowerCase() ?? "défi à vérifier"), ...fortsPre.map((s) => s.libelle.toLowerCase())].join(", ")}. Ça peut venir d'une connexion instable : un autre défi aide à lever le doute.`);
   if (moyens) phrases.push("Les écarts de fuseau ou de connexion s'expliquent souvent par un VPN ou un déplacement.");
   if (x.preVerification.statut !== "faite") phrases.push("La pré-vérification n'a pas été faite : ce n'est pas un signal, simplement une information en moins.");
   if (!forts && !moyens) phrases.push("Rien ne contredit ce que le candidat a déclaré.");

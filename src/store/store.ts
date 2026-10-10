@@ -53,6 +53,12 @@ export const actions = {
     maj(id, (x) => { const p = x.preVerification; return { ...x, preVerification: { ...p, lien, statut: p.statut === "non_envoyee" || p.statut === "non_faite" ? "envoyee" : p.statut, envoyeeLe: relance && p.envoyeeLe ? p.envoyeeLe : iso(), relanceeLe: relance ? iso() : p.relanceeLe } }; });
   },
   restaurerPreVerif(id: string, p: PreVerification) { maj(id, (x) => ({ ...x, preVerification: p })); },
+  preVerifRefusee(id: string) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: x.preVerification.statut === "faite" ? "faite" : "non_faite", refuseeLe: iso() } })); },
+  /** Pendant la visio */
+  demarrer(id: string) { maj(id, (x) => (x.statut === "a_venir" ? { ...x, statut: "en_cours" } : x)); },
+  retirerDefi(id: string, defiId: string) { maj(id, (x) => ({ ...x, defis: x.defis.filter((d) => d.id !== defiId) })); },
+  /** Démo : remet un entretien dans son état d'origine. */
+  remettreAZero(id: string) { const neuf = seed().entretiens.find((e) => e.id === id); maj(id, (x) => neuf ?? { ...x, statut: "a_venir", defis: [], signaux: [], score: undefined, decision: { valeur: "non_prise" } }); },
   /** Page candidat : progression des étapes, puis résultat final (branché par l'équipe, voir integration.ts). */
   preVerifOuverte(id: string) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: "ouverte", ouverteLe: x.preVerification.ouverteLe ?? iso() } })); },
   preVerifEtape(id: string, etapes: Partial<Entretien["preVerification"]["etapes"]>) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, etapes: { ...x.preVerification.etapes, ...etapes } } })); },
@@ -65,7 +71,7 @@ export const actions = {
   majDefi(id: string, defi: Defi) { maj(id, (x) => ({ ...x, defis: x.defis.some((d) => d.id === defi.id) ? x.defis.map((d) => (d.id === defi.id ? defi : d)) : [...x.defis, defi] })); },
   ajouterSignal(id: string, s: Signal) { maj(id, (x) => ({ ...x, signaux: [...x.signaux, s] })); },
   setScore(id: string, score: Score) { maj(id, (x) => ({ ...x, score })); },
-  terminer(id: string) { maj(id, (x) => ({ ...x, statut: "termine" })); },
+  terminer(id: string) { maj(id, (x) => (x.statut === "termine" ? x : { ...x, statut: "termine", dureeMin: Math.max(10, ...x.defis.map((d) => (d.finMin ?? d.debutMin ?? 0) + 4)) })); },
   decider(id: string, valeur: Decision["valeur"], note?: string) { maj(id, (x) => ({ ...x, decision: { valeur, note: note ?? x.decision.note, par: etat.moi, le: iso() } })); },
   noter(id: string, note: string) { maj(id, (x) => ({ ...x, decision: { ...x.decision, note } })); },
   reglages(r: Partial<Reglages>) { setEtat((e) => ({ ...e, reglages: { ...e.reglages, ...r } })); },

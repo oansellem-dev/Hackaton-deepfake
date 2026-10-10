@@ -139,3 +139,8 @@ export function transition(fn: () => void) {
   // Une transition sautée (deux clics rapides) rejette ses promesses : sans gravité, on l'ignore.
   [vt?.ready, vt?.finished, vt?.updateCallbackDone].forEach((p) => p?.catch(() => {}));
 }
+
+/* ── Interrupteur ────────────────────────────────────────────── */
+export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return <button type="button" role="switch" aria-checked={on} aria-label={label} title={label} disabled={disabled} className={`switch${on ? " is-on" : ""}`} onClick={() => onChange(!on)}><i /></button>;
+}

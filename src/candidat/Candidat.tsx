@@ -16,7 +16,7 @@ export function Candidat({ token }: { token?: string }) {
   useEffect(() => { if (x && (p?.statut === "envoyee" || p?.statut === "non_faite")) actions.preVerifOuverte(x.id); }, [x?.id]); // eslint-disable-line
   if (x && p?.statut === "faite" && p.lien?.utiliseLe) return <LienFini titre="Cette vérification est déjà faite" texte="Merci, vous n'avez rien d'autre à faire. À tout à l'heure !" />;
   if (x && p?.lien && Date.now() > new Date(p.lien.expireLe).getTime()) return <LienFini titre="Ce lien a expiré" texte="Il était valable jusqu'au début de l'entretien. Ce n'est pas un problème : les vérifications se feront en direct." />;
-  return <PreVerif token={token ?? "demo"} entretienId={x?.id} />;
+  return <PreVerif token={token ?? "demo"} entretienId={x?.id} prenom={x?.candidat.prenom} />;
 }
 
 function LienFini({ titre, texte }: { titre: string; texte: string }) {

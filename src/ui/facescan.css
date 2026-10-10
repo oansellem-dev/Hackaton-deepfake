@@ -1,0 +1,61 @@
+/* ═══ Cadre Oval — scan du visage ═══ */
+.scan { position: relative; aspect-ratio: 3 / 4; flex: none; isolation: isolate; --c: #6f9bff; --hud: #fff; }
+.scan__frame { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: radial-gradient(70% 60% at 50% 36%, #27314f 0%, #121729 76%); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.16), inset 0 -40px 80px rgba(0,0,0,.45); transform: translateZ(0); }
+.scan__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan__video--miroir { transform: scaleX(-1); }
+.scan__ph { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scan__vignette { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 60px rgba(8,12,28,.55); pointer-events: none; }
+
+/* Grille de points et bande de balayage (seulement pendant l'analyse) */
+.scan__grid { position: absolute; inset: 0; background-image: radial-gradient(color-mix(in srgb, var(--c) 75%, white) 1px, transparent 1.6px); background-size: 14px 14px; opacity: 0; transition: opacity .4s var(--ease); pointer-events: none; }
+.scan--scan .scan__grid, .scan--geste .scan__grid { opacity: .26; }
+.scan__band { position: absolute; left: 0; right: 0; top: 0; height: 28%; opacity: 0; transform: translateY(-100%); pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--c) 16%, transparent) 55%, color-mix(in srgb, var(--c) 55%, transparent) 92%, var(--c) 97%, transparent 100%); }
+.scan--scan .scan__band, .scan--geste .scan__band { opacity: 1; animation: scan-band 1.9s cubic-bezier(.45,0,.55,1) infinite; }
+@keyframes scan-band { from { transform: translateY(-100%); } to { transform: translateY(360%); } }
+
+/* Halo extérieur */
+.scan__glow { position: absolute; inset: -3%; border-radius: 50%; box-shadow: 0 0 0 2px var(--c), 0 0 48px 8px color-mix(in srgb, var(--c) 45%, transparent); opacity: .7; animation: scan-breathe 3.4s ease-in-out infinite; pointer-events: none; }
+@keyframes scan-breathe { 0%,100% { opacity: .45; } 50% { opacity: .95; } }
+.scan--ok .scan__glow, .scan--signal .scan__glow, .scan--lumiere .scan__glow { animation: none; opacity: 1; }
+.scan--off .scan__glow { opacity: .3; animation: none; }
+
+/* 72 graduations : poursuite lumineuse pendant l'analyse, progression pendant la lumière */
+.scan__ticks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.scan__ticks line { stroke: var(--hud); stroke-width: 2; stroke-linecap: round; opacity: .22; transition: opacity .25s, stroke .3s; }
+.scan__ticks line.maj { stroke-width: 2.8; opacity: .42; }
+.scan__ticks line.on { stroke: var(--c); opacity: 1; }
+.scan--scan .scan__ticks line, .scan--geste .scan__ticks line { stroke: var(--c); animation: scan-tick 1.4s linear infinite; animation-delay: calc(var(--k) * 1.4s / 72 - 1.4s); }
+@keyframes scan-tick { 0% { opacity: 1; } 35%, 100% { opacity: .16; } }
+.scan--ok .scan__ticks line, .scan--signal .scan__ticks line { stroke: var(--c); opacity: .95; }
+
+/* Orbite : un point qui fait le tour de l'ovale (rotation d'un cercle étiré) */
+.scan__orbit { position: absolute; left: -2%; width: 104%; aspect-ratio: 1; top: 50%; transform: translateY(-50%) scaleY(1.3333); pointer-events: none; transition: opacity .3s; }
+.scan__orbitIn { position: absolute; inset: 0; animation: scan-orbit 5s linear infinite; }
+.scan__orbitIn i { position: absolute; top: -4px; left: 50%; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px 4px color-mix(in srgb, var(--c) 70%, transparent); }
+@keyframes scan-orbit { to { transform: rotate(360deg); } }
+.scan--scan .scan__orbitIn, .scan--geste .scan__orbitIn { animation-duration: 1.6s; }
+.scan--ok .scan__orbit, .scan--signal .scan__orbit, .scan--lumiere .scan__orbit, .scan--off .scan__orbit { opacity: 0; }
+
+/* Repères d'angle */
+.scan__c { position: absolute; width: 17%; aspect-ratio: 1; border: 2px solid var(--hud); opacity: .5; pointer-events: none; }
+.scan__c--tl { top: -9%; left: -13%; border-right: 0; border-bottom: 0; border-top-left-radius: 14px; }
+.scan__c--tr { top: -9%; right: -13%; border-left: 0; border-bottom: 0; border-top-right-radius: 14px; }
+.scan__c--bl { bottom: -9%; left: -13%; border-right: 0; border-top: 0; border-bottom-left-radius: 14px; }
+.scan__c--br { bottom: -9%; right: -13%; border-left: 0; border-top: 0; border-bottom-right-radius: 14px; }
+
+/* Main qui passe (défi gestuel) */
+.scan__hand { position: absolute; top: 34%; left: 50%; width: 34%; color: #fff; opacity: 0; animation: scan-hand 2.6s ease-in-out infinite; filter: drop-shadow(0 6px 14px rgba(0,0,0,.45)); pointer-events: none; }
+.scan__hand svg { width: 100%; height: auto; display: block; }
+@keyframes scan-hand { 0% { transform: translateX(-160%); opacity: 0; } 20%, 80% { opacity: .95; } 100% { transform: translateX(60%); opacity: 0; } }
+
+/* Étiquette d'état, toujours un mot */
+.scan__badge { position: absolute; left: 50%; bottom: -15%; transform: translateX(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: rgba(12,16,30,.74); color: #fff; font-size: 13px; font-weight: 600; border: 1px solid rgba(255,255,255,.18); -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4); box-shadow: 0 10px 24px rgba(0,0,0,.28); z-index: 2; }
+.scan__badge > i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); flex: none; }
+.scan__badge svg { width: 14px; height: 14px; color: var(--c); }
+
+@media (prefers-reduced-motion: reduce) {
+  .scan *, .scan *::before { animation: none !important; }
+  .scan--scan .scan__band, .scan--geste .scan__band { opacity: 0; }
+  .scan--scan .scan__ticks line, .scan--geste .scan__ticks line { opacity: .6; }
+}

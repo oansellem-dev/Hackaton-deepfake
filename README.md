@@ -13,16 +13,21 @@ npm run dev
 
 | Écran | Adresse |
 |---|---|
-| Système de design | http://localhost:5173/#/styleguide |
 | Accueil (planning) | http://localhost:5173/#/ |
 | Entretiens | http://localhost:5173/#/entretiens |
 | Rapport d'un entretien | http://localhost:5173/#/rapport/e-noah |
+| Rapport imprimable | http://localhost:5173/#/rapport/e-noah/imprimer |
+| Visio Oval (appel + panneau, plan B) | http://localhost:5173/#/visio/e-emma |
 | Page candidat | http://localhost:5173/#/candidat/e-camille |
-| Panneau recruteur (360 px) | http://localhost:5173/sidepanel.html |
+| Page candidat, directement au test de lumière | http://localhost:5173/#/candidat/e-camille?etape=lumiere |
+| Bibliothèque de défis | http://localhost:5173/#/defis |
+| Réglages | http://localhost:5173/#/reglages |
+| Panneau recruteur seul (360 px) | http://localhost:5173/sidepanel.html?e=e-emma |
+| Système de design | http://localhost:5173/#/styleguide |
 
 Extension Chrome : `npm run build`, puis `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » → dossier `dist/`.
 
-Mode démo du panneau : touches `1` à `4` (états), `A`/`B` (candidat sans ou avec signal), `D` (barre démo), ou triple-clic sur Manta.
+Mode démo du panneau (aussi dans la visio) : `2` propose un défi, `3` simule son résultat, `4` termine, `A` vrai visage, `B` visage substitué, `R` remet l'entretien à zéro, `D` affiche la barre démo (ou triple-clic sur Manta). Avant le pitch : Réglages → « Réinitialiser la démo ».
 
 ## Arborescence
 

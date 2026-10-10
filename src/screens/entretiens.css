@@ -1,0 +1,29 @@
+/* ═══ Entretiens ═══ */
+.ent { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 18px; align-items: start; }
+.ent__liste { padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ent__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 0 4px; }
+.ent__tools { display: flex; gap: 10px; flex-wrap: wrap; }
+.ent__filtres { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ent__chip { cursor: pointer; }
+.ent__chip svg { width: 12px; height: 12px; }
+.ent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ent-row { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(96px, .8fr) minmax(140px, 1.1fr) minmax(130px, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; cursor: pointer; }
+.ent-row:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ent-row__who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ent-row__who div { min-width: 0; display: grid; }
+.ent-row__who strong { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ent-row__who span { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ent-row__col { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.ent-row__col .pill { max-width: 100%; white-space: normal; line-height: 1.25; }
+.ent-row__dec { font-size: 12px; color: var(--ink-2); }
+.ent__droite { display: flex; flex-direction: column; gap: 18px; }
+.ent__nouvel { padding: 24px; display: grid; gap: 16px; }
+.attente { list-style: none; margin: 0; padding: 0; display: grid; }
+.attente li { display: flex; align-items: center; gap: 10px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.attente li:last-child { border-bottom: 0; }
+.attente__nom { font-weight: 600; font-size: 14.5px; }
+.attente__nom:hover { text-decoration: underline; text-underline-offset: 3px; }
+.attente__btn { cursor: pointer; transition: transform var(--t) var(--spring), background-color var(--t); }
+.attente__btn:hover { background: #dfe3ec; transform: translateY(-1px); }
+@media (max-width: 1320px) { .ent { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .ent-row { grid-template-columns: 1fr 1fr; } .ent-row__who { grid-column: 1 / -1; } .ent-row > .btn { justify-self: start; } }

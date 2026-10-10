@@ -41,7 +41,7 @@ function barres(x: Entretien, start: Date, ref: Date): Barre[] {
         ton: sig ? "gold" : nonFaite ? "neutral" : "violet",
         label: fait ? "Pré-vérification" : "Lien envoyé",
         court: fait ? (sig ? "À vérifier" : "Pré-vérif. faite") : nonFaite ? "Non faite" : "Lien envoyé",
-        chip: fait ? (sig ? "À vérifier" : p.etapes.lumiere === "passe" ? "Lumière passée" : "Faite") : nonFaite ? "Non faite" : p.statut === "ouverte" ? "Ouvert" : p.relanceeLe ? "Relancé" : "En attente",
+        chip: fait ? (sig ? "À vérifier" : p.etapes.lumiere === "passe" ? "Lumière passée" : "Faite") : p.refuseeLe ? "Refusée" : nonFaite ? "Non faite" : p.statut === "ouverte" ? "Ouvert" : p.relanceeLe ? "Relancé" : "En attente",
         icon: fait ? (sig ? <IcFlag /> : <IcCheck />) : nonFaite ? <IcDots /> : <IcArrowUR />,
       });
     }
@@ -190,19 +190,20 @@ function CarteJour({ x, ref_, enAvant }: { x: Entretien; ref_: Date; enAvant: bo
   const auj = memeJour(new Date(x.date), ref_);
   const termine = x.statut === "termine";
   const pv = p.statut === "faite" ? "pré-vérification faite"
+    : p.refuseeLe ? "pré-vérification refusée, les défis se feront en direct"
     : termine || auj ? "pré-vérification non faite, les défis se feront en direct"
     : p.statut === "non_envoyee" ? "lien pas encore envoyé"
     : `lien envoyé ${relatif(p.relanceeLe ?? p.envoyeeLe ?? x.creeLe, ref_).toLowerCase()}`;
   const st = statutEntretien(x, ref_);
   const coin = termine ? st.texte : auj ? relatif(x.date, ref_) : jourCourt(x.date);
   const coinTon: Ton = enAvant ? "white" : termine ? (st.ton === "gold" ? "soft-gold" : st.ton === "green" ? "soft-green" : "neutral") : auj ? "soft-blue" : "neutral";
-  const panneau = `/sidepanel.html?e=${x.id}`;
+  const panneau = `#/visio/${x.id}`;
   let action: ReactNode;
   if (termine) action = <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Ouvrir le rapport</Btn>;
-  else if (enAvant) action = <Btn size="sm" variant="glass" icon={<IcPlay />} href={panneau} newTab>Rejoindre avec Oval</Btn>;
+  else if (enAvant) action = <Btn size="sm" variant="glass" icon={<IcPlay />} href={panneau}>Rejoindre avec Oval</Btn>;
   else if (p.statut === "non_envoyee") action = <Btn size="sm" icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>Envoyer le lien</Btn>;
   else if (p.statut !== "faite") action = <Btn size="sm" icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer le lien</Btn>;
-  else action = auj ? <Btn size="sm" icon={<IcPlay />} href={panneau} newTab>Rejoindre avec Oval</Btn> : <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Voir la fiche</Btn>;
+  else action = auj ? <Btn size="sm" icon={<IcPlay />} href={panneau}>Rejoindre avec Oval</Btn> : <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Voir la fiche</Btn>;
   return (
     <article className={`card auj__card${enAvant ? " auj__card--now" : " lift"}`}>
       <div className="auj__top">

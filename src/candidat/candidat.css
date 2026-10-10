@@ -1,29 +1,83 @@
-/* Page candidat — une colonne, même langage visuel */
-.cand { position: relative; max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding-top: 8px; }
-.cand__top { display: flex; align-items: center; justify-content: space-between; }
-.cand__steps { display: flex; gap: 6px; }
-.cand__step { width: 28px; height: 6px; border-radius: 999px; background: rgba(0,0,0,.12); transition: background .4s, transform .4s var(--spring), box-shadow .4s; }
-.cand__step--done { background: var(--ink); }
-.cand__step--now { background: var(--yellow); box-shadow: 0 0 14px rgba(250,228,120,.9); transform: scaleX(1.3); }
-.cand h1 { font-size: 32px; font-weight: 300; line-height: 1.12; }
-.cand__intro { font-size: 15px; color: var(--ink-2); }
-.liste-check { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-.liste-check li { display: flex; gap: 12px; align-items: flex-start; }
-.liste-check .pill { flex-shrink: 0; min-width: 48px; justify-content: center; }
-.cand__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.cam { width: 100%; aspect-ratio: 4/3; border-radius: 28px; background: #1b1b1b; overflow: hidden; position: relative; display: grid; place-items: center; color: #fff; box-shadow: var(--shadow-float); }
-.cam video { width: 100%; height: 100%; object-fit: cover; }
-.cam__ovale { position: absolute; inset: 0; margin: auto; width: 46%; aspect-ratio: 3/4; border: 3px solid rgba(255,255,255,.9); border-radius: 50%; box-shadow: 0 0 0 999px rgba(20,20,20,.4); pointer-events: none; transition: border-color .4s, transform .4s var(--spring), box-shadow .4s; }
-.cam__ovale--ok { border-color: var(--yellow); transform: scale(1.04); box-shadow: 0 0 0 999px rgba(20,20,20,.4), 0 0 40px rgba(250,228,120,.9); }
-.signaux-tech { display: grid; gap: 12px; margin: 0; }
-.signaux-tech div { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.signaux-tech div:last-child { border-bottom: 0; }
-.signaux-tech dt { color: var(--ink-2); } .signaux-tech dd { margin: 0; font-weight: 400; }
+/* ═══ Page candidat ═══ */
+.cand-app { min-height: 100vh; padding: 20px; display: grid; place-items: start center; }
+.cand { width: min(900px, 100%); padding: 22px 30px 18px; display: flex; flex-direction: column; gap: 22px; }
+.cand__head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.cand__logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 19px; }
+.cand__logo .logo-o { width: 15px; height: 22px; border-width: 4px; }
+.cand__steps { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.cand__step { display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); background: var(--card); box-shadow: var(--hi-soft), var(--sh-tile); transition: background-color var(--t), color var(--t); }
+.cand__step svg { width: 13px; height: 13px; color: var(--green-text); }
+.cand__step.is-fait { color: var(--ink); }
+.cand__step.is-now { background: var(--blue-soft); color: var(--blue-text); box-shadow: var(--sh-inset-blue), 0 0 0 2px var(--blue); }
+.cand__secure { justify-self: end; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.cand__secure svg { width: 14px; height: 14px; }
+.cand__body { display: flex; flex-direction: column; gap: 22px; }
+.cand__ref { text-align: center; font-size: 12px; color: var(--ink-3); }
 
-/* Test de lumière : plein écran, fondus, jamais de flash */
-.lumiere { position: fixed; inset: 0; z-index: 50; background: var(--lum, #fff); transition: background .3s linear; display: grid; place-items: center; }
-.lumiere__ovale { width: min(44vw, 240px); aspect-ratio: 3/4; border-radius: 50%; overflow: hidden; border: 4px solid rgba(255,255,255,.7); background: #1b1b1b; display: grid; place-items: center; color: #fff; }
-.lumiere__ovale video { width: 100%; height: 100%; object-fit: cover; }
-.lumiere__foot { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--lum-ink, var(--ink)); }
-.lumiere__foot .btn--secondary { background: rgba(255,255,255,.85); }
-@media (prefers-reduced-motion: reduce) { .lumiere { transition: background .3s linear; } } /* le fondu est une mesure de sécurité, on le garde */
+.cand__hero { display: grid; justify-items: center; gap: 12px; text-align: center; padding-top: 6px; }
+.cand__hero h1 { font-size: 34px; font-weight: 500; letter-spacing: -0.025em; line-height: 1.15; max-width: 600px; }
+.cand__hero p { max-width: 520px; font-size: 16px; }
+.cand__hero--fin { padding: 30px 0 20px; }
+.cand__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cand__box { padding: 18px 20px; display: grid; gap: 6px; }
+.cand__list { list-style: none; margin: 0; padding: 0; display: grid; }
+.cand__list li { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.cand__list li:last-child { border-bottom: 0; }
+.cand__ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--inset); box-shadow: var(--sh-inset); color: var(--ink-2); }
+.cand__ic svg { width: 15px; height: 15px; }
+.cand__ic--ok { background: var(--blue-soft); color: var(--blue-text); box-shadow: none; }
+.cand__actions { display: grid; justify-items: center; gap: 10px; padding-bottom: 6px; }
+.cand__refus { font-size: 14px; font-weight: 600; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+.cand__refus:hover { color: var(--ink); }
+
+/* Scène sombre « du futur » : caméra, lumière, geste */
+.cand__stage { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--r-panel); padding: 26px 24px 30px; display: grid; justify-items: center; gap: 22px; text-align: center; color: #fff;
+  background: radial-gradient(120% 90% at 50% 0%, #27314f 0%, #11152a 58%, #0a0d1b 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), var(--sh-panel); }
+.cand__stage::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.4px); background-size: 22px 22px; -webkit-mask: radial-gradient(70% 60% at 50% 40%, #000, transparent); mask: radial-gradient(70% 60% at 50% 40%, #000, transparent); }
+.cand__stage::after { content: ""; position: absolute; z-index: -1; left: 50%; top: 38%; width: 520px; height: 520px; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(closest-side, rgba(86,180,240,.18), transparent); pointer-events: none; }
+.cand__stage > .scan { margin: 36px 0 66px; }
+.cand__hud { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.72); }
+.cand__live { width: 8px; height: 8px; border-radius: 50%; background: #56d0f5; box-shadow: 0 0 0 0 rgba(86,208,245,.6); animation: live 1.8s ease-out infinite; }
+@keyframes live { 0% { box-shadow: 0 0 0 0 rgba(86,208,245,.55); } 100% { box-shadow: 0 0 0 10px rgba(86,208,245,0); } }
+.cand__stageTitre { font-size: 22px; font-weight: 500; letter-spacing: -0.015em; max-width: 520px; }
+.cand__checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: min(600px, 100%); }
+.cand__check { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; text-align: left; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); animation: rise var(--t-slow) var(--ease) backwards; }
+.cand__check:nth-child(2) { animation-delay: 80ms; } .cand__check:nth-child(3) { animation-delay: 160ms; } .cand__check:nth-child(4) { animation-delay: 240ms; }
+.cand__checkIc { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); }
+.cand__check.is-ok .cand__checkIc { background: rgba(76,214,154,.2); color: #7ff0bd; }
+.cand__checkIc svg { width: 14px; height: 14px; }
+.cand__checkTxt { display: grid; font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.cand__checkTxt b { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+.cand__spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.cand__note { max-width: 520px; font-size: 14px; color: rgba(255,255,255,.8); }
+.cand__duo { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.cand__ghost { color: rgba(255,255,255,.82); }
+.cand__ghost:hover { color: #fff; background: rgba(255,255,255,.1); }
+.cand__avert { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; width: min(560px, 100%); text-align: left; }
+.cand__avert li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); font-size: 14.5px; line-height: 1.45; }
+.cand__avert svg { width: 18px; height: 18px; flex: none; color: #8cd3f7; margin-top: 1px; }
+.cand__stage .btn:disabled { opacity: .45; }
+
+/* Test de lumière plein écran : couches qui s'enchaînent en fondu (opacité seulement) */
+.lum { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: #0b0e1d; overflow: hidden; }
+.lum__layer { position: absolute; inset: 0; opacity: 0; transition: opacity var(--fondu, 300ms) linear; }
+.lum__layer.on { opacity: 1; }
+.lum__ui { position: relative; z-index: 20; display: grid; justify-items: center; gap: 40px; padding: 20px; }
+.lum__ui .scan { margin-bottom: 8px; }
+.cand__bulle { display: flex; align-items: center; gap: 12px; padding: 12px 18px 12px 12px; border-radius: 22px; background: #fff; color: var(--ink); box-shadow: 0 16px 40px rgba(0,0,0,.18); max-width: 520px; text-align: left; font-size: 15px; }
+.lum__dots { display: flex; gap: 8px; }
+.lum__dots i { width: 36px; height: 6px; border-radius: 99px; background: rgba(255,255,255,.55); box-shadow: 0 0 0 1px rgba(0,0,0,.12); transition: background-color .3s; }
+.lum__dots i.on { background: #fff; }
+.lum__skip { position: absolute; z-index: 20; bottom: 32px; left: 50%; transform: translateX(-50%); }
+.lum__skip:hover { transform: translateX(-50%) translateY(-1.5px); }
+
+@media (max-width: 760px) {
+  .cand-app { padding: 8px; }
+  .cand { padding: 16px; }
+  .cand__head { grid-template-columns: 1fr; justify-items: center; }
+  .cand__secure { justify-self: center; }
+  .cand__cols, .cand__checks { grid-template-columns: 1fr; }
+  .cand__hero h1 { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { .cand__live, .cand__spin { animation: none; } }

@@ -184,3 +184,20 @@ textarea.field__ctl { resize: none; min-height: 84px; line-height: 1.45; }
 .nouvel__2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .nouvel__info { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
 .nouvel__info strong { font-weight: 600; font-size: 14px; }
+
+/* Interrupteur */
+.switch { position: relative; width: 48px; height: 28px; border-radius: 999px; background: var(--inset); box-shadow: var(--sh-inset); flex: none; transition: background-color var(--t) var(--ease); }
+.switch i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(62,74,110,.3); transition: transform var(--t) var(--spring); }
+.switch.is-on { background: var(--blue); box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+.switch.is-on i { transform: translateX(20px); }
+.switch:disabled { opacity: .45; cursor: not-allowed; }
+/* Points de couleur (toujours accompagnés d'un mot) */
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; }
+.dot--green { background: #4cc792; } .dot--gold { background: #f0b63f; } .dot--neutral { background: #9aa3b8; } .dot--blue { background: var(--blue); } .dot--violet { background: #7357ea; }
+.progress { height: 4px; border-radius: 2px; background: rgba(27,32,50,.08); overflow: hidden; margin-top: 10px; }
+.progress i { display: block; height: 100%; width: 40%; background: var(--ink); border-radius: 2px; animation: progress 1.2s ease-in-out infinite; }
+@keyframes progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: 10px 14px; margin: 0; font-size: 14px; }
+.kv dt { color: var(--ink-3); font-weight: 600; }
+.kv dd { margin: 0; }
+.code { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--inset); box-shadow: var(--sh-inset); padding: 10px 12px; border-radius: 12px; color: var(--ink); }

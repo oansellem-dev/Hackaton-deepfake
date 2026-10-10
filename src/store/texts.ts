@@ -82,3 +82,5 @@ export const MANTA = {
   lumiere: "J'éclaire ton visage avec quelques couleurs.",
   rappel: "Oval vérifie une présence humaine, pas une identité. Vous décidez.",
 };
+
+export const DECISIONS_COURT: Record<DecisionValeur, string> = { non_prise: "en attente", poursuivre: "poursuivre", refaire_defi: "refaire un défi", presentiel: "présentiel proposé" };

@@ -1,0 +1,21 @@
+{
+  "name": "kyc-visio",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web,ext -c blue,green,magenta \"npm -w apps/server run dev\" \"npm -w apps/web run dev\" \"npm -w apps/extension run dev\"",
+    "dev:server": "npm -w apps/server run dev",
+    "dev:web": "npm -w apps/web run dev",
+    "dev:ext": "npm -w apps/extension run dev",
+    "build": "npm -w apps/web run build && npm -w apps/extension run build",
+    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension"
+  },
+  "devDependencies": {
+    "concurrently": "9.1.0",
+    "typescript": "5.6.3"
+  }
+}

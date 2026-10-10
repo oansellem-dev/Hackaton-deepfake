@@ -1,6 +1,8 @@
 // Test de bout en bout du test du reflet de l'écran, dans un vrai Chrome sans interface.
 // Usage : node flash.mjs <photo de visage.jpg>   (site construit, serveur lancé ; BASE, CHROME_PATH)
-//   1. Espace de test : photo qui renvoie la couleur de l'écran → « Réussi » ; photo qui ne réagit pas → « Échec ».
+//   1. Espace de test : photo qui renvoie la couleur de l'écran → « Réussi » ; photo qui ne réagit pas → « Échec » ;
+//      filtre d'échange de visage sur une caméra qui renvoie l'écran : échange simple → « Échec », échange qui recopie
+//      l'éclairage → résultat rapporté tel quel (attaque la plus difficile).
 //   2. Pré-vérification avec une fausse caméra (photo fixe) : deux essais sans reflet → signal à vérifier.
 //   3. « Passer ce test » → signal sans effet sur le score ; règles du serveur (ordre, essais, validation).
 // playwright-core pilote le Chrome installé, sans télécharger de navigateur.
@@ -41,6 +43,10 @@ const browser = await chromium.launch({
     '--use-fake-device-for-media-stream',
     `--use-file-for-fake-video-capture=${mjpeg}`,
     '--autoplay-policy=no-user-gesture-required',
+    // Sans WebGL, MediaPipe ne suit aucun visage en mode sans interface. Sur Mac, le GPU (Metal) ; ailleurs, le choix
+    // de Chrome, avec repli sur un WebGL logiciel (trop lent pour le filtre d'échange de visage). GL=swiftshader pour forcer.
+    ...(process.env.GL === 'swiftshader' ? ['--use-angle=swiftshader'] : process.platform === 'darwin' ? ['--use-angle=metal'] : []),
+    '--enable-unsafe-swiftshader',
   ],
 });
 
@@ -64,6 +70,7 @@ async function labRun(kind) {
   await page.waitForSelector('.lab-verdict', { timeout: 60000 });
   const verdict = await page.textContent('.lab-verdict');
   const facts = (await page.locator('.facts').first().innerText()).replace(/\s+/g, ' ');
+  if (kind === 'sim-react') ok(facts.includes('visage suivi'), 'suivi du visage MediaPipe actif (pas le repli au centre de l’image)');
   console.log(`     ${kind} en ${((Date.now() - t0) / 1000).toFixed(1)} s : ${verdict} · ${facts.slice(0, 260)}`);
   await page.context().close();
   return verdict;
@@ -72,6 +79,104 @@ async function labRun(kind) {
 console.log('--- Espace de test (/lab/flash)');
 ok((await labRun('sim-react')) === 'Réussi', 'photo qui renvoie la couleur de l’écran → Réussi');
 ok((await labRun('sim-static')) === 'Échec', 'photo qui ne réagit pas → Échec');
+
+// --- Filtre d'échange de visage (deepfake temps réel) ---
+// La fausse caméra de Chrome est une photo fixe ; ici on la remplace par une caméra qui renvoie la couleur de l'écran,
+// comme un vrai visage. Le site ne le sait pas : seul getUserMedia est remplacé, dans ce test uniquement.
+async function reactivePage(tag) {
+  const page = await newPage(tag);
+  await page.addInitScript(() => {
+    const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const cam = await real(constraints);
+      const v = document.createElement('video');
+      v.muted = true;
+      v.srcObject = cam;
+      await v.play();
+      const cv = document.createElement('canvas');
+      cv.width = 640;
+      cv.height = 480;
+      const ctx = cv.getContext('2d');
+      const history = [];
+      const timer = setInterval(() => {
+        const stage = document.querySelector('.flash-stage');
+        const now = performance.now();
+        history.push({ t: now, c: stage ? getComputedStyle(stage).backgroundColor : 'rgb(0,0,0)' });
+        while (history.length > 1 && history[1].t <= now - 100) history.shift();
+        const s = Math.max(640 / v.videoWidth, 480 / v.videoHeight) || 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.drawImage(v, (640 - v.videoWidth * s) / 2 + Math.random() - 0.5, (480 - v.videoHeight * s) / 2, v.videoWidth * s, v.videoHeight * s);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = history[0].c;
+        ctx.fillRect(0, 0, 640, 480);
+      }, 33);
+      const out = cv.captureStream(30);
+      // Arrêter la caméra simulée libère aussi la fausse caméra de Chrome (elle ne s'ouvre qu'une fois à la fois).
+      const track = out.getVideoTracks()[0];
+      const stop = track.stop.bind(track);
+      track.stop = () => {
+        clearInterval(timer);
+        cam.getTracks().forEach((t) => t.stop());
+        stop();
+      };
+      return out;
+    };
+  });
+  await page.goto(`${BASE}/lab/flash`);
+  return page;
+}
+
+// Visage de remplacement : la photo retournée et recolorée (aucune autre personne réelle).
+async function replacementFace() {
+  const page = await newPage('visage');
+  const data = readFileSync(photo).toString('base64');
+  const url = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/jpeg;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.filter = 'hue-rotate(160deg) saturate(1.4)';
+    ctx.translate(c.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0);
+    return c.toDataURL('image/png');
+  }, data);
+  await page.context().close();
+  return Buffer.from(url.split(',')[1], 'base64');
+}
+
+async function swapRun(kind, lighting, face) {
+  const page = await reactivePage(`échange ${kind}`);
+  await page.selectOption('select', kind);
+  if (kind === 'faceswap') {
+    await page.setInputFiles('input[type="file"][accept="image/*"]', { name: 'visage.png', mimeType: 'image/png', buffer: face });
+    if (lighting) await page.check('.lab-check input');
+    await page.waitForSelector('text=Filtre actif', { timeout: 30000 });
+  }
+  await page.waitForTimeout(1500);
+  await page.click('text=Lancer l’essai');
+  await page.waitForSelector('.lab-verdict', { timeout: 60000 });
+  const verdict = await page.textContent('.lab-verdict');
+  const facts = (await page.locator('.facts').first().innerText()).replace(/\s+/g, ' ');
+  console.log(`     ${kind}${lighting ? ' + éclairage' : ''} : ${verdict} · ${facts.slice(0, 200)}`);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/echange-${kind}${lighting ? '-eclairage' : ''}.png`, fullPage: true });
+  await page.context().close();
+  return verdict;
+}
+
+console.log('--- Filtre d’échange de visage, caméra qui renvoie l’écran');
+{
+  const face = await replacementFace();
+  ok((await swapRun('camera', false, face)) === 'Réussi', 'contrôle : vrai visage (sans filtre) → Réussi');
+  ok((await swapRun('faceswap', false, face)) === 'Échec', 'échange de visage simple → Échec');
+  const lit = await swapRun('faceswap', true, face);
+  console.log(`INFO échange avec éclairage recopié → ${lit} (attaque la plus difficile, résultat rapporté tel quel)`);
+}
 
 // --- 2 et 3. Pré-vérification ---
 async function sessionAtFlashStep(label) {

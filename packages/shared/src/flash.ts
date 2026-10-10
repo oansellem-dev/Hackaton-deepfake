@@ -71,6 +71,9 @@ export const FLASH_THRESHOLDS = {
   passMinCorrelation: 0.5, // … et un accord net
   failMinP: 0.05, // échec : l'image ne suit pas la vraie suite mieux qu'une suite prise au hasard…
   failMaxCorrelation: 0.4, // … et l'accord reste faible (un vrai visage, même mal éclairé, dépasse en général 0,5)
+  // Teinte quasi immobile (en points) : même sans reflet, le bruit d'une vraie caméra dépasse largement ce seuil.
+  // En dessous, l'image est figée ou de synthèse : échec, sauf si elle suit nettement l'écran.
+  frozenMaxAmplitude: 0.02,
 };
 
 // Retards caméra essayés : de l'affichage d'une couleur à son reflet dans l'image.
@@ -294,6 +297,7 @@ export function analyzeFlash(run: FlashRun, options: { alternatives?: number; se
   const nullThreshold = nullBest.length ? nullBest[Math.min(nullBest.length - 1, Math.floor(nullBest.length * 0.99))] : 1;
 
   const T = FLASH_THRESHOLDS;
+  const amplitude = bestLag ? Math.sqrt(bestLag.energy / (3 * bestLag.idx.length)) * 100 : 0;
   let result: FlashResult = 'inconclusive';
   let reason: FlashReason = 'weak-response';
   if (fps < T.minFps || best < 0 || validSegments < T.minValidSegments) reason = 'few-frames';
@@ -301,7 +305,7 @@ export function analyzeFlash(run: FlashRun, options: { alternatives?: number; se
   else if (pValue <= T.passMaxP && correlation >= T.passMinCorrelation) {
     result = 'passed';
     reason = 'response';
-  } else if (pValue >= T.failMinP && correlation < T.failMaxCorrelation) {
+  } else if ((pValue >= T.failMinP && correlation < T.failMaxCorrelation) || amplitude < T.frozenMaxAmplitude) {
     result = 'failed';
     reason = 'no-response';
   }
@@ -312,7 +316,7 @@ export function analyzeFlash(run: FlashRun, options: { alternatives?: number; se
     correlation,
     pValue,
     lagMs: best >= 0 ? FLASH_LAGS_MS[best] : 0,
-    amplitude: bestLag ? Math.sqrt(bestLag.energy / (3 * bestLag.idx.length)) * 100 : 0,
+    amplitude,
     frames,
     fps,
     faceCoverage,

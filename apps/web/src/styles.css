@@ -130,3 +130,6 @@ label.inline { flex-direction: row; align-items: center; gap: 6px; margin: 0; }
 .lab-runs { border-collapse: collapse; width: 100%; font-size: 13px; }
 .lab-runs th, .lab-runs td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; white-space: nowrap; }
 .lab-runs th { color: #666; font-weight: normal; }
+label.lab-check { align-items: flex-start; font-size: 14px; margin-bottom: 8px; }
+label.lab-check input { margin-top: 3px; }
+.lab-summary th.lab-sub { font-size: 13px; padding-left: 12px; }

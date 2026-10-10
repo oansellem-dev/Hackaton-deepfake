@@ -11,17 +11,19 @@ import {
   type FlashResult,
 } from '@kyc/shared';
 import { FlashLagCurve, FlashTimeline } from '../components/FlashChart.tsx';
+import { createFaceSwap, type FaceSwap } from '../lib/faceswap.ts';
 import { FlashAborted, enterFullscreen, exitFullscreen, runFlash, secureRandom, type FlashRunResult } from '../lib/flash.ts';
 
 // Espace de test de l'équipe (/lab/flash) : lancer le test du reflet sur une vraie caméra ou sur une attaque, voir
 // pourquoi il conclut, et tenir le compte des 20 essais (taux de détection, taux de faux positifs) pour le jury.
 // Aucun serveur : tout reste dans ce navigateur, y compris le journal des essais.
 
-type SourceKind = 'camera' | 'replay' | 'file' | 'sim-react' | 'sim-static';
+type SourceKind = 'camera' | 'faceswap' | 'replay' | 'file' | 'sim-react' | 'sim-static';
 type Truth = 'real' | 'attack';
 
 const SOURCES: { kind: SourceKind; label: string }[] = [
   { kind: 'camera', label: 'Caméra (vrai visage, ou caméra virtuelle)' },
+  { kind: 'faceswap', label: 'Filtre : échange de visage en temps réel (deepfake)' },
   { kind: 'replay', label: 'Vidéo rejouée, enregistrée ici' },
   { kind: 'file', label: 'Fichier vidéo' },
   { kind: 'sim-react', label: 'Simulation : photo qui renvoie l’écran (contrôle technique)' },
@@ -30,11 +32,14 @@ const SOURCES: { kind: SourceKind; label: string }[] = [
 
 const ATTACKS = [
   'Vidéo rejouée',
+  'Échange de visage (simple)',
+  'Échange de visage (éclairage recopié)',
   'Caméra virtuelle (OBS, ManyCam…)',
   'Photo ou écran tenu devant la caméra',
-  'Filtre ou échange de visage',
-  'Autre',
+  'Autre filtre ou outil de deepfake',
 ];
+const SWAP_SIMPLE = ATTACKS[1];
+const SWAP_LIGHTING = ATTACKS[2];
 
 const RESULT_LABEL: Record<FlashResult, string> = { passed: 'Réussi', failed: 'Échec', inconclusive: 'Non concluant' };
 
@@ -143,6 +148,11 @@ export function FlashLab() {
   const [recording, setRecording] = useState(0); // secondes restantes
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [simImage, setSimImage] = useState<HTMLImageElement | null>(null);
+  const [swapImage, setSwapImage] = useState<HTMLImageElement | null>(null);
+  const [matchLighting, setMatchLighting] = useState(false);
+  const [swapActive, setSwapActive] = useState(false);
+  const swapRef = useRef<FaceSwap | null>(null);
+  const matchLightingRef = useRef(matchLighting);
   const [sourceError, setSourceError] = useState<string | null>(null);
 
   const [truth, setTruth] = useState<Truth>('real');
@@ -173,7 +183,7 @@ export function FlashLab() {
 
   // Liste des caméras (les noms n'apparaissent qu'après une autorisation).
   useEffect(() => {
-    if (kind !== 'camera' || cameras.length) return;
+    if ((kind !== 'camera' && kind !== 'faceswap') || cameras.length) return;
     navigator.mediaDevices
       .getUserMedia({ video: true })
       .then(async (s) => {
@@ -181,7 +191,8 @@ export function FlashLab() {
         s.getTracks().forEach((t) => t.stop());
         const list = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
         setCameras(list);
-        setCameraId((id) => id || current || list[0]?.deviceId || '');
+        // La caméra en cours si elle est dans la liste, sinon la première (un flux de synthèse a un identifiant inventé).
+        setCameraId((id) => id || (list.some((d) => d.deviceId === current) ? current : list[0]?.deviceId) || '');
       })
       .catch((e) => setSourceError(`Caméra indisponible : ${e}`));
   }, [kind, cameras.length]);
@@ -196,6 +207,7 @@ export function FlashLab() {
     video.removeAttribute('src');
     video.loop = false;
     setSourceError(null);
+    setSwapActive(false);
 
     const playStream = (stream: MediaStream, stop: () => void) => {
       video.srcObject = stream;
@@ -219,11 +231,44 @@ export function FlashLab() {
     else if (isSim && simImage) {
       const sim = simulatedCamera(simImage, stage, kind === 'sim-react');
       playStream(sim.stream, sim.stop);
+    } else if (kind === 'faceswap' && cameraId && swapImage) {
+      // Faux flux de caméra : la vraie caméra, visage remplacé. Branché comme n'importe quelle caméra.
+      navigator.mediaDevices
+        .getUserMedia({ video: { deviceId: { exact: cameraId }, width: { ideal: 640 }, height: { ideal: 480 } } })
+        .then(async (cam) => {
+          const stopCam = () => cam.getTracks().forEach((t) => t.stop());
+          if (cancelled) return stopCam();
+          try {
+            const swap = await createFaceSwap(cam, swapImage, matchLightingRef.current);
+            if (cancelled) {
+              swap.stop();
+              return stopCam();
+            }
+            swapRef.current = swap;
+            playStream(swap.stream, () => {
+              swap.stop();
+              stopCam();
+              swapRef.current = null;
+            });
+            setSwapActive(true);
+          } catch (e) {
+            stopCam();
+            console.error('Filtre d’échange de visage :', e);
+            setSourceError(`Filtre impossible : ${e instanceof Error ? e.message : e}`);
+          }
+        })
+        .catch((e) => setSourceError(`Caméra indisponible : ${e}`));
     }
     return () => {
       cancelled = true;
     };
-  }, [kind, cameraId, replayUrl, fileUrl, simImage, isSim]);
+  }, [kind, cameraId, replayUrl, fileUrl, simImage, swapImage, isSim]);
+
+  // L'option d'éclairage change à chaud, sans recharger le filtre.
+  useEffect(() => {
+    matchLightingRef.current = matchLighting;
+    swapRef.current?.setMatchLighting(matchLighting);
+  }, [matchLighting]);
 
   // Classement proposé selon la source (modifiable avant de lancer).
   useEffect(() => {
@@ -234,8 +279,11 @@ export function FlashLab() {
     } else if (kind === 'replay' || kind === 'file') {
       setTruth('attack');
       setAttack(ATTACKS[0]);
+    } else if (kind === 'faceswap') {
+      setTruth('attack');
+      setAttack(matchLighting ? SWAP_LIGHTING : SWAP_SIMPLE);
     }
-  }, [kind, cameraLabel]);
+  }, [kind, cameraLabel, matchLighting]);
 
   async function recordReplay() {
     setSourceError(null);
@@ -274,16 +322,22 @@ export function FlashLab() {
     setFileUrl(URL.createObjectURL(file));
   }
 
-  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = () => setSimImage(img);
-    img.src = URL.createObjectURL(file);
+  function pickImage(set: (img: HTMLImageElement) => void) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => set(img);
+      img.src = URL.createObjectURL(file);
+    };
   }
 
   const sourceName = () =>
-    kind === 'camera' ? cameraLabel || 'caméra' : SOURCES.find((s) => s.kind === kind)!.label.split(' (')[0];
+    kind === 'camera'
+      ? cameraLabel || 'caméra'
+      : kind === 'faceswap'
+        ? `Échange de visage (${matchLighting ? 'éclairage recopié' : 'simple'})`
+        : SOURCES.find((s) => s.kind === kind)!.label.split(' (')[0];
 
   async function run() {
     const stage = stageRef.current!;
@@ -374,7 +428,19 @@ export function FlashLab() {
   const real = runs.filter((r) => r.truth === 'real');
   const attacks = runs.filter((r) => r.truth === 'attack');
   const count = (list: LabRun[], result: FlashResult) => list.filter((r) => r.result === result).length;
-  const ready = !running && !recording && (kind === 'camera' ? !!cameraId : kind === 'replay' ? !!replayUrl : kind === 'file' ? !!fileUrl : !!simImage);
+  const ready =
+    !running &&
+    !recording &&
+    (kind === 'camera'
+      ? !!cameraId
+      : kind === 'faceswap'
+        ? swapActive
+        : kind === 'replay'
+          ? !!replayUrl
+          : kind === 'file'
+            ? !!fileUrl
+            : !!simImage);
+  const attackTypes = ATTACKS.filter((a) => attacks.some((r) => r.attack === a));
   const active = running;
 
   return (
@@ -402,7 +468,7 @@ export function FlashLab() {
           </select>
         </label>
 
-        {kind === 'camera' && (
+        {(kind === 'camera' || kind === 'faceswap') && (
           <label>
             Caméra
             <select value={cameraId} onChange={(e) => setCameraId(e.target.value)} disabled={running}>
@@ -433,15 +499,36 @@ export function FlashLab() {
             <input type="file" accept="video/*" onChange={pickFile} disabled={running} />
           </label>
         )}
+        {kind === 'faceswap' && (
+          <>
+            <label>
+              Visage de remplacement : un visage généré par IA (par exemple une image enregistrée depuis
+              thispersondoesnotexist.com) ou une personne qui a donné son accord écrit
+              <input type="file" accept="image/*" onChange={pickImage(setSwapImage)} disabled={running} />
+            </label>
+            <label className="inline lab-check">
+              <input type="checkbox" checked={matchLighting} onChange={(e) => setMatchLighting(e.target.checked)} />
+              Recopier l’éclairage de la vraie caméra sur le faux visage, à chaque image (comme DeepFaceLive) : l’attaque
+              la plus difficile pour ce test
+            </label>
+            <p className="muted">
+              {swapActive
+                ? 'Filtre actif : votre visage est remplacé. Le test ne le sait pas : il reçoit ce flux comme une caméra.'
+                : swapImage
+                  ? 'Préparation du filtre…'
+                  : 'Choisissez une photo pour activer le filtre.'}
+            </p>
+          </>
+        )}
         {isSim && (
           <label>
             Photo d’un visage (pour vérifier la chaîne technique, pas comptée dans les chiffres)
-            <input type="file" accept="image/*" onChange={pickImage} disabled={running} />
+            <input type="file" accept="image/*" onChange={pickImage(setSimImage)} disabled={running} />
           </label>
         )}
         {sourceError && <p className="faceid-error">{sourceError}</p>}
 
-        <div ref={stageRef} className={`flash-stage ${active ? 'flash-active' : ''} ${kind === 'camera' ? '' : 'no-mirror'}`}>
+        <div ref={stageRef} className={`flash-stage ${active ? 'flash-active' : ''} ${kind === 'camera' || kind === 'faceswap' ? '' : 'no-mirror'}`}>
           <video ref={videoRef} playsInline muted />
           {active && (
             <div className="flash-hud">
@@ -521,8 +608,10 @@ export function FlashLab() {
               <tr>
                 <th>Images</th>
                 <td>
-                  {last.analysis.frames} ({fr(last.analysis.fps, 0)} par seconde, horloge : {last.run.clock}) · visage suivi{' '}
-                  {Math.round(last.analysis.faceCoverage * 100)} % du temps
+                  {last.analysis.frames} ({fr(last.analysis.fps, 0)} par seconde, horloge : {last.run.clock}) ·{' '}
+                  {last.run.zone === 'face'
+                    ? `visage suivi ${Math.round(last.analysis.faceCoverage * 100)} % du temps`
+                    : 'suivi du visage indisponible (pas de WebGL) : centre de l’image mesuré'}
                 </td>
               </tr>
             </tbody>
@@ -552,6 +641,18 @@ export function FlashLab() {
                 <strong>taux de détection : {pct(count(attacks, 'failed'), attacks.length)}</strong>
               </td>
             </tr>
+            {attackTypes.map((a) => {
+              const list = attacks.filter((r) => r.attack === a);
+              return (
+                <tr key={a}>
+                  <th className="lab-sub">↳ {a}</th>
+                  <td>
+                    détectées {count(list, 'failed')}/{list.length} ({pct(count(list, 'failed'), list.length)}) · non
+                    concluantes {count(list, 'inconclusive')} · passées {count(list, 'passed')}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

@@ -18,6 +18,9 @@ export type FlashClock = 'capture' | 'presentation' | 'animation';
 
 export interface FlashRunResult extends FlashRun {
   clock: FlashClock; // horloge des images : instant de capture (le plus précis), d'affichage, ou d'animation (repli)
+  // Zone mesurée : le visage suivi par MediaPipe, ou le centre de l'image si le suivi est indisponible
+  // (navigateur sans WebGL) : dans ce cas la présence du visage n'est pas vérifiée.
+  zone: 'face' | 'center';
 }
 
 export interface FlashRunOptions {
@@ -91,6 +94,7 @@ export async function runFlash({
   let endAt = 0;
   const samples: FlashSample[] = [];
   let clock: FlashClock = 'animation';
+  let zone: 'face' | 'center' = tracker ? 'face' : 'center';
 
   let roi = { x: 0.35, y: 0.3, w: 0.3, h: 0.4 }; // centre de l'image tant qu'aucun visage n'est suivi
   let lastDetect = -Infinity;
@@ -109,6 +113,7 @@ export async function runFlash({
         // Suivi du visage en panne : on continue sur le centre de l'image plutôt que d'arrêter la mesure.
         tracker = null;
         lastFace = Infinity;
+        zone = 'center';
       }
       if (face) {
         const b = boundingBox(face);
@@ -197,7 +202,7 @@ export async function runFlash({
       }
       if (elapsed >= total) {
         cleanup();
-        resolve({ segments, shownAt, endAt, samples, clock: useFrameCallback ? clock : 'animation' });
+        resolve({ segments, shownAt, endAt, samples, clock: useFrameCallback ? clock : 'animation', zone });
         return;
       }
       raf = requestAnimationFrame(paint);

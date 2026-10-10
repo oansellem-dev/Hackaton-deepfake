@@ -157,6 +157,13 @@ Il sert à faire les 20 essais du plan sans serveur ni entretien. Le journal res
   - caméra virtuelle OBS qui diffuse une vidéo ;
   - téléphone tenu devant la caméra ;
   - filtre de visage.
+- **Filtre d’échange de visage** (source « Filtre : échange de visage en temps réel ») : un deepfake simple, en temps réel, dans le navigateur (`apps/web/src/lib/faceswap.ts`).
+  - Fonctionnement : ton visage, yeux et bouche compris, est remplacé par celui d’une photo. Prends un visage généré par IA, ou une personne qui a donné son accord écrit.
+  - Le test ne sait pas que le filtre est actif : il reçoit ce flux exactement comme une caméra.
+  - Deux niveaux d’attaque :
+    - **simple** : le visage collé ne renvoie pas le reflet de l’écran ;
+    - **éclairage recopié** : à chaque image, la couleur du vrai visage est recopiée sur le faux, comme le transfert de couleur de DeepFaceLive.
+  - Le journal compte le taux de détection pour chaque type d’attaque.
 - **Les deux simulations** (photo qui renvoie l’écran, photo figée) vérifient seulement la chaîne technique. Elles ne comptent pas dans les chiffres.
 - **Graphiques** : les bandes des couleurs affichées et les courbes de la teinte mesurée, puis l’accord selon le retard face à la ligne du hasard.
 
@@ -168,13 +175,23 @@ Calibré sur des caméras simulées (`packages/shared/test/flash.test.ts`) :
 | Visage avec un reflet très faible (0,7 %) | 76 % | 2 % |
 | Image injectée | 1 à 2 % | 82 à 93 % |
 
+Dans Chrome, avec une caméra simulée qui renvoie l’écran (`tools/e2e/flash.mjs`) :
+
+| Cas | Verdict |
+|---|---|
+| Vrai visage | Réussi |
+| Échange de visage simple | Échec (détecté) |
+| Échange avec éclairage recopié | Réussi (non détecté) |
+
+Ce dernier cas est la limite du test. Il faut s’appuyer sur les autres signaux : défis de mouvement, détecteur passif.
+
 Ces chiffres sont à confirmer avec les 20 vrais essais. Les seuils sont dans `FLASH_THRESHOLDS`.
 
 ## Tests de bout en bout (`tools/e2e/`)
 
 - `npm test` : tests unitaires (mesures du visage, test du reflet).
-- `node tools/e2e/flash.mjs <photo de visage.jpg>` : 16 contrôles dans Chrome sans interface (site construit, serveur lancé, `BASE` et `CHROME_PATH` si besoin) :
-  - espace de test (photo qui renvoie l’écran → réussi, photo figée → échec) ;
+- `node tools/e2e/flash.mjs <photo de visage.jpg>` : 19 contrôles dans Chrome sans interface (site construit, serveur lancé, `BASE` et `CHROME_PATH` si besoin) :
+  - espace de test (photo qui renvoie l’écran → réussi, photo figée → échec, échange de visage simple → échec, échange avec éclairage recopié → rapporté) ;
   - pré-vérification avec une fausse caméra fixe (deux essais → signal à vérifier, rapport) ;
   - « Passer ce test » ;
   - règles du serveur (ordre, nombre d’essais, validation).

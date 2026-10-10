@@ -132,10 +132,10 @@ export function Panel() {
   const aDesSignaux = (entretien?.preVerification.signaux.length ?? 0) > 0;
   let dot = "";
   let phrase = "Tout va bien. L'outil regarde avec vous.";
-  if (etape === "attente" && aDesSignaux) { dot = "panel__dot--orange"; phrase = "Deux points à vérifier pendant l'entretien. Des défis adaptés vous sont proposés."; }
+  if (etape === "attente" && aDesSignaux) { dot = "panel__dot--rouge"; phrase = "Deux points à vérifier pendant l'entretien. Des défis adaptés vous sont proposés."; }
   if (etape === "defi") { dot = analyse ? "panel__dot--gris" : ""; phrase = analyse ? "Vérification du geste en cours…" : "Demandez-lui, naturellement :"; }
   if (etape === "resultat" && score) {
-    dot = score.signaux.length ? "panel__dot--orange" : "";
+    dot = score.signaux.length ? "panel__dot--rouge" : "";
     phrase = score.signaux.length ? "Signal à vérifier : " + score.signaux[0].libelle.toLowerCase() + "." : "Présence humaine vérifiée.";
   }
   if (etape === "fin") { dot = "panel__dot--gris"; phrase = "C'est à vous de décider. La trace est conservée."; }

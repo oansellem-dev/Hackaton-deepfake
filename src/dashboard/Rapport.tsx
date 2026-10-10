@@ -83,7 +83,7 @@ export function Rapport({ id }: { id: string }) {
                   <li key={d.id}>
                     <time>{d.horodatage ? heure(d.horodatage) : "—"}</time>
                     <span>{DEFI_NOMS[d.type]} — <span className="muted">« {d.phrase} »</span></span>
-                    <span className={`pill ${d.resultat === "execute" ? "pill--vert" : d.resultat === "signal_a_verifier" ? "pill--orange" : "pill--gris"}`}>{DEFI_RESULTATS[d.resultat]}</span>
+                    <span className={`pill ${d.resultat === "execute" ? "pill--vert" : d.resultat === "signal_a_verifier" ? "pill--rouge" : "pill--gris"}`}>{DEFI_RESULTATS[d.resultat]}</span>
                   </li>
                 ))}
               </ul>
@@ -97,7 +97,7 @@ export function Rapport({ id }: { id: string }) {
               <ul className="signaux" style={{ gap: 14 }}>
                 {signaux.map((s) => (
                   <li key={s.id}>
-                    <span className={`pill ${s.niveau === "fort" ? "pill--orange" : "pill--gris"}`}>{s.niveau === "fort" ? "Fort" : "Moyen"}</span>
+                    <span className={`pill ${s.niveau === "fort" ? "pill--rouge" : "pill--gris"}`}>{s.niveau === "fort" ? "Fort" : "Moyen"}</span>
                     <span><strong style={{ fontWeight: 500 }}>{s.libelle}</strong><br /><span className="muted small">{s.explication}</span></span>
                   </li>
                 ))}

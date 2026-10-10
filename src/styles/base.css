@@ -61,7 +61,7 @@ a { color: inherit; }
 }
 .pill--vert { background: var(--green); color: #fff; }
 .pill--rouge { background: var(--red); color: #fff; }
-.pill--orange { background: var(--orange); color: #fff; }
+.pill--rouge { background: var(--orange); color: #fff; }
 .pill--jaune { background: var(--yellow); color: var(--ink); }
 .pill--violet { background: var(--violet); color: #fff; }
 .pill--gris { background: #ebe8e3; color: var(--ink-2); }

@@ -57,7 +57,7 @@ export function EnvoiLien() {
                     <td>{e.candidat.prenom ? `${e.candidat.prenom} ${e.candidat.nom}` : e.candidat.email}</td>
                     <td className="muted">{quand(e.date)}</td>
                     <td><span className={`pill ${st === "faite" ? "pill--jaune" : "pill--gris"}`}>{PREVERIF_STATUTS[st]}</span></td>
-                    <td>{st !== "faite" ? <span className="muted">Pas d'information, ce n'est pas un signal</span> : n === 0 ? <span className="pill pill--vert">Rien à signaler</span> : <span className="pill pill--orange">{n} point{n > 1 ? "s" : ""} à vérifier pendant l'entretien</span>}</td>
+                    <td>{st !== "faite" ? <span className="muted">Pas d'information, ce n'est pas un signal</span> : n === 0 ? <span className="pill pill--vert">Rien à signaler</span> : <span className="pill pill--rouge">{n} point{n > 1 ? "s" : ""} à vérifier pendant l'entretien</span>}</td>
                   </tr>
                 );
               })}

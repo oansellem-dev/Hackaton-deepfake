@@ -10,7 +10,7 @@ export function Resultat({ score, onNouveauDefi, onTerminer }: { score: Score; o
             <span className="score__value">{score.valeur}</span>
             <span className="score__label">/ 100<br />fiabilité</span>
           </div>
-          <span className={`pill ${ok ? "pill--vert" : "pill--orange"}`}>{ok ? "Présence vérifiée" : "Signal à vérifier"}</span>
+          <span className={`pill ${ok ? "pill--vert" : "pill--rouge"}`}>{ok ? "Présence vérifiée" : "Signal à vérifier"}</span>
         </div>
         <div className="card__rule" />
         <ul className="explications">
@@ -25,7 +25,7 @@ export function Resultat({ score, onNouveauDefi, onTerminer }: { score: Score; o
           <ul className="signaux">
             {score.signaux.map((s) => (
               <li key={s.id}>
-                <span className={`pill ${s.niveau === "fort" ? "pill--orange" : "pill--gris"}`}>{s.niveau === "fort" ? "Fort" : "Moyen"}</span>
+                <span className={`pill ${s.niveau === "fort" ? "pill--rouge" : "pill--gris"}`}>{s.niveau === "fort" ? "Fort" : "Moyen"}</span>
                 <span>{s.libelle}</span>
               </li>
             ))}

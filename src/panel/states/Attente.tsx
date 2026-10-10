@@ -7,7 +7,7 @@ export function Attente({ entretien, onProposer }: { entretien: Entretien; onPro
   const n = pv.signaux.length;
   const resume =
     pv.statut !== "faite" ? "Pas encore d'information : ce n'est pas un signal." : n === 0 ? "Rien à signaler" : `${n} point${n > 1 ? "s" : ""} à vérifier`;
-  const pillClass = pv.statut !== "faite" ? "pill--gris" : n === 0 ? "pill--vert" : "pill--orange";
+  const pillClass = pv.statut !== "faite" ? "pill--gris" : n === 0 ? "pill--vert" : "pill--rouge";
 
   return (
     <>
@@ -34,7 +34,7 @@ export function Attente({ entretien, onProposer }: { entretien: Entretien; onPro
             <div className="card__rule" />
             <ul className="signaux">
               {pv.signaux.map((s) => (
-                <li key={s.id}><span className="pill pill--orange">À vérifier</span><span>{s.libelle}</span></li>
+                <li key={s.id}><span className="pill pill--rouge">À vérifier</span><span>{s.libelle}</span></li>
               ))}
             </ul>
           </>

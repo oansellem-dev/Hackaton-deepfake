@@ -5,6 +5,7 @@ import type {
   FaceIdStepResult,
   FaceIdSubmission,
   IdentityPayload,
+  LiveSample,
   PrecheckPayload,
   SessionView,
   SignalStatus,
@@ -60,18 +61,9 @@ export function createApi(base: string = DEFAULT_API_BASE, recruiterKey?: string
         `/api/sessions/${id}/faceid/submit`,
         { method: 'POST', body: JSON.stringify(payload) },
       ),
-    // Pendant l'entretien : proportions du visage affiché, comparées au profil de la pré-vérification.
-    sendFaceSample: (id: string, sample: { ratios: number[]; yawDeg: number }) =>
-      call<{ verdict: string }>(`/api/sessions/${id}/face-sample`, { method: 'POST', body: JSON.stringify(sample) }),
-    // Détecteur passif : une capture JPEG du visage. Analysée en mémoire côté agent, jamais conservée.
-    sendFrame: async (id: string, image: Blob, phase: 'precheck' | 'live' = 'live'): Promise<void> => {
-      const res = await fetch(`${base}/api/sessions/${id}/frame${phase === 'precheck' ? '?phase=precheck' : ''}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'image/jpeg', ...auth },
-        body: image,
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-    },
+    // Pendant l'entretien : mesures du visage affiché, calculées dans le navigateur (jamais d'image envoyée).
+    sendLiveSample: (id: string, sample: LiveSample) =>
+      call<{ verdict: string }>(`/api/sessions/${id}/live-sample`, { method: 'POST', body: JSON.stringify(sample) }),
     // Page candidat de la visio de secours : nom de la caméra réellement utilisée.
     reportLiveCamera: (id: string, cameraLabel: string) =>
       call<{ checked: boolean }>(`/api/sessions/${id}/live-camera`, { method: 'POST', body: JSON.stringify({ cameraLabel }) }),

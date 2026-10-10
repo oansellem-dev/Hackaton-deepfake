@@ -7,10 +7,10 @@ import express from 'express';
 import type { ChallengeResult, Decision, PrecheckPayload } from '@kyc/shared';
 import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
-import { analyzeCv, forwardFrame, viewWithAgent, type CvResult } from './agent.ts';
-import { hasRecruiterKey, recruiterOnly } from './auth.ts';
+import { analyzeCv, viewWithAgent, type CvResult } from './agent.ts';
+import { recruiterOnly } from './auth.ts';
 import { cleanMetrics, recordChallenge } from './challenges.ts';
-import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
+import { faceIdRouter } from './faceid.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -75,31 +75,6 @@ app.post('/api/sessions/:id/challenges', recruiterOnly, async (req, res) => {
 
 app.use(faceIdRouter);
 
-// Détecteur passif : le panneau envoie une capture du visage (JPEG) toutes les ~2 s.
-// Elle est transmise à l'agent local, analysée en mémoire, jamais conservée.
-app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' }), async (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
-  // Le candidat n'envoie des captures que pendant sa vérification du visage ; ensuite, seul le recruteur le peut.
-  const precheck = req.query.phase === 'precheck';
-  const faceIdOpen =
-    !!session.faceId && (!session.faceId.completedAt || Date.now() - session.faceId.completedAt < 60_000);
-  if (!(precheck && faceIdOpen) && !hasRecruiterKey(req, session.recruiterKey)) {
-    return res.status(403).json({ error: 'réservé au recruteur' });
-  }
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'image manquante' });
-  try {
-    const { status, body } = await forwardFrame(session.id, req.body, req.headers['content-type'] ?? 'image/jpeg');
-    const { embedding, ...rest } = (body ?? {}) as { embedding?: unknown; frame?: { fake_probability?: unknown } };
-    onFrameEmbedding(session, embedding, precheck ? 'precheck' : 'live');
-    const p = rest.frame?.fake_probability;
-    if (typeof p === 'number' && Number.isFinite(p)) session.passiveScores = [...(session.passiveScores ?? []), p].slice(-15);
-    // L'empreinte reste sur le serveur : le navigateur ne reçoit que le résultat du détecteur passif.
-    res.status(status).json(rest);
-  } catch {
-    res.status(503).json({ error: 'agent injoignable' });
-  }
-});
 
 // CV chargé par le recruteur (jamais par le candidat : son parcours reste léger). Comparé à ses déclarations,
 // puis oublié : on garde seulement les écarts, les éléments concordants et les liens de vérification.

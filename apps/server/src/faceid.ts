@@ -2,13 +2,11 @@ import { randomBytes, randomInt } from 'node:crypto';
 import express from 'express';
 import {
   ANGLE_MAX_YAW_DEG,
-  DIFFERENT_PERSON_MAX,
-  MIN_PROFILE_EMBEDDINGS,
   MIN_PROFILE_SAMPLES,
-  SAME_PERSON_MIN,
   combineContinuity,
   cosine,
   findVirtualCameras,
+  isProbability,
   isValidEmbedding,
   isValidRatios,
   judgeContinuity,
@@ -23,9 +21,11 @@ import {
   type FaceIdStep,
   type FaceIdSubmission,
   type IdentityPayload,
+  type LiveSample,
 } from '@kyc/shared';
 import { recruiterOnly } from './auth.ts';
 import { recordChallenge } from './challenges.ts';
+import { thresholds } from './config.ts';
 import { declaredInfoSignals, lookupWebPresence, sanitizeIdentity } from './identity.ts';
 import { getSession, schedulePersist, upsertSignals } from './store.ts';
 
@@ -158,7 +158,8 @@ faceIdRouter.post('/api/sessions/:id/faceid/submit', (req, res) => {
   const angles = validAngles(body.angles);
   if (center?.result !== 'failed' && isValidRatios(body.ratios) && body.samples >= MIN_PROFILE_SAMPLES) {
     session.faceProfile = { ratios: body.ratios, samples: body.samples, angles, createdAt: Date.now() };
-    finalizeEmbedding(session);
+    // Empreinte calculée dans le navigateur du candidat : seul ce vecteur arrive ici, jamais une image.
+    if (isValidEmbedding(body.embedding)) session.faceProfile.embedding = meanEmbedding([body.embedding]);
     upsertSignals(session, [
       {
         id: 'face.profile',
@@ -185,6 +186,8 @@ faceIdRouter.post('/api/sessions/:id/faceid/submit', (req, res) => {
       },
     ]);
   }
+
+  if (Array.isArray(body.passive)) session.passiveScores = body.passive.filter(isProbability).slice(-15);
 
   plan.completedAt = Date.now();
   session.precheckDone = true;
@@ -219,9 +222,8 @@ faceIdRouter.post('/api/sessions/:id/live-camera', (req, res) => {
 });
 
 // --- Pendant l'entretien : la personne est-elle la même qu'à la pré-vérification ? ---
-// Deux contrôles indépendants : l'empreinte faciale (calculée par l'agent sur les captures) et les proportions
-// du visage (mesurées par le panneau). Seules les mesures sont gardées, en mémoire, jamais les images.
-const precheckEmbeddings = new Map<string, number[][]>();
+// Deux contrôles indépendants, calculés dans le navigateur du recruteur : l'empreinte faciale et les proportions du
+// visage. Le serveur ne reçoit que ces nombres ; il garde en mémoire les similarités, jamais les empreintes reçues.
 const similarities = new Map<string, number[]>();
 const geometry = new Map<string, number[]>();
 
@@ -232,30 +234,6 @@ function push(map: Map<string, number[]>, id: string, value: number) {
   map.set(id, list);
 }
 
-// L'empreinte de référence est la moyenne des captures de la pré-vérification (elles peuvent arriver juste après la fin).
-function finalizeEmbedding(session: Session) {
-  const list = precheckEmbeddings.get(session.id) ?? [];
-  if (session.faceProfile && !session.faceProfile.embedding && list.length >= MIN_PROFILE_EMBEDDINGS) {
-    session.faceProfile.embedding = meanEmbedding(list);
-    precheckEmbeddings.delete(session.id);
-    schedulePersist();
-  }
-}
-
-export function onFrameEmbedding(session: Session, embedding: unknown, phase: 'precheck' | 'live') {
-  if (!isValidEmbedding(embedding)) return;
-  if (phase === 'precheck') {
-    const list = precheckEmbeddings.get(session.id) ?? [];
-    if (list.length < 20) list.push(embedding);
-    precheckEmbeddings.set(session.id, list);
-    finalizeEmbedding(session);
-    return;
-  }
-  if (!session.faceProfile?.embedding) return;
-  push(similarities, session.id, cosine(session.faceProfile.embedding, embedding));
-  updateContinuity(session);
-}
-
 function pct(x: number) {
   return `${Math.round(x * 1000) / 10} %`;
 }
@@ -263,11 +241,14 @@ function pct(x: number) {
 function updateContinuity(session: Session) {
   const sims = similarities.get(session.id) ?? [];
   const dists = geometry.get(session.id) ?? [];
-  const verdict = combineContinuity(judgeIdentity(sims), judgeContinuity(dists));
+  const verdict = combineContinuity(
+    judgeIdentity(sims, thresholds.samePersonMin, thresholds.differentPersonMax),
+    judgeContinuity(dists, thresholds.sameShapeMax, thresholds.differentShapeMin),
+  );
 
   const parts = [
     sims.length
-      ? `empreinte : similarité médiane ${median(sims).toFixed(2)} sur ${sims.length} capture(s) (même personne au-dessus de ${SAME_PERSON_MIN}, différente sous ${DIFFERENT_PERSON_MAX})`
+      ? `empreinte : similarité médiane ${median(sims).toFixed(2)} sur ${sims.length} capture(s) (même personne au-dessus de ${thresholds.samePersonMin}, différente sous ${thresholds.differentPersonMax})`
       : 'empreinte : pas encore de capture',
     dists.length
       ? `proportions : écart médian ${pct(median(dists))} sur ${dists.length} mesure(s)`
@@ -298,18 +279,21 @@ function updateContinuity(session: Session) {
   return verdict;
 }
 
-// Le panneau envoie les proportions du visage affiché ; comparées au profil de face ou sous l'angle le plus proche.
-faceIdRouter.post('/api/sessions/:id/face-sample', recruiterOnly, (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
-  if (!session.faceProfile) return res.json({ verdict: 'unknown', reason: 'pas de profil' });
+// Le panneau recruteur envoie, toutes les 2 s et pendant les défis, des mesures du visage affiché calculées dans son
+// navigateur : proportions (comparées au profil de face ou sous l'angle le plus proche), empreinte, probabilité de
+// trucage. Aucune image n'est acceptée ici.
+faceIdRouter.post('/api/sessions/:id/live-sample', recruiterOnly, (req, res) => {
+  if (!req.is('application/json')) return res.status(415).json({ error: 'mesures uniquement, jamais d\'image' });
+  const session = getSession(req.params.id)!;
+  const { ratios, yawDeg, embedding, fakeProbability } = (req.body ?? {}) as LiveSample;
+  if (isProbability(fakeProbability)) session.passiveScores = [...(session.passiveScores ?? []), fakeProbability].slice(-15);
 
-  const { ratios, yawDeg } = req.body as { ratios?: number[]; yawDeg?: number };
-  if (!isValidRatios(ratios) || !Number.isFinite(yawDeg)) return res.status(400).json({ error: 'mesure invalide' });
-  const reference = referenceFor(session.faceProfile, yawDeg!);
-  if (!reference) return res.json({ verdict: 'unknown', reason: 'angle sans profil de référence' });
-
-  push(geometry, session.id, ratioDistance(reference, ratios));
-  const verdict = updateContinuity(session);
-  res.json({ verdict, samples: (geometry.get(session.id) ?? []).length });
+  const profile = session.faceProfile;
+  if (!profile) return res.json({ verdict: 'unknown', reason: 'pas de profil' });
+  if (isValidEmbedding(embedding) && profile.embedding) push(similarities, session.id, cosine(profile.embedding, embedding));
+  if (isValidRatios(ratios) && Number.isFinite(yawDeg)) {
+    const reference = referenceFor(profile, yawDeg!);
+    if (reference) push(geometry, session.id, ratioDistance(reference, ratios));
+  }
+  res.json({ verdict: updateContinuity(session) });
 });

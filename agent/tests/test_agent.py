@@ -85,3 +85,11 @@ def test_passive_summary_is_echoed_for_the_report():
     out = post({"passive": {"frames_analyzed": 6, "median_fake_probability": 0.2},
                 "challenges": [{"type": "head_turn", "status": "passed"}]})
     assert out["passive"] == {"frames_analyzed": 6, "median_fake_probability": 0.2}
+
+
+def test_agent_never_accepts_face_images():
+    # Les images du visage ne quittent jamais le navigateur : l'agent n'a aucune route pour en recevoir.
+    from app.main import app as agent_app
+    assert not any("frame" in getattr(r, "path", "") for r in agent_app.routes)
+    r = client.post("/frame/s1", files={"image": ("f.jpg", b"\xff\xd8\xff", "image/jpeg")})
+    assert r.status_code == 404

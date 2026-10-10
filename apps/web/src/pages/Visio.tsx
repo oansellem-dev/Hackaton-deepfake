@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { RecruiterPanel } from '@kyc/panel';
 import { API_BASE, WS_URL, api, recruiterKeyFor } from '../config.ts';
+import { loadFaceModels } from '../lib/faceModels.ts';
 import { createLiveDetector } from '../lib/liveDetector.ts';
-import { loadTracker, sampleFace } from '../lib/tracker.ts';
+import { loadTracker, sampleLive } from '../lib/tracker.ts';
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -21,9 +22,11 @@ export function Visio() {
   const [status, setStatus] = useState('Connexion…');
   const detector = useMemo(() => createLiveDetector(id, recruiterKey), [id, recruiterKey]);
 
-  // Côté recruteur, l'analyse d'image se charge dès l'ouverture : le premier défi démarre sans attendre.
+  // Côté recruteur, l'analyse d'image se charge dès l'ouverture : premières mesures et premier défi sans attendre.
   useEffect(() => {
-    if (role === 'recruiter') loadTracker().catch(() => undefined);
+    if (role !== 'recruiter') return;
+    loadTracker().catch(() => undefined);
+    loadFaceModels().catch(() => undefined);
   }, [role]);
 
   useEffect(() => {
@@ -134,7 +137,7 @@ export function Visio() {
             stream={remoteStream}
             apiBase={API_BASE}
             reportUrl={`/report/${id}${recruiterKey ? `?key=${recruiterKey}` : ''}`}
-            faceSampler={sampleFace}
+            liveSampler={sampleLive}
             detector={detector}
             recruiterKey={recruiterKey}
           />

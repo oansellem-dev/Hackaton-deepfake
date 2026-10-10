@@ -183,11 +183,12 @@ export function angleProfiles(samples: { yawDeg: number; ratios: number[] }[]): 
 export type Continuity = 'consistent' | 'different' | 'unknown';
 
 // `distances` : écarts entre le profil de pré-vérification et les mesures faites pendant l'entretien.
-export function judgeContinuity(distances: number[]): Continuity {
+// Seuils réglables par le serveur (variables d'environnement), valeurs par défaut ci-dessus.
+export function judgeContinuity(distances: number[], sameMax = SAME_FACE_MAX, differentMin = DIFFERENT_FACE_MIN): Continuity {
   if (distances.length < MIN_LIVE_SAMPLES) return 'unknown';
   const m = median(distances);
-  if (m <= SAME_FACE_MAX) return 'consistent';
-  if (m >= DIFFERENT_FACE_MIN) return 'different';
+  if (m <= sameMax) return 'consistent';
+  if (m >= differentMin) return 'different';
   return 'unknown';
 }
 
@@ -236,12 +237,28 @@ export function meanEmbedding(list: number[][]): number[] {
   return sum.map((x) => x / norm);
 }
 
-export function judgeIdentity(similarities: number[]): Continuity {
+export function judgeIdentity(
+  similarities: number[],
+  sameMin = SAME_PERSON_MIN,
+  differentMax = DIFFERENT_PERSON_MAX,
+): Continuity {
   if (similarities.length < MIN_LIVE_SAMPLES) return 'unknown';
   const m = median(similarities);
-  if (m >= SAME_PERSON_MIN) return 'consistent';
-  if (m <= DIFFERENT_PERSON_MAX) return 'different';
+  if (m >= sameMin) return 'consistent';
+  if (m <= differentMax) return 'different';
   return 'unknown';
+}
+
+export function isProbability(p: unknown): p is number {
+  return typeof p === 'number' && Number.isFinite(p) && p >= 0 && p <= 1;
+}
+
+// Mesures envoyées par le panneau recruteur, toutes calculées dans son navigateur : jamais d'image.
+export interface LiveSample {
+  ratios?: number[];
+  yawDeg?: number;
+  embedding?: number[];
+  fakeProbability?: number; // détecteur passif de face-swap
 }
 
 // Verdict final : un seul contrôle qui voit un visage différent suffit à lever un signal (à vérifier, jamais une preuve).
@@ -275,6 +292,8 @@ export interface FaceIdSubmission {
   ratios: number[]; // médiane des mesures de face
   samples: number;
   angles?: AngleProfile[];
+  embedding?: number[]; // moyenne des empreintes calculées dans le navigateur du candidat
+  passive?: number[]; // probabilités de trucage du détecteur passif, calculées dans son navigateur
 }
 
 export const MIN_PROFILE_SAMPLES = 8;

@@ -54,7 +54,11 @@ ok((await fetch(`${API}/api/sessions/${id}`)).status === 403, 'sans jeton : sign
 ok((await fetch(`${API}/api/sessions/${id}`, { headers: { 'X-Recruiter-Key': 'faux' } })).status === 403, 'mauvais jeton : refusé');
 ok((await post(`/api/sessions/${id}/decision`, { value: 'stop' })).status === 403, 'sans jeton : pas de décision');
 ok((await post(`/api/sessions/${id}/challenges`, { challengeId: 'hand-over-face', result: 'passed', durationMs: 1 })).status === 403, 'sans jeton : pas de défi enregistré');
-ok((await fetch(`${API}/api/sessions/${id}/frame`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: 'x' })).status === 403, 'sans jeton : pas de capture hors vérification du visage');
+// Aucune image du visage n'est acceptée par le serveur : ni route d'envoi, ni mesure sous forme d'image.
+const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46]);
+ok((await fetch(`${API}/api/sessions/${id}/frame`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpeg })).status === 404, 'aucune route pour envoyer une image');
+ok((await fetch(`${API}/api/sessions/${id}/live-sample`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Recruiter-Key': keys.get(id) }, body: jpeg })).status === 415, 'mesures en direct : image refusée (415)');
+ok((await post(`/api/sessions/${id}/live-sample`, { fakeProbability: 0.1 })).status === 403, 'mesures en direct : réservées au recruteur');
 ok((await post(`/api/sessions/${id}/identity`, { firstName: 'Ada', lastName: 'Lovelace', consent: false })).status === 400, 'refus sans consentement');
 ok((await post(`/api/sessions/${id}/faceid/start`, { cameraLabel: 'Integrated Camera' })).status === 409, 'caméra refusée avant le consentement');
 const t0 = Date.now();
@@ -93,12 +97,16 @@ const start = (await post(`/api/sessions/${id1}/faceid/start`, { cameraLabel: 'I
 ok(start.steps?.[0] === 'center' && start.steps.length === 4 && !start.hardened, `parcours normal : ${start.steps?.join(', ')}`);
 
 const base = [1.2, 1.3, 0.6, 0.9, 0.35, 0.8, 0.55, 0.3];
+const unit = (v) => { const n = Math.hypot(...v); return v.map((x) => x / n); };
+const E = unit(Array.from({ length: 128 }, (_, i) => Math.sin(i + 1)));
+const nearE = unit(E.map((x, i) => x + 0.05 * Math.cos(3 * i)));
+const otherE = unit(Array.from({ length: 128 }, (_, i) => Math.cos(7 * i + 2)));
 const right = base.map((x) => x * 1.03);
 const angles = [{ yawDeg: -26, ratios: right, samples: 6 }, { yawDeg: 27, ratios: base.map((x) => x * 0.97), samples: 5 }];
 const results = start.steps.map((step) => ({ step, result: 'passed', durationMs: 1500 }));
 ok((await post(`/api/sessions/${id1}/faceid/submit`, { nonce: 'faux', results, ratios: base, samples: 16 })).status === 409, 'mauvais nonce refusé');
-const sub = await post(`/api/sessions/${id1}/faceid/submit`, { nonce: start.nonce, results, ratios: base, samples: 16, angles });
-ok(sub.json.profileStored === true, 'profil enregistré (face + 2 angles)');
+const sub = await post(`/api/sessions/${id1}/faceid/submit`, { nonce: start.nonce, results, ratios: base, samples: 16, angles, embedding: E, passive: [0.2, 0.3, 0.25] });
+ok(sub.json.profileStored === true, 'profil enregistré (empreinte du navigateur, face + 2 angles)');
 ok((await post(`/api/sessions/${id1}/faceid/start`, { cameraLabel: 'Integrated Camera' })).status === 409, 'pas de second passage après la fin');
 v = await get(`/api/sessions/${id1}`);
 ok(!('faceProfile' in v) && v.hasFaceProfile, 'le profil ne sort jamais du serveur');
@@ -110,11 +118,15 @@ await new Promise((r) => setTimeout(r, 600));
 const raw = readFileSync(join(DATA, 'sessions.json'), 'utf8');
 ok(raw.includes('faceProfileSealed') && !raw.includes('"ratios"'), 'profil chiffré sur disque');
 
-for (let i = 0; i < 3; i++) await rpost(`/api/sessions/${id1}/face-sample`, { ratios: base.map((x) => x * 1.01), yawDeg: 3 });
-for (let i = 0; i < 3; i++) await rpost(`/api/sessions/${id1}/face-sample`, { ratios: right, yawDeg: -24 });
-ok((await rpost(`/api/sessions/${id1}/face-sample`, { ratios: base, yawDeg: 55 })).json.reason === 'angle sans profil de référence', 'angle sans profil ignoré');
+for (let i = 0; i < 3; i++) await rpost(`/api/sessions/${id1}/live-sample`, { ratios: base.map((x) => x * 1.01), yawDeg: 3, embedding: nearE, fakeProbability: 0.2 });
+for (let i = 0; i < 3; i++) await rpost(`/api/sessions/${id1}/live-sample`, { ratios: right, yawDeg: -24, embedding: nearE });
+const measures = (view) => Number(sig(view, 'face.continuity')?.detail.match(/sur (\d+) mesure/)?.[1] ?? 0);
+const before = measures(await get(`/api/sessions/${id1}`));
+await rpost(`/api/sessions/${id1}/live-sample`, { ratios: base, yawDeg: 55 });
 v = await get(`/api/sessions/${id1}`);
+ok(measures(v) === before, 'angle sans profil de référence : proportions ignorées');
 ok(sig(v, 'face.continuity')?.status === 'ok', `même visage, de face et tourné : ${sig(v, 'face.continuity')?.detail}`);
+ok(v.agent?.passive?.frames === 6, `détecteur passif : ${v.agent?.passive?.frames} probabilité(s) reçue(s) du navigateur`);
 
 // --- Session 2 : informations incohérentes → parcours durci, visage différent pendant l'entretien
 const id2 = (await post('/api/sessions', {})).json.id;
@@ -129,11 +141,11 @@ ok(sig(v, 'identity.phone')?.status === 'contradiction', 'indicatif +44 pour la 
 ok(sig(v, 'identity.github')?.status === 'contradiction', `GitHub : ${sig(v, 'identity.github')?.detail}`);
 const st2 = (await post(`/api/sessions/${id2}/faceid/start`, { cameraLabel: 'Integrated Camera' })).json;
 ok(st2.hardened && st2.steps.length === 7, `parcours renforcé (${st2.steps.length} étapes)`);
-await post(`/api/sessions/${id2}/faceid/submit`, { nonce: st2.nonce, results: st2.steps.map((step) => ({ step, result: 'passed', durationMs: 1 })), ratios: base, samples: 16 });
-const other = base.map((x, i) => x * (i % 2 ? 1.25 : 0.8));
-for (let i = 0; i < 6; i++) await rpost(`/api/sessions/${id2}/face-sample`, { ratios: other, yawDeg: 2 });
+await post(`/api/sessions/${id2}/faceid/submit`, { nonce: st2.nonce, results: st2.steps.map((step) => ({ step, result: 'passed', durationMs: 1 })), ratios: base, samples: 16, embedding: E });
+// Proportions presque identiques, mais empreinte d'une autre personne : l'empreinte suffit à lever le signal.
+for (let i = 0; i < 6; i++) await rpost(`/api/sessions/${id2}/live-sample`, { ratios: base.map((x) => x * 1.02), yawDeg: 2, embedding: otherE });
 v = await get(`/api/sessions/${id2}`);
-ok(sig(v, 'face.continuity')?.status === 'contradiction', 'visage différent détecté');
+ok(sig(v, 'face.continuity')?.status === 'contradiction', `visage différent détecté : ${sig(v, 'face.continuity')?.detail}`);
 console.log(`     score session 2 : ${v.score.value} (${v.score.level})`);
 
 // --- OBS installé mais vraie caméra utilisée : information, pas contradiction, et parcours normal

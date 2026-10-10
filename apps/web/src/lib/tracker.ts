@@ -1,5 +1,6 @@
 import { FaceLandmarker, FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-import { computeRatios, estimateYawDeg, type Point } from '@kyc/shared';
+import { boundingBox, computeRatios, estimateYawDeg, type LiveSample, type Point } from '@kyc/shared';
+import { analyzeSnapshot, snapshotFace } from './faceModels.ts';
 
 // Suivi du visage et des mains, entièrement dans le navigateur. Les modèles et le WASM sont servis par notre propre site
 // (voir scripts/prepare-assets.mjs) : aucune image ne part vers un tiers, aucun CDN n'est appelé pendant l'entretien.
@@ -25,7 +26,8 @@ export function loadTracker(): Promise<Tracker> {
       face: await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: '/models/face_landmarker.task', delegate },
         runningMode: 'VIDEO',
-        numFaces: 1,
+        // Plusieurs visages possibles (vignettes de Teams, Meet, Zoom) : on garde le plus grand, celui du candidat.
+        numFaces: 4,
       }),
       hand: await HandLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: '/models/hand_landmarker.task', delegate },
@@ -58,20 +60,47 @@ export interface Detection {
 }
 
 
+export function largestFace(faces: Point[][]): Point[] | null {
+  let best: Point[] | null = null;
+  let bestArea = 0;
+  for (const f of faces) {
+    const b = boundingBox(f);
+    const area = (b.maxX - b.minX) * (b.maxY - b.minY);
+    if (area > bestArea) {
+      bestArea = area;
+      best = f;
+    }
+  }
+  return best;
+}
+
 // La détection des mains coûte cher : on ne la lance que si l'étape en a besoin.
 export function detect(tracker: Tracker, video: HTMLVideoElement, withHands = false): Detection {
   const ts = nextTs();
-  const face = tracker.face.detectForVideo(video, ts).faceLandmarks[0] ?? null;
+  const face = largestFace(tracker.face.detectForVideo(video, ts).faceLandmarks);
   const hands = withHands ? tracker.hand.detectForVideo(video, ts).landmarks : [];
   return { face, hands };
 }
 
-// Mesure d'un visage pendant l'entretien (panneau recruteur) : proportions + angle, ou null si pas de visage.
-export async function sampleFace(video: HTMLVideoElement): Promise<{ ratios: number[]; yawDeg: number } | null> {
+// Au-delà de cet angle estimé (environ la moitié de l'angle réel), l'empreinte s'éloigne même pour la bonne
+// personne : on ne l'envoie pas. La comparaison se fait sur la médiane de la session, quelques profils ne la faussent pas.
+const LIVE_EMBED_MAX_YAW = 30;
+
+// Mesure du visage affiché pendant l'entretien (panneau recruteur), entièrement dans ce navigateur :
+// proportions, angle, empreinte et probabilité de trucage. Aucune image n'est envoyée.
+export async function sampleLive(video: HTMLVideoElement): Promise<LiveSample | null> {
   if (video.readyState < 2 || video.videoWidth === 0) return null;
   const tracker = await loadTracker();
-  const face = tracker.face.detectForVideo(video, nextTs()).faceLandmarks[0];
+  const face = largestFace(tracker.face.detectForVideo(video, nextTs()).faceLandmarks);
   if (!face) return null;
-  const ratios = computeRatios(face, video.videoWidth, video.videoHeight);
-  return ratios ? { ratios, yawDeg: estimateYawDeg(face, video.videoWidth) } : null;
+  const yawDeg = estimateYawDeg(face, video.videoWidth);
+  const sample: LiveSample = { ratios: computeRatios(face, video.videoWidth, video.videoHeight) ?? undefined, yawDeg };
+  try {
+    const { embedding, fakeProbability } = await analyzeSnapshot(snapshotFace(video, face));
+    sample.fakeProbability = fakeProbability;
+    if (Math.abs(yawDeg) <= LIVE_EMBED_MAX_YAW) sample.embedding = embedding;
+  } catch {
+    /* modèles indisponibles : les proportions suffisent */
+  }
+  return sample;
 }

@@ -30,9 +30,17 @@ function launch(video) {
   });
 }
 
+// Exigence « aucune photo côté serveur » : toute requête qui envoie une image au serveur fait échouer le test.
+const imageUploads = [];
+
 async function newPage(browser, tag) {
   const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], viewport: { width: 1100, height: 900 } });
   const page = await ctx.newPage();
+  page.on('request', (r) => {
+    if (!r.url().startsWith(BASE) || r.method() !== 'POST') return;
+    const type = r.headers()['content-type'] ?? '';
+    if (type.startsWith('image/') || type.startsWith('multipart/') || r.url().includes('/frame')) imageUploads.push(`${tag} ${r.url()}`);
+  });
   page.on('pageerror', (e) => console.log(`[${tag}] erreur page :`, e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log(`[${tag}] console :`, m.text().slice(0, 200)); });
   return page;
@@ -134,7 +142,7 @@ if (mode === 'precheck' || mode === 'all') {
 
   if (mode === 'all') {
     console.log('--- Visio, même personne');
-    await visio(candidateBrowser, recruiterBrowser, id, 28);
+    await visio(candidateBrowser, recruiterBrowser, id, 40);
     const v2 = await api(`/api/sessions/${id}`);
     const c = sig(v2, 'face.continuity');
     ok(c?.status === 'ok', `continuité : ${c?.label} — ${c?.detail}`);
@@ -147,7 +155,7 @@ if (mode === 'visio' || mode === 'all') {
   console.log(`--- Substitution : pré-vérification par une personne, visio par une autre (session ${id})`);
   await precheck(candidateBrowser, id, { first: 'Eileen', last: 'Collins', email: 'eileen@example.org', phone: '+33 6 12 34 56 78' });
   const otherBrowser = await launch(otherVideo);
-  await visio(otherBrowser, recruiterBrowser, id, 28);
+  await visio(otherBrowser, recruiterBrowser, id, 40);
   const v = await api(`/api/sessions/${id}`);
   const c = sig(v, 'face.continuity');
   ok(c?.status === 'contradiction', `continuité : ${c?.label} — ${c?.detail}`);
@@ -183,5 +191,6 @@ if (mode === 'live') {
 
 await candidateBrowser.close();
 await recruiterBrowser.close();
+ok(imageUploads.length === 0, `aucune image envoyée au serveur${imageUploads.length ? ` : ${imageUploads.slice(0, 3).join(', ')}` : ''}`);
 console.log(failures ? `${failures} échec(s)` : 'Tout est OK');
 process.exitCode = failures ? 1 : 0;

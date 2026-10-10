@@ -31,3 +31,4 @@ export const IcHalf = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><circle cx=
 export const IcPrint = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="7" /></svg>;
 export const IcGrid = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>;
 export const IcInfo = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>;
+export const IcCopy = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>;

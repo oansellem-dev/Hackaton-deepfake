@@ -6,6 +6,7 @@
 import type { Etat } from "./types";
 import { actions, nomComplet } from "./store";
 import { ouvrirNouvelEntretien } from "../app/events";
+import { envoyerPreVerif } from "./envoi";
 
 export interface Reponse {
   comprise: boolean;
@@ -39,7 +40,7 @@ export function interpreter(demande: string, e: Etat): Reponse {
     const x = trouver(e, t);
     if (!x) return { comprise: false, message: "À qui envoyer le lien ? Je n'ai pas reconnu le nom.", suggestions: ACTIONS_RAPIDES(e) };
     const relance = x.preVerification.statut !== "non_envoyee";
-    return { comprise: true, message: relance ? `Lien relancé à ${nomComplet(x)}.` : `Lien de pré-vérification envoyé à ${nomComplet(x)}.`, executer: () => { if (relance) actions.relancerLien(x.id); else actions.envoyerLien(x.id); } };
+    return { comprise: true, message: relance ? `Je relance ${nomComplet(x)} par e-mail.` : `J'envoie le lien de pré-vérification à ${nomComplet(x)}.`, executer: () => { void envoyerPreVerif(x.id, relance); } };
   }
   // Ouvrir le rapport de Y
   if (/rapport|resultat|deroule/.test(t)) {

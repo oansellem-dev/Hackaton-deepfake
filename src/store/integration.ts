@@ -40,7 +40,7 @@ export function signauxDepuis(t: SignauxTechniques, villeDeclaree?: string): Sig
   const virtuelle = t.cameras.find((c) => /virtual|obs|snap|manycam|xsplit/i.test(c));
   out.push(virtuelle
     ? { id: `s-${Date.now()}-cam`, type: "camera_virtuelle", poids: "fort", libelle: SIGNAL_LIBELLES.camera_virtuelle, explication: `Le navigateur liste « ${virtuelle} ». Un nom de périphérique n'est pas une preuve : à vérifier avec un défi en direct.`, resultat: "a_verifier", source: "preverification", a }
-    : { id: `s-${Date.now()}-cam`, type: "camera_physique", poids: "info", libelle: SIGNAL_LIBELLES.camera_physique, explication: t.cameras.length ? "Aucune caméra virtuelle déclarée." : "Aucune caméra déclarée : ce n'est pas un signal.", resultat: "rien_a_signaler", source: "preverification", a });
+    : { id: `s-${Date.now()}-cam`, type: "camera_physique", poids: "info", libelle: t.cameras.length ? SIGNAL_LIBELLES.camera_physique : "Aucune caméra déclarée", explication: t.cameras.length ? "Aucune caméra virtuelle déclarée." : "Aucune caméra déclarée : ce n'est pas un signal.", resultat: "rien_a_signaler", source: "preverification", a });
   const parisien = /Europe\/(Paris|Brussels|Zurich|Luxembourg|Monaco)/.test(t.fuseau);
   out.push({ id: `s-${Date.now()}-tz`, type: "fuseau_horaire", poids: "moyen", libelle: SIGNAL_LIBELLES.fuseau_horaire, explication: `${t.fuseau}${villeDeclaree ? `, lieu déclaré : ${villeDeclaree}` : ""}. ${parisien || !villeDeclaree ? "Cohérent." : "Un déplacement ou un VPN l'expliquent souvent."}`, resultat: parisien || !villeDeclaree ? "coherent" : "a_verifier", source: "preverification", a });
   return out;

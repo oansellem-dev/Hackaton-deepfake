@@ -59,3 +59,14 @@ Les données d'exemple (`seed.ts`) sont sauvegardées dans le navigateur. « Ré
 ## Règles de contenu
 
 Jamais « faux candidat », jamais « identité vérifiée ». On écrit « signal à vérifier » et « présence humaine vérifiée ». La couleur ne porte jamais le sens seule. Une information absente n'est jamais négative. Le recruteur décide.
+
+## Envoi des e-mails de pré-vérification
+
+« Envoyer le lien », « Relancer le lien », « Nouvel entretien » et Manta envoient un vrai e-mail au candidat. Il contient un lien unique (`#/candidat/<jeton>`), valable une fois, jusqu'au début de l'entretien. L'envoi passe par le serveur de dev (`server/email.ts`, route `/api/email`).
+
+1. Copier `.env.example` en `.env` et remplir les identifiants SMTP (Gmail : mot de passe d'application ; ou Brevo, Outlook…).
+2. Relancer `npm run dev`.
+
+Sans `.env`, rien n'est perdu : une fenêtre affiche l'e-mail rédigé et « Ouvrir dans ma messagerie » le prépare dans la messagerie du recruteur. `SMTP_HOST=test` enregistre les e-mails dans `outbox/` sans rien envoyer.
+
+Le lien pointe vers l'adresse du navigateur du recruteur (localhost) : il ne s'ouvre que sur cet ordinateur. Pour un candidat sur le même Wi-Fi, lancer `npm run dev:lan` et mettre l'adresse « Network » dans `VITE_PUBLIC_URL`. Les résultats du candidat ne remontent au dashboard que sur le même navigateur : sur un autre appareil, il faudra le serveur de l'équipe (brique A).

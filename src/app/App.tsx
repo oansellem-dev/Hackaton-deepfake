@@ -5,14 +5,14 @@ import { nomComplet, parId, useEtat } from "../store/store";
 import { Styleguide } from "../screens/Styleguide";
 import { Accueil } from "../screens/Accueil";
 import { EnConstruction } from "../screens/EnConstruction";
-import { PreVerif } from "../candidat/PreVerif";
+import { Candidat } from "../candidat/Candidat";
 
 export function App() {
   const { parts } = useRoute();
   const etat = useEtat();
   const [p0, p1] = parts;
   if (p0 === "styleguide") return <><Styleguide /><Toaster /></>;
-  if (p0 === "candidat") return <><PreVerif token={p1 ?? "demo"} /><Toaster /></>;
+  if (p0 === "candidat") return <><Candidat token={p1} /><Toaster /></>;
 
   let actif = "accueil";
   let ecran: React.ReactNode;

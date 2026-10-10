@@ -5,6 +5,7 @@ import { premierSignal } from "../store/statuts";
 import { Avatar, Avatars, Btn, ICirc, Modal, Pill, Pop, Tabs } from "../ui/ui";
 import { IcBell, IcGrid, IcList, IcPlus, IcSearch, IcSpark } from "../ui/icons";
 import { NouvelEntretienForm } from "../screens/NouvelEntretien";
+import { EmailPret } from "./EmailPret";
 import { aller, useRoute } from "./router";
 import "./shell.css";
 
@@ -55,6 +56,7 @@ export function Shell({ actif, children }: { actif: string; children: ReactNode 
         </div>
       </div>
       <Modal open={nouveau} onClose={fermer} title="Nouvel entretien"><NouvelEntretienForm onDone={fermer} /></Modal>
+      <EmailPret />
     </div>
   );
 }

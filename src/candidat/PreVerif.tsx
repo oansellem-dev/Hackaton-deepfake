@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Resultat } from "../store/types";
+import { actions, getEtat, parId } from "../store/store";
+import { relever, signauxDepuis, simulerGeste, simulerLumiere } from "../store/integration";
+import type { ResultatLumiere } from "./steps/TestLumiere";
 import { Accord } from "./steps/Accord";
 import { Signaux } from "./steps/Signaux";
 import { TestLumiere } from "./steps/TestLumiere";
@@ -16,10 +20,26 @@ import "./candidat.css";
 export type Etape = 0 | 1 | 2 | 3 | 4;
 const TITRES = ["Avant de commencer", "Signaux techniques", "Test de lumière", "Un geste simple", "C'est terminé"];
 
-export function PreVerif({ token }: { token: string }) {
+export function PreVerif({ token, entretienId }: { token: string; entretienId?: string }) {
   const [etape, setEtape] = useState<Etape>(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const suivant = () => setEtape((e) => Math.min(4, e + 1) as Etape);
+  // Résultats (simulés en attendant le moteur vidéo, voir integration.ts)
+  const lumiereP = useRef<Promise<Resultat>>(Promise.resolve("passe"));
+  const gesteP = useRef<Promise<Resultat>>(Promise.resolve("passe"));
+  const finLumiere = useCallback((r: ResultatLumiere) => { lumiereP.current = simulerLumiere({ couleurs: r.sequence, horodatages: r.horodatages, passe: r.passe }); setEtape(3); }, []);
+  const finGeste = (fait: boolean) => { gesteP.current = fait ? simulerGeste(stream) : Promise.resolve("passe"); setEtape(4); };
+  // Fin du parcours : le dashboard du recruteur passe à « Pré-vérification faite »
+  const enregistre = useRef(false);
+  useEffect(() => {
+    if (etape !== 4 || !entretienId || enregistre.current) return;
+    enregistre.current = true;
+    void (async () => {
+      const [lumiere, geste, tech] = await Promise.all([lumiereP.current, gesteP.current, relever()]);
+      actions.preVerifEtape(entretienId, { accord: true, camera: !!stream, lumiere, geste });
+      actions.preVerifFaite(entretienId, signauxDepuis(tech, parId(getEtat(), entretienId)?.candidat.villeDeclaree));
+    })();
+  }, [etape, entretienId, stream]);
 
   useEffect(() => () => stream?.getTracks().forEach((t) => t.stop()), [stream]);
 
@@ -45,8 +65,8 @@ export function PreVerif({ token }: { token: string }) {
         <div className="page" key={etape} style={{ display: "contents" }}>
           {etape === 0 && <Accord onAccepter={demanderCamera} />}
           {etape === 1 && <Signaux stream={stream} onSuivant={suivant} />}
-          {etape === 2 && <TestLumiere stream={stream} onFin={suivant} />}
-          {etape === 3 && <DefiGestuel stream={stream} onSuivant={suivant} />}
+          {etape === 2 && <TestLumiere stream={stream} onFin={finLumiere} />}
+          {etape === 3 && <DefiGestuel stream={stream} onSuivant={finGeste} />}
           {etape === 4 && <Fin token={token} />}
         </div>
       </div>

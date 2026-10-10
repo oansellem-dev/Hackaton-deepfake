@@ -3,7 +3,7 @@
  * Toute l'interface lit `useEtat()` et écrit via `actions`.
  */
 import { useSyncExternalStore } from "react";
-import type { Decision, Defi, DefiType, Entretien, Etat, Reglages, Score, Signal } from "./types";
+import type { Decision, Defi, DefiType, Entretien, Etat, LienPreVerif, PreVerification, Reglages, Score, Signal } from "./types";
 import { seed, SEED_VERSION } from "./seed";
 import { DEFI_PHRASES } from "./texts";
 
@@ -48,10 +48,15 @@ export const actions = {
   },
   envoyerLien(id: string) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: "envoyee", envoyeeLe: iso() } })); },
   relancerLien(id: string) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: x.preVerification.statut === "non_envoyee" ? "envoyee" : x.preVerification.statut, relanceeLe: iso(), envoyeeLe: x.preVerification.envoyeeLe ?? iso() } })); },
+  /** Lien de pré-vérification envoyé (ou relancé) par e-mail. Voir envoi.ts. */
+  marquerLienEnvoye(id: string, lien: LienPreVerif, relance: boolean) {
+    maj(id, (x) => { const p = x.preVerification; return { ...x, preVerification: { ...p, lien, statut: p.statut === "non_envoyee" || p.statut === "non_faite" ? "envoyee" : p.statut, envoyeeLe: relance && p.envoyeeLe ? p.envoyeeLe : iso(), relanceeLe: relance ? iso() : p.relanceeLe } }; });
+  },
+  restaurerPreVerif(id: string, p: PreVerification) { maj(id, (x) => ({ ...x, preVerification: p })); },
   /** Page candidat : progression des étapes, puis résultat final (branché par l'équipe, voir integration.ts). */
   preVerifOuverte(id: string) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: "ouverte", ouverteLe: x.preVerification.ouverteLe ?? iso() } })); },
   preVerifEtape(id: string, etapes: Partial<Entretien["preVerification"]["etapes"]>) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, etapes: { ...x.preVerification.etapes, ...etapes } } })); },
-  preVerifFaite(id: string, signaux: Signal[]) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: "faite", faiteLe: iso(), signaux } })); },
+  preVerifFaite(id: string, signaux: Signal[]) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: "faite", faiteLe: iso(), signaux, lien: x.preVerification.lien ? { ...x.preVerification.lien, utiliseLe: iso() } : undefined } })); },
   ajouterDefi(id: string, type: DefiType, proposePar: Defi["proposePar"] = "manta"): Defi {
     const dfi: Defi = { id: uid("d"), type, phrase: DEFI_PHRASES[type], proposePar, resultat: "propose" };
     maj(id, (x) => ({ ...x, statut: x.statut === "a_venir" ? "en_cours" : x.statut, defis: [...x.defis, dfi] }));

@@ -32,11 +32,14 @@ export type Resultat = "coherent" | "a_verifier" | "non_concluant" | "passe" | "
 
 // ── Pré-vérification (lien de deux minutes envoyé avant l'entretien) ────
 export type StatutPreVerif = "non_envoyee" | "envoyee" | "ouverte" | "faite" | "non_faite";
+/** Lien unique envoyé par e-mail : valable une fois, jusqu'au début de l'entretien. */
+export interface LienPreVerif { token: string; expireLe: ISODate; utiliseLe?: ISODate }
 export interface PreVerification {
   statut: StatutPreVerif;
   envoyeeLe?: ISODate;
   ouverteLe?: ISODate;
   relanceeLe?: ISODate;
+  lien?: LienPreVerif;
   faiteLe?: ISODate;
   /** Les quatre étapes du lien. `undefined` = pas encore faite. */
   etapes: { accord?: boolean; camera?: boolean; lumiere?: Resultat; geste?: Resultat };

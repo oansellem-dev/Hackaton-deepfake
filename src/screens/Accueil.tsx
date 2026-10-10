@@ -9,6 +9,7 @@ import { IcArrowUR, IcCal, IcCheck, IcChevron, IcClock, IcDots, IcFilter, IcFlag
 import { aller } from "../app/router";
 import { ouvrirNouvelEntretien } from "../app/events";
 import { MantaAsk } from "./MantaAsk";
+import { envoyerPreVerif } from "../store/envoi";
 import "./accueil.css";
 
 const v = (o: Record<string, string | number>) => o as CSSProperties;
@@ -199,8 +200,8 @@ function CarteJour({ x, ref_, enAvant }: { x: Entretien; ref_: Date; enAvant: bo
   let action: ReactNode;
   if (termine) action = <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Ouvrir le rapport</Btn>;
   else if (enAvant) action = <Btn size="sm" variant="glass" icon={<IcPlay />} href={panneau} newTab>Rejoindre avec Oval</Btn>;
-  else if (p.statut === "non_envoyee") action = <Btn size="sm" icon={<IcMail />} onClick={() => { actions.envoyerLien(x.id); toast(`Lien de pré-vérification envoyé à ${x.candidat.prenom}`); }}>Envoyer le lien</Btn>;
-  else if (p.statut !== "faite") action = <Btn size="sm" icon={<IcRefresh />} onClick={() => { actions.relancerLien(x.id); toast(`Lien relancé à ${x.candidat.prenom}`); }}>Relancer le lien</Btn>;
+  else if (p.statut === "non_envoyee") action = <Btn size="sm" icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>Envoyer le lien</Btn>;
+  else if (p.statut !== "faite") action = <Btn size="sm" icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer le lien</Btn>;
   else action = auj ? <Btn size="sm" icon={<IcPlay />} href={panneau} newTab>Rejoindre avec Oval</Btn> : <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Voir la fiche</Btn>;
   return (
     <article className={`card auj__card${enAvant ? " auj__card--now" : " lift"}`}>

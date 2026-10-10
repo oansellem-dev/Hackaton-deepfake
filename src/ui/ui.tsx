@@ -105,11 +105,13 @@ export function Avatars({ children }: { children: ReactNode }) { return <span cl
 
 /* ── Modale ──────────────────────────────────────────────────── */
 export function Modal({ open, onClose, title, children, width }: { open: boolean; onClose: () => void; title: string; children: ReactNode; width?: number }) {
-  useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, [open, onClose]);
+  const ref = useRef<HTMLDivElement>(null);
+  // Échap ferme seulement la fenêtre du dessus
+  useEffect(() => { if (!open) return; const k = (e: KeyboardEvent) => { if (e.key !== "Escape") return; const toutes = document.querySelectorAll(".modal"); if (toutes[toutes.length - 1] === ref.current) onClose(); }; addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, [open, onClose]);
   if (!open) return null;
   return (
     <div className="modal-backdrop backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="panel modal pop" role="dialog" aria-modal="true" aria-label={title} style={width ? { width: `min(${width}px, 100%)` } : undefined}>
+      <div ref={ref} className="panel modal pop" role="dialog" aria-modal="true" aria-label={title} style={width ? { width: `min(${width}px, 100%)` } : undefined}>
         <div className="modal__head"><h2 className="t-h2">{title}</h2><ICirc size="sm" label="Fermer" onClick={onClose}><IcX /></ICirc></div>
         {children}
       </div>

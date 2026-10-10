@@ -1,5 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
-import { actions, aujourdhui, useEtat } from "../store/store";
+import { actions, aujourdhui, recruteur, useEtat } from "../store/store";
+import { envoyerPreVerif, apercuEmail } from "../store/envoi";
+import { composerEmail } from "../store/email";
 import { debutJour, isoDate, plusJours } from "../store/format";
 import { Btn, Field, Input, Select } from "../ui/ui";
 import { toast } from "../ui/toast";
@@ -32,12 +34,17 @@ export function NouvelEntretienForm({ onDone }: { onDone?: (id: string) => void 
     const quand = valider();
     if (!quand) return;
     const [prenom, ...reste] = f.nom.trim().split(/\s+/);
-    const x = actions.creerEntretien({ prenom, nom: reste.join(" "), email: f.email.trim(), poste: f.poste, date: quand.toISOString() }, lien);
-    toast(lien ? `Entretien créé, lien envoyé à ${prenom}` : `Entretien créé pour ${prenom}, sans pré-vérification`);
+    const x = actions.creerEntretien({ prenom, nom: reste.join(" "), email: f.email.trim(), poste: f.poste, date: quand.toISOString() }, false);
+    toast(lien ? `Entretien créé pour ${prenom}` : `Entretien créé pour ${prenom}, sans pré-vérification`);
+    if (lien) void envoyerPreVerif(x.id);
     setF({ ...f, nom: "", email: "" });
     onDone?.(x.id);
   };
   const prenom = f.nom.trim().split(/\s+/)[0];
+  const voirEmail = () => {
+    const d = new Date(`${f.date}T${f.heure || "10:00"}`);
+    apercuEmail(composerEmail({ prenom: prenom || "Camille", to: f.email.trim() || "candidat@exemple.fr", poste: f.poste, date: (isNaN(+d) ? new Date() : d).toISOString(), recruteur: recruteur(etat, etat.moi).nom, token: "apercu", relance: false, objet: etat.reglages.textesLien.objet, intro: etat.reglages.textesLien.intro }));
+  };
 
   return (
     <form className="nouvel" noValidate onSubmit={(e: FormEvent) => { e.preventDefault(); creer(true); }}>
@@ -50,7 +57,7 @@ export function NouvelEntretienForm({ onDone }: { onDone?: (id: string) => void 
       </div>
       <div className="card nouvel__info">
         <Manta size={48} />
-        <div><strong>Ce que recevra {prenom || "le candidat"}</strong><p className="t-small muted">Un lien de 2 minutes : accord, test de lumière, un geste. Aucune vidéo enregistrée. Il peut refuser sans que ça compte contre lui.</p></div>
+        <div><strong>Ce que recevra {prenom || "le candidat"}</strong><p className="t-small muted">Un lien de 2 minutes : accord, test de lumière, un geste. Aucune vidéo enregistrée. Il peut refuser sans que ça compte contre lui.</p><button type="button" className="btn btn--ghost btn--sm nouvel__voir" onClick={voirEmail}>Voir l'e-mail</button></div>
       </div>
       <Btn type="submit" variant="primary" size="lg" block icon={<IcMail />}>Envoyer le lien de pré-vérification</Btn>
       <Btn block onClick={() => creer(false)}>Créer sans pré-vérification</Btn>

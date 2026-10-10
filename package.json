@@ -11,10 +11,11 @@
     "dev:server": "npm -w apps/server run dev",
     "dev:web": "npm -w apps/web run dev",
     "dev:ext": "npm -w apps/extension run dev",
+    "dev:oval": "npm -w apps/oval run dev",
     "share": "npm -w apps/web run build && npm -w apps/server run start",
-    "build":"npm -w apps/web run build && npm -w apps/extension run build",
+    "build": "npm -w apps/web run build && npm -w apps/extension run build && npm -w apps/oval run build",
     "test": "node --test packages/shared/test/*.test.ts",
-    "typecheck":"tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension"
+    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension && tsc --noEmit -p apps/oval"
   },
   "devDependencies": {
     "concurrently": "9.1.0",

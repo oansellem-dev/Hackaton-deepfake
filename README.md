@@ -51,6 +51,36 @@ Si les deux vidéos ne se connectent pas (Wi-Fi d'école ou d'entreprise qui blo
 | `apps/server` | A, D | API des entretiens, signaux de pré-vérification, score, signalisation WebRTC |
 | `apps/web` | A, E, plan B | `/` recruteur, `/check/:id` candidat, `/visio/:id?role=…` visio de secours, `/report/:id` rapport |
 | `apps/extension` | C | Panneau latéral Chrome qui capture l'onglet de visio |
+| `apps/oval` | design | Interface Oval de Jules : dashboard, page candidat, panneau avec Manta. Sur données d'exemple, à brancher (voir ci-dessous) |
+
+## Interface Oval (design de Jules) : `apps/oval/`
+
+L'interface de Jules est dans le même dépôt, à côté du moteur, avec tout son historique. Les deux tournent séparément : rien ne casse.
+
+```bash
+npm run dev:oval      # interface Oval (port 5173, ou le suivant si le site moteur tourne déjà)
+npm run dev           # moteur : serveur :8787, site fonctionnel :5173, extension
+```
+
+Pour l'instant, elle tourne sur ses données d'exemple (`apps/oval/src/store/seed.ts`). Chaque brique du moteur se branche dans **un seul fichier**, `apps/oval/src/store/integration.ts`, en remplaçant une fonction simulée :
+
+| Fonction simulée | Brique du moteur à brancher | Où elle est |
+|---|---|---|
+| `simulerLumiere(seq)` | Test de lumière (Gaspard) | `apps/web/src/lib/flash.ts`, `packages/shared/src/flash.ts` |
+| `simulerGeste(stream)` | Défi de la main, pré-vérification (Oren) | `apps/web/src/components/FaceId.tsx` |
+| `simulerDefi(defi)` et `emettre(...)` | Défis en direct pendant la visio (Oren) | `apps/web/src/lib/liveDetector.ts` |
+| `calculerScore(entretien)` | Score et explication (serveur, agent) | `GET /api/sessions/:id` (jeton recruteur) |
+| `relever()` | Signaux techniques, adresse IP côté serveur | `POST /api/sessions/:id/precheck` |
+
+Le magasin d'Oval vit dans le navigateur. Pour qu'un candidat sur un autre appareil remonte au dashboard, il faut passer par le serveur du moteur (`apps/server`).
+
+**Mettre à jour depuis la branche de Jules** (s'il continue sur `Jules-architecture`) :
+
+```bash
+git fetch && git merge -X subtree=apps/oval origin/Jules-architecture
+```
+
+Le plus simple reste que chacun travaille désormais à partir de `main`, Jules dans `apps/oval/`.
 
 ## Parcours de démo
 

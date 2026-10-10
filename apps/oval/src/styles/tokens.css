@@ -1,0 +1,82 @@
+/* ═══════════════════════════════════════════════════════════════
+   OVAL — SYSTÈME DE DESIGN (jetons)
+   Relief doux entre verre dépoli et néomorphisme.
+   Trois niveaux : panneau, carte dans un panneau, élément en creux.
+   Contrastes vérifiés (WCAG) pour un écran projeté.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Neutres froids, légèrement bleutés */
+  --bg-outer: #a7aebd;
+  --shell:    #eceff5;
+  --panel:    #f3f5f9;
+  --card:     #f9fafd;
+  --card-2:   #fcfdff;
+  --inset:    #e8ebf2;
+  --we:       #e2e6ef;                 /* fond des week-ends */
+  --hatch:    rgba(96,108,140,.2);     /* hachures */
+
+  /* Texte : ink ≥ 14:1, ink-2 ≥ 6,6:1, ink-3 ≥ 4,6:1 sur panneau, carte et creux */
+  --ink:   #1b2032;
+  --ink-2: #46506b;
+  --ink-3: #5e6880;
+  --line:  rgba(27,32,50,.07);
+
+  /* Bleu vif : uniquement « aujourd'hui / maintenant » et l'élément actif */
+  --blue:      #3463ea;
+  --blue-soft: #e3ebff;
+  --blue-text: #1f45b8;
+
+  /* Statuts : dégradés doux à deux tons, reflet interne, ombre de leur teinte */
+  --g-green:  linear-gradient(135deg, #8fe3ba 0%, #4cc792 100%);
+  --g-violet: linear-gradient(135deg, #7357ea 0%, #4f33cc 100%);
+  --g-blue:   linear-gradient(135deg, #dce8ff 0%, #b2cafc 100%);
+  --g-gold:   linear-gradient(135deg, #ffdf8a 0%, #f5be4c 100%);
+  --g-navy:   linear-gradient(135deg, #2a3147 0%, #161b2b 100%);
+  --g-now:    linear-gradient(135deg, #3463ea 0%, #2448c4 100%);
+  --sh-green:  0 10px 24px rgba(76,199,146,.32);
+  --sh-violet: 0 10px 24px rgba(79,51,204,.30);
+  --sh-blue:   0 10px 24px rgba(120,160,250,.32);
+  --sh-gold:   0 10px 24px rgba(245,190,76,.36);
+  --sh-navy:   0 10px 24px rgba(27,32,50,.32);
+  --sh-now:    0 12px 28px rgba(36,72,196,.35);
+  --reflect:   inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.05);
+
+  /* Textes posés sur une couleur (tous ≥ 4,5:1) */
+  --green-ink:   #0a4029;
+  --green-text:  #0f6b45;
+  --violet-text: #3f25a8;
+  --gold-text:   #5c3a00;
+
+  /* Rayons */
+  --r-shell: 44px;
+  --r-panel: 32px;
+  --r-card:  22px;
+  --r-sm:    14px;
+  --r-pill:  999px;
+
+  /* Relief : lumière en haut à gauche, ombre froide large en bas à droite */
+  --hi:       inset 1.5px 1.5px 0 rgba(255,255,255,.95);
+  --hi-soft:  inset 1px 1px 0 rgba(255,255,255,.85);
+  --sh-panel: 12px 16px 40px rgba(62,74,110,.13), 2px 3px 8px rgba(62,74,110,.05);
+  --sh-card:  6px 8px 24px rgba(62,74,110,.10), 1px 2px 5px rgba(62,74,110,.04);
+  --sh-tile:  4px 6px 16px rgba(62,74,110,.09), 1px 2px 4px rgba(62,74,110,.04);
+  --sh-raise: 10px 14px 34px rgba(62,74,110,.16), 2px 3px 8px rgba(62,74,110,.06);
+  --sh-float: 20px 28px 64px rgba(62,74,110,.24), 4px 6px 14px rgba(62,74,110,.09);
+  --sh-inset: inset 2px 2px 6px rgba(62,74,110,.16), inset -1px -1px 0 rgba(255,255,255,.9);
+  --sh-inset-blue: inset 2px 2px 6px rgba(42,86,214,.22), inset -1px -1px 0 rgba(255,255,255,.7);
+
+  /* Verre : pastilles translucides posées sur une couleur */
+  --glass-bg:     rgba(255,255,255,.55);
+  --glass-border: rgba(255,255,255,.65);
+  --glass-blur:   blur(10px) saturate(1.5);
+
+  /* Mouvement */
+  --t-fast: 180ms;
+  --t:      220ms;
+  --t-slow: 260ms;
+  --ease:   cubic-bezier(.2,.8,.2,1);
+  --spring: cubic-bezier(.34,1.45,.64,1);
+  --cascade: 40ms;
+}

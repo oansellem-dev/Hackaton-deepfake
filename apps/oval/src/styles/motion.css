@@ -1,0 +1,54 @@
+/* ═══ Mouvement : 180–260 ms, courbe naturelle, ressort léger.
+   On n'anime que transform et opacity : l'ombre élargie du survol
+   est portée par un ::after dont seule l'opacité change. ═══ */
+
+.lift, .btn, .icirc, .rail__item, .bar { position: relative; }
+.lift::after, .btn::after, .icirc::after, .rail__item::after, .bar::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: var(--sh-raise); opacity: 0; transition: opacity var(--t) var(--ease);
+}
+.lift:hover::after, .btn:hover::after, .icirc:hover::after, .rail__item:hover::after, .bar:hover::after { opacity: 1; }
+
+.lift { transition: transform var(--t) var(--ease); }
+.lift:hover { transform: translateY(-1.5px); }
+.lift:active { transform: translateY(1px) scale(.985); transition-duration: var(--t-fast); }
+
+/* Arrivée en cascade (40 ms d'écart) */
+.rise { animation: rise var(--t-slow) var(--ease) backwards; animation-delay: calc(var(--i, 0) * var(--cascade)); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* Changement de page : fondu avec léger glissement */
+.page { animation: page-in var(--t-slow) var(--ease) backwards; }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Barres du calendrier : se déploient de gauche à droite (sur un conteneur, jamais sur l'élément incliné) */
+.grow-x { transform-origin: left center; animation: grow-x 460ms var(--ease) backwards; animation-delay: calc(var(--i, 0) * var(--cascade) + 120ms); }
+@keyframes grow-x { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+
+/* Pression ressort */
+.squish:active { animation: squish 420ms var(--spring); }
+@keyframes squish { 0% { transform: scale(1); } 30% { transform: scale(1.08, .9); } 60% { transform: scale(.96, 1.05); } 100% { transform: scale(1); } }
+
+/* Fenêtres et menus */
+.backdrop { animation: fade var(--t) var(--ease) both; }
+.pop { animation: pop var(--t-slow) var(--spring) both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* Anneau « maintenant » (transform + opacity) */
+.pulse { position: relative; }
+.pulse::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; border: 2px solid var(--blue); opacity: 0; pointer-events: none; animation: ring 2.2s ease-out infinite; }
+@keyframes ring { 0% { transform: scale(.94); opacity: .55; } 100% { transform: scale(1.18); opacity: 0; } }
+
+::view-transition-group(*) { animation-duration: var(--t-slow); animation-timing-function: var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover, .lift:active, .tilt:hover, .btn:hover, .btn:active, .icirc:hover, .icirc:active,
+  .bar:hover, .bar:active, .rail__item:hover, .rail__item:active, .tabs__tab:active { transform: none !important; }
+  .bar--attention, .bar--attention:hover { transform: rotate(-2.2deg) !important; }
+  .rise, .page, .pop, .toast, .grow-x { animation-name: fade !important; animation-duration: var(--t) !important; }
+  .squish:active { animation: none; }
+  .pulse::before { animation: none; }
+  .tabs__ind { transition: opacity var(--t) !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

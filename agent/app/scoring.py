@@ -24,6 +24,7 @@ SLOW_RESPONSE_PENALTY = 8
 LIP_SYNC_MS = 200
 LIP_SYNC_PENALTY = 10
 # Détecteur passif : ~80 % de précision annoncée, donc signal moyen, plafonné bas.
+FACE_CONTINUITY_PENALTY = 30  # visage différent de la pré-vérification (lunettes, barbe, lumière possibles)
 PASSIVE_MIN_FRAMES = 5
 PASSIVE_THRESHOLD = 0.6
 PASSIVE_MAX_PENALTY = 15
@@ -94,6 +95,10 @@ def _other_signals(inp: AssessmentInput) -> list[Signal]:
         out.append(Signal(id="cv_contradiction", severity=Severity.MEDIUM, penalty=penalty,
                           message="Contradiction entre le CV et les informations déclarées par le candidat.",
                           evidence={"items": [c.model_dump() for c in inp.cv_contradictions]}))
+    if inp.face_continuity is False:
+        out.append(Signal(id="face_continuity", severity=Severity.STRONG, penalty=FACE_CONTINUITY_PENALTY,
+                          message="Le visage de l'entretien diffère de celui de la pré-vérification : signal à vérifier "
+                                  "(lunettes, barbe ou éclairage peuvent l'expliquer)."))
     p = inp.passive
     if p and p.median_fake_probability is not None and p.frames_analyzed >= PASSIVE_MIN_FRAMES             and p.median_fake_probability >= PASSIVE_THRESHOLD:
         scale = (p.median_fake_probability - PASSIVE_THRESHOLD) / (1 - PASSIVE_THRESHOLD)

@@ -1,4 +1,13 @@
-import type { ChallengeResult, Decision, PrecheckPayload, SessionView, SignalStatus } from '@kyc/shared';
+import type {
+  ChallengeResult,
+  Decision,
+  FaceIdPlan,
+  FaceIdStepResult,
+  FaceIdSubmission,
+  PrecheckPayload,
+  SessionView,
+  SignalStatus,
+} from '@kyc/shared';
 
 export const DEFAULT_API_BASE = 'http://localhost:8787';
 
@@ -26,6 +35,21 @@ export function createApi(base: string = DEFAULT_API_BASE) {
         method: 'POST',
         body: JSON.stringify({ challengeId, result, durationMs }),
       }),
+    // Pré-vérification : nom, prénom et consentement explicite, puis parcours Face ID.
+    sendIdentity: (id: string, payload: { firstName: string; lastName: string; consent: boolean }) =>
+      call<{ checked: boolean; status: SignalStatus }>(`/api/sessions/${id}/identity`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    startFaceId: (id: string) => call<FaceIdPlan>(`/api/sessions/${id}/faceid/start`, { method: 'POST', body: '{}' }),
+    submitFaceId: (id: string, payload: FaceIdSubmission) =>
+      call<{ profileStored: boolean; steps: { step: FaceIdStepResult['step']; result: FaceIdStepResult['result'] }[] }>(
+        `/api/sessions/${id}/faceid/submit`,
+        { method: 'POST', body: JSON.stringify(payload) },
+      ),
+    // Pendant l'entretien : proportions du visage affiché, comparées au profil de la pré-vérification.
+    sendFaceSample: (id: string, sample: { ratios: number[]; yawDeg: number }) =>
+      call<{ verdict: string }>(`/api/sessions/${id}/face-sample`, { method: 'POST', body: JSON.stringify(sample) }),
     // Détecteur passif : une capture JPEG du visage. Analysée en mémoire côté agent, jamais conservée.
     sendFrame: async (id: string, image: Blob): Promise<void> => {
       const res = await fetch(`${base}/api/sessions/${id}/frame`, {

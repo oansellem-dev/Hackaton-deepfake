@@ -94,3 +94,20 @@ export ANTHROPIC_API_KEY=sk-ant-...                # optionnel : explication ref
 - La première recommandation de l'agent remplace le tirage aléatoire du premier défi, puis chaque défi suivant.
 - Doc interactive de l'agent : `http://localhost:8000/docs`. Tests : `cd agent && .venv/Scripts/python -m pytest`.
 - Licence du modèle passif : recherche / non commercial. À remplacer avant un produit commercial.
+
+## Lien de pré-vérification complet (identité, environnement, Face ID)
+
+`/check/:id` enchaîne trois étapes :
+
+1. **Identité** : prénom, nom et **consentement explicite** (obligatoire côté serveur). Le nom déclenche une recherche publique via l'API Brave Search (`BRAVE_API_KEY`). Ne rien trouver donne un signal `unknown`, sans effet sur le score. Sans clé, la recherche est simplement désactivée.
+2. **Environnement** : caméras, fuseau horaire, IP (inchangé).
+3. **Face ID** : caméra de l'appareil uniquement, ovale de cadrage, puis étapes tirées au hasard par le serveur (visage de face, tête tournée des deux côtés, main devant le visage). Parcours durci (étapes en plus) si un signal à vérifier existe déjà. Analyse MediaPipe dans le navigateur, une dizaine d'images JPEG partent seulement vers le détecteur passif local.
+
+Ce qui est conservé : **8 rapports de proportions du visage** (jamais d'image), chiffrés en AES-256-GCM dans `apps/server/data/sessions.json` (clé : `BIOMETRIC_KEY` en hexadécimal sur 64 caractères, sinon `data/biometric.key`). Ils sont effacés dès la décision du recruteur, et au plus tard après 24 h. Pendant l'entretien (visio de secours), le panneau mesure le visage affiché toutes les 2 s et le serveur le compare au profil : un écart médian ≥ 12 % crée un signal « visage différent » (fort), ≤ 7 % valide, entre les deux ne conclut pas.
+
+```bash
+npm install            # télécharge aussi les modèles MediaPipe dans apps/web/public (predev / prebuild)
+BRAVE_API_KEY=... BIOMETRIC_KEY=$(openssl rand -hex 32) npm run dev
+```
+
+À régler sur nos 20 tests : seuils de continuité (`SAME_FACE_MAX`, `DIFFERENT_FACE_MIN` dans `packages/shared/src/face.ts`) et détection de la main. Le panneau de l'extension Chrome ne mesure pas encore le visage (seule la visio de secours le fait).

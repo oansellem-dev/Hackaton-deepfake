@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { RecruiterPanel } from '@kyc/panel';
 import { API_BASE, WS_URL } from '../config.ts';
+import { sampleFace } from '../lib/tracker.ts';
 
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -117,7 +118,13 @@ export function Visio() {
       </div>
       {role === 'recruiter' && (
         <aside className="visio-side">
-          <RecruiterPanel sessionId={id} stream={remoteStream} apiBase={API_BASE} reportUrl={`/report/${id}`} />
+          <RecruiterPanel
+            sessionId={id}
+            stream={remoteStream}
+            apiBase={API_BASE}
+            reportUrl={`/report/${id}`}
+            faceSampler={sampleFace}
+          />
         </aside>
       )}
     </div>

@@ -5,12 +5,16 @@ import { stubDetector, type ChallengeDetector } from './detector.ts';
 import { Mascot } from './Mascot.tsx';
 import './panel.css';
 
+export type FaceSampler = (video: HTMLVideoElement) => Promise<{ ratios: number[]; yawDeg: number } | null>;
+
 interface Props {
   sessionId: string;
   stream: MediaStream | null;
   apiBase?: string;
   detector?: ChallengeDetector;
   reportUrl?: string;
+  // Mesure du visage affiché (MediaPipe côté site). Absent : pas de comparaison avec la pré-vérification.
+  faceSampler?: FaceSampler;
 }
 
 const LEVEL_LABEL = {
@@ -36,7 +40,7 @@ function nextChallenge(session: SessionView): Challenge {
   return pickChallenge(done);
 }
 
-export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDetector, reportUrl }: Props) {
+export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDetector, reportUrl, faceSampler }: Props) {
   const api = useMemo(() => createApi(apiBase), [apiBase]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -80,6 +84,26 @@ export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDete
     }, FRAME_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [api, sessionId, stream]);
+
+  // Continuité du visage : une mesure toutes les 2 s, comparée côté serveur au profil de la pré-vérification.
+  useEffect(() => {
+    if (!stream || !faceSampler) return;
+    let busy = false;
+    const timer = setInterval(async () => {
+      const video = videoRef.current;
+      if (busy || !video) return;
+      busy = true;
+      try {
+        const sample = await faceSampler(video);
+        if (sample) await api.sendFaceSample(sessionId, sample);
+      } catch {
+        /* mesure impossible : sans effet sur le score */
+      } finally {
+        busy = false;
+      }
+    }, FRAME_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [api, sessionId, stream, faceSampler]);
 
   useEffect(() => {
     let alive = true;

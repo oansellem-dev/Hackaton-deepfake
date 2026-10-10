@@ -1,4 +1,5 @@
 import { computeScore, getChallenge, type AgentInfo, type Session, type SessionView } from '@kyc/shared';
+import { stripBiometrics } from './store.ts';
 
 // Agent de score et de recommandation (agent/, FastAPI). S'il est injoignable, on retombe sur computeScore.
 const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:8000';
@@ -27,12 +28,14 @@ function statusOf(session: Session, id: string) {
 function toAgentInput(session: Session) {
   const cam = statusOf(session, 'precheck.virtual-camera');
   const tz = statusOf(session, 'precheck.timezone');
+  const face = statusOf(session, 'face.continuity');
   return {
     session_id: session.id,
     environment: {
       virtual_camera_detected: cam === 'contradiction' ? true : cam === 'ok' ? false : null,
       timezone_consistent: tz === 'ok' ? true : tz === 'contradiction' ? false : null,
     },
+    face_continuity: face === 'ok' ? true : face === 'contradiction' ? false : null,
     challenges: session.challenges
       .filter((c) => TO_AGENT[c.challengeId])
       .map((c) => ({
@@ -68,7 +71,7 @@ export async function viewWithAgent(session: Session): Promise<SessionView> {
       .map((r) => ({ challengeId: FROM_AGENT[r.challenge], phrase: r.phrase, rationale: r.rationale }));
     const agent: AgentInfo = { available: true, recommendations };
     return {
-      ...session,
+      ...stripBiometrics(session),
       score: {
         value: out.score ?? local.value,
         level: out.level === 'insufficient_data' ? local.level : out.level,
@@ -78,7 +81,7 @@ export async function viewWithAgent(session: Session): Promise<SessionView> {
     };
   } catch (err) {
     console.warn('Agent de score injoignable, score local utilisé :', String(err));
-    return { ...session, score: local, agent: { available: false, recommendations: [] } };
+    return { ...stripBiometrics(session), score: local, agent: { available: false, recommendations: [] } };
   }
 }
 

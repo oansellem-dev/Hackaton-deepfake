@@ -63,3 +63,12 @@ def test_timezone_flag_and_available_challenges():
                 "available_challenges": ["hand_occlusion", "head_turn", "random_phrase"]})
     assert any(s["id"] == "location_mismatch" for s in out["signals"])
     assert {r["challenge"] for r in out["recommendations"]} <= {"hand_occlusion", "random_phrase"}
+
+
+def test_face_continuity_only_penalizes_a_measured_difference():
+    chal = [{"type": "hand_occlusion", "status": "passed", "compliance": 1.0}]
+    unknown = post({"challenges": chal, "face_continuity": None})
+    same = post({"challenges": chal, "face_continuity": True})
+    diff = post({"challenges": chal, "face_continuity": False})
+    assert unknown["score"] == same["score"] == 100
+    assert diff["score"] == 70 and diff["level"] == "orange" and any(s["id"] == "face_continuity" for s in diff["signals"])

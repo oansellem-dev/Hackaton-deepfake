@@ -74,6 +74,7 @@ class AssessmentInput(BaseModel):
     cv_contradictions: list[CvContradiction] = []  # uniquement du texte fourni par le candidat
     media: Media = Media()
     passive: PassiveSummary | None = None  # rempli par le serveur depuis /frame si absent
+    face_continuity: bool | None = None  # visage de l'entretien cohérent avec celui de la pré-vérification ; None = non mesuré
     available_challenges: list[ChallengeType] | None = None  # défis que le panneau sait détecter ; None = tous
 
 

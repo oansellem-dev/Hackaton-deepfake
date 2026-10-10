@@ -1,12 +1,14 @@
 // Contrat partagé entre le serveur, le site web et l'extension.
 
+import type { FaceIdPlan, FaceProfile } from './face.ts';
+
 export type Severity = 'strong' | 'medium';
 
 // Règle n°1 : seul « contradiction » fait baisser le score.
 // « unknown » (absence de trace, signal non vérifiable) n'a aucun effet.
 export type SignalStatus = 'ok' | 'contradiction' | 'unknown';
 
-export type SignalSource = 'precheck' | 'challenge' | 'cv';
+export type SignalSource = 'precheck' | 'challenge' | 'cv' | 'identity' | 'face';
 
 export interface Signal {
   id: string;
@@ -38,11 +40,22 @@ export interface Score {
   explanation: string[]; // 3 lignes max
 }
 
+// Identité déclarée par le candidat, avec son consentement explicite (RGPD).
+export interface DeclaredIdentity {
+  firstName: string;
+  lastName: string;
+  consentAt: number;
+}
+
 export interface Session {
   id: string;
   createdAt: number;
   candidateLabel: string;
   precheckDone: boolean;
+  identity?: DeclaredIdentity;
+  faceId?: FaceIdPlan & { startedAt: number; completedAt?: number };
+  // Proportions du visage (biométrie) : stockées chiffrées, jamais renvoyées au client, effacées à la décision.
+  faceProfile?: FaceProfile;
   signals: Signal[];
   challenges: ChallengeRun[];
   decision?: { value: Decision; note?: string; at: number };
@@ -60,8 +73,9 @@ export interface AgentInfo {
   recommendations: AgentRecommendation[];
 }
 
-export interface SessionView extends Session {
+export interface SessionView extends Omit<Session, 'faceProfile'> {
   score: Score;
+  hasFaceProfile: boolean;
   agent?: AgentInfo;
 }
 

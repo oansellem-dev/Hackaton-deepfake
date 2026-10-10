@@ -4,11 +4,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import { getChallenge, type ChallengeResult, type Decision, type PrecheckPayload } from '@kyc/shared';
+import type { ChallengeResult, Decision, PrecheckPayload } from '@kyc/shared';
 import { precheckSignals } from './precheck.ts';
 import { attachSignaling } from './signaling.ts';
 import { forwardFrame, viewWithAgent } from './agent.ts';
-import { createSession, getSession, upsertSignals } from './store.ts';
+import { recordChallenge } from './challenges.ts';
+import { faceIdRouter } from './faceid.ts';
+import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -16,6 +18,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.set('trust proxy', true);
+// Les sessions (et leur profil de visage chiffré) sont sauvegardées après chaque requête qui les modifie.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') res.on('finish', schedulePersist);
+  next();
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
@@ -56,32 +63,11 @@ app.post('/api/sessions/:id/challenges', async (req, res) => {
     result: ChallengeResult;
     durationMs: number;
   };
-  const challenge = getChallenge(challengeId);
-  if (!challenge) return res.status(400).json({ error: 'défi inconnu' });
-
-  const at = Date.now();
-  session.challenges.push({ challengeId, result, durationMs, at });
-  upsertSignals(session, [
-    {
-      id: `challenge.${challengeId}.${session.challenges.length}`,
-      source: 'challenge',
-      severity: 'strong',
-      at,
-      status: result === 'failed' ? 'contradiction' : result === 'passed' ? 'ok' : 'unknown',
-      label:
-        result === 'failed'
-          ? `Défi « ${challenge.label} » non exécuté ou image déformée`
-          : `Défi « ${challenge.label} »`,
-      detail:
-        result === 'passed'
-          ? 'Exécuté correctement.'
-          : result === 'failed'
-            ? 'À reproposer avant de conclure.'
-            : 'Résultat non concluant, sans effet sur le score.',
-    },
-  ]);
+  if (!recordChallenge(session, challengeId, result, durationMs)) return res.status(400).json({ error: 'défi inconnu' });
   res.json(await viewWithAgent(session));
 });
+
+app.use(faceIdRouter);
 
 // Détecteur passif : le panneau envoie une capture du visage (JPEG) toutes les ~2 s.
 // Elle est transmise à l'agent local, analysée en mémoire, jamais conservée.
@@ -104,6 +90,8 @@ app.post('/api/sessions/:id/decision', async (req, res) => {
 
   const { value, note } = req.body as { value: Decision; note?: string };
   session.decision = { value, note, at: Date.now() };
+  // L'entretien est tranché : les proportions du visage (biométrie) sont effacées.
+  purgeBiometrics(session);
   res.json(await viewWithAgent(session));
 });
 

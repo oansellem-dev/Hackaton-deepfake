@@ -133,3 +133,9 @@ label.inline { flex-direction: row; align-items: center; gap: 6px; margin: 0; }
 label.lab-check { align-items: flex-start; font-size: 14px; margin-bottom: 8px; }
 label.lab-check input { margin-top: 3px; }
 .lab-summary th.lab-sub { font-size: 13px; padding-left: 12px; }
+
+.cv-upload { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; padding: 10px 14px; border: 1px dashed #6c5ce7; border-radius: 8px; cursor: pointer; color: #6c5ce7; font-weight: 600; }
+.cv-upload input { font-weight: normal; color: #444; }
+.cv-links { list-style: none; padding: 0; columns: 2; column-gap: 24px; font-size: 14px; }
+.cv-links li { padding: 3px 0; break-inside: avoid; }
+@media (max-width: 560px) { .cv-links { columns: 1; } }

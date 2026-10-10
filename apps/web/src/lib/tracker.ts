@@ -8,6 +8,14 @@ interface Tracker {
   hand: HandLandmarker;
 }
 
+let lastTs = 0;
+
+// MediaPipe exige des horodatages strictement croissants, même entre deux appels très rapprochés.
+function nextTs(): number {
+  lastTs = Math.max(performance.now(), lastTs + 1);
+  return lastTs;
+}
+
 let loading: Promise<Tracker> | null = null;
 
 export function loadTracker(): Promise<Tracker> {
@@ -25,17 +33,19 @@ export function loadTracker(): Promise<Tracker> {
         numHands: 2,
       }),
     });
+    let tracker: Tracker;
     try {
-      const gpu = await make('GPU');
-      // Sans WebGL utilisable, MediaPipe se crée sur le GPU puis échoue à la première image : on essaie à vide.
-      const probe = document.createElement('canvas');
-      probe.width = probe.height = 64;
-      gpu.face.detectForVideo(probe, nextTs());
-      gpu.hand.detectForVideo(probe, nextTs());
-      return gpu;
+      tracker = await make('GPU');
     } catch {
-      return make('CPU');
+      tracker = await make('CPU');
     }
+    // Échauffement : la toute première analyse initialise le moteur de calcul et peut prendre plusieurs secondes.
+    // On la fait ici, sur une image vide, plutôt que pendant le premier défi.
+    const blank = document.createElement('canvas');
+    blank.width = blank.height = 64;
+    tracker.face.detectForVideo(blank, nextTs());
+    tracker.hand.detectForVideo(blank, nextTs());
+    return tracker;
   })();
   // Un échec de chargement ne doit pas rester en cache : on pourra réessayer.
   loading.catch(() => (loading = null));
@@ -47,13 +57,6 @@ export interface Detection {
   hands: Point[][];
 }
 
-let lastTs = 0;
-
-// MediaPipe exige des horodatages strictement croissants, même entre deux appels très rapprochés.
-function nextTs(): number {
-  lastTs = Math.max(performance.now(), lastTs + 1);
-  return lastTs;
-}
 
 // La détection des mains coûte cher : on ne la lance que si l'étape en a besoin.
 export function detect(tracker: Tracker, video: HTMLVideoElement, withHands = false): Detection {

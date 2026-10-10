@@ -29,6 +29,7 @@ export interface ChallengeRun {
   durationMs: number;
   at: number;
   phase?: 'precheck' | 'live'; // absent = pendant l'entretien
+  metrics?: Record<string, number>; // mesures brutes du détecteur, affichées au rapport, sans effet sur le score
 }
 
 // Règle n°2 : le recruteur décide, l'outil éclaire.
@@ -60,6 +61,15 @@ export interface DeclaredIdentity {
 
 export type IdentityPayload = Omit<DeclaredIdentity, 'consentAt'> & { consent: boolean };
 
+// CV chargé par le recruteur : lu en mémoire puis oublié. On ne garde que ce qui a été comparé et les liens
+// de vérification (module d'Hector) que le recruteur ouvre lui-même.
+export interface CvAnalysis {
+  analyzedAt: number;
+  found: { emails: string[]; phones: string[]; github: string[]; linkedin: string[]; schools: string[] };
+  consistent: string[]; // éléments identiques entre le CV et les déclarations
+  links: { categorie: string; label: string; url: string }[];
+}
+
 export interface Session {
   id: string;
   createdAt: number;
@@ -71,6 +81,11 @@ export interface Session {
   faceProfile?: FaceProfile;
   // Test du reflet de l'écran : résumé de chaque essai (aucune mesure image par image, aucune image).
   screenFlash?: FlashSummary;
+  // Probabilités de trucage du détecteur passif sur les dernières captures (15 au plus), sans les images.
+  passiveScores?: number[];
+  // Jeton du recruteur (serveur seulement) : exigé pour lire les signaux, décider et enregistrer les défis.
+  recruiterKey?: string;
+  cv?: CvAnalysis;
   signals: Signal[];
   challenges: ChallengeRun[];
   decision?: { value: Decision; note?: string; at: number };
@@ -89,7 +104,7 @@ export interface AgentInfo {
   passive?: { frames: number; medianFakeProbability: number | null }; // détecteur passif local
 }
 
-export interface SessionView extends Omit<Session, 'faceProfile'> {
+export interface SessionView extends Omit<Session, 'faceProfile' | 'recruiterKey'> {
   score: Score;
   hasFaceProfile: boolean;
   // Ce que contient le profil, sans les valeurs (elles ne quittent jamais le serveur).

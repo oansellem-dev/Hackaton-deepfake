@@ -26,6 +26,8 @@ const IDX = {
   mouthB: 291,
   irisA: 468,
   irisB: 473,
+  lipUpper: 13,
+  lipLower: 14,
 } as const;
 
 export const RATIO_NAMES = [
@@ -187,6 +189,22 @@ export function judgeContinuity(distances: number[]): Continuity {
   if (m <= SAME_FACE_MAX) return 'consistent';
   if (m >= DIFFERENT_FACE_MIN) return 'different';
   return 'unknown';
+}
+
+// --- Défis (pré-vérification et entretien) : mêmes seuils partout ---
+
+// Angle estimé par MediaPipe (profondeur des joues). Mesuré en test : une rotation de 32° est vue vers 16-17°,
+// et de face le bruit reste sous 2°. 14° correspond donc à une rotation volontaire.
+export const TURN_YAW_DEG = 14;
+export const TURN_FRAMES = 4; // images d'affilée
+export const HAND_POINTS_OVER_FACE = 8; // points de la main (sur 21) dans le rectangle du visage
+export const HAND_FRAMES = 4;
+export const MOUTH_RANGE_SPEAKING = 0.06; // amplitude d'ouverture de la bouche qui signale une parole
+
+// Ouverture de la bouche (lèvres internes), rapportée à l'écart des yeux : ~0 bouche fermée.
+export function mouthOpenness(lm: Point[], width: number, height: number): number {
+  const eyeSpan = dist(lm[IDX.eyeOuterA], lm[IDX.eyeOuterB], width, height);
+  return eyeSpan > 1e-6 ? dist(lm[IDX.lipUpper], lm[IDX.lipLower], width, height) / eyeSpan : 0;
 }
 
 // --- Empreinte faciale (calculée par l'agent local à partir des captures, jamais d'image conservée) ---

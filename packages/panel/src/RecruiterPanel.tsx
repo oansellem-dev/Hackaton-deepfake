@@ -15,6 +15,7 @@ interface Props {
   reportUrl?: string;
   // Mesure du visage affiché (MediaPipe côté site). Absent : pas de comparaison avec la pré-vérification.
   faceSampler?: FaceSampler;
+  recruiterKey?: string; // jeton donné à la création de l'entretien
 }
 
 const LEVEL_LABEL = {
@@ -41,8 +42,16 @@ function nextChallenge(session: SessionView): Challenge {
   return pickChallenge(done);
 }
 
-export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDetector, reportUrl, faceSampler }: Props) {
-  const api = useMemo(() => createApi(apiBase), [apiBase]);
+export function RecruiterPanel({
+  sessionId,
+  stream,
+  apiBase,
+  detector = stubDetector,
+  reportUrl,
+  faceSampler,
+  recruiterKey,
+}: Props) {
+  const api = useMemo(() => createApi(apiBase, recruiterKey), [apiBase, recruiterKey]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [session, setSession] = useState<SessionView | null>(null);
@@ -139,8 +148,15 @@ export function RecruiterPanel({ sessionId, stream, apiBase, detector = stubDete
     setRunning(true);
     const start = performance.now();
     try {
-      const result = await detector(videoRef.current, challenge, controller.signal);
-      const updated = await api.sendChallenge(sessionId, challenge.id, result, Math.round(performance.now() - start));
+      const outcome = await detector(videoRef.current, challenge, controller.signal);
+      const { result, metrics } = typeof outcome === 'string' ? { result: outcome, metrics: undefined } : outcome;
+      const updated = await api.sendChallenge(
+        sessionId,
+        challenge.id,
+        result,
+        Math.round(performance.now() - start),
+        metrics,
+      );
       setSession(updated);
       setChallenge(nextChallenge(updated));
     } catch (e) {

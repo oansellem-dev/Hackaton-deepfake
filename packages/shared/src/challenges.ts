@@ -21,20 +21,20 @@ export const CHALLENGES: Challenge[] = [
     label: 'Main devant le visage',
     mascotLine:
       "Vous pourriez lui demander de passer la main devant son visage, par exemple pour vérifier que l'image n'est pas figée.",
-    timeoutMs: 8000,
+    timeoutMs: 12000,
   },
   {
     id: 'head-turn',
     label: 'Rotation de la tête',
     mascotLine:
       'Proposez-lui de tourner la tête à gauche puis à droite, comme pour ajuster son cadrage.',
-    timeoutMs: 8000,
+    timeoutMs: 12000,
   },
   {
     id: 'random-phrase',
     label: 'Phrase aléatoire',
     mascotLine: 'Demandez-lui de lire à voix haute : « {phrase} »',
-    timeoutMs: 10000,
+    timeoutMs: 15000,
   },
 ];
 

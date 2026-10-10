@@ -25,7 +25,8 @@ FACE_MARGIN = 0.18
 MIN_FRAMES = 5  # en dessous, pas assez d'images pour conclure
 WINDOW = 15  # médiane glissante : un instantané raté ne suffit pas à lever un signal
 
-_lock = threading.Lock()
+_lock = threading.Lock()  # chargement des modèles
+_infer_lock = threading.Lock()  # analyse : le détecteur de visage OpenCV n'est pas prévu pour plusieurs fils à la fois
 _session = None
 _cascade = None
 _scores: dict[str, deque] = defaultdict(lambda: deque(maxlen=WINDOW))  # session_id -> p_fake
@@ -41,10 +42,11 @@ def _load():
     with _lock:
         if _session is None:
             import onnxruntime as ort
-            from huggingface_hub import hf_hub_download
 
-            path = hf_hub_download(REPO, "deepfakeguard_v2.onnx")
-            labels = json.load(open(hf_hub_download(REPO, "labels_v2.json")))
+            from .models import model_path
+
+            path = model_path(REPO, "deepfakeguard_v2.onnx")
+            labels = json.load(open(model_path(REPO, "labels_v2.json")))
             # p_real = sortie sigmoïde de la classe « positive » ; on vérifie plutôt que d'en supposer l'ordre.
             if labels.get("positive_class_name") != "real":
                 raise RuntimeError("Convention de sortie inattendue pour le modèle.")
@@ -70,13 +72,18 @@ def analyze_frame(image_bytes: bytes) -> FrameResult:
     if bgr is None:
         raise ValueError("Image illisible")
     session, cascade = _load()
-    face = _crop_face(bgr, cascade)
-    if face is None or face.size == 0:
-        return FrameResult(face_found=False)
-    rgb = cv2.cvtColor(cv2.resize(face, (INPUT_SIZE, INPUT_SIZE), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
-    # Valeurs brutes 0..255 en float32, comme à l'entraînement (pas de division par 255).
-    p_real = float(session.run(None, {session.get_inputs()[0].name: rgb.astype(np.float32)[None]})[0][0][0])
+    with _infer_lock:
+        face = _crop_face(bgr, cascade)
+        if face is None or face.size == 0:
+            return FrameResult(face_found=False)
+        rgb = cv2.cvtColor(cv2.resize(face, (INPUT_SIZE, INPUT_SIZE), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
+        # Valeurs brutes 0..255 en float32, comme à l'entraînement (pas de division par 255).
+        p_real = float(session.run(None, {session.get_inputs()[0].name: rgb.astype(np.float32)[None]})[0][0][0])
     return FrameResult(face_found=True, fake_probability=round(1 - p_real, 4))
+
+
+def warm_up() -> None:
+    _load()
 
 
 def record(session_id: str, result: FrameResult) -> PassiveSummary:

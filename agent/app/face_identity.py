@@ -9,7 +9,8 @@ import threading
 import cv2
 import numpy as np
 
-_lock = threading.Lock()
+_lock = threading.Lock()  # chargement des modèles
+_infer_lock = threading.Lock()  # le détecteur garde la taille d'entrée en état interne
 _detector = None
 _recognizer = None
 
@@ -18,20 +19,24 @@ def _load():
     global _detector, _recognizer
     with _lock:
         if _recognizer is None:
-            from huggingface_hub import hf_hub_download
+            from .models import model_path
 
-            det = hf_hub_download("opencv/face_detection_yunet", "face_detection_yunet_2023mar.onnx")
-            rec = hf_hub_download("opencv/face_recognition_sface", "face_recognition_sface_2021dec.onnx")
+            det = model_path("opencv/face_detection_yunet", "face_detection_yunet_2023mar.onnx")
+            rec = model_path("opencv/face_recognition_sface", "face_recognition_sface_2021dec.onnx")
             _detector = cv2.FaceDetectorYN.create(det, "", (320, 320), 0.8, 0.3, 5000)
             _recognizer = cv2.FaceRecognizerSF.create(rec, "")
     return _detector, _recognizer
+
+
+def warm_up() -> None:
+    _load()
 
 
 def embed(bgr: np.ndarray) -> list[float] | None:
     """Empreinte normalisée du plus grand visage de l'image, ou None s'il n'y a pas de visage net."""
     detector, recognizer = _load()
     h, w = bgr.shape[:2]
-    with _lock:  # le détecteur garde la taille d'entrée en état interne
+    with _infer_lock:
         detector.setInputSize((w, h))
         _, faces = detector.detect(bgr)
         if faces is None or len(faces) == 0:

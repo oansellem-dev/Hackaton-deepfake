@@ -24,6 +24,7 @@ import {
   type FaceIdSubmission,
   type IdentityPayload,
 } from '@kyc/shared';
+import { recruiterOnly } from './auth.ts';
 import { recordChallenge } from './challenges.ts';
 import { declaredInfoSignals, lookupWebPresence, sanitizeIdentity } from './identity.ts';
 import { getSession, schedulePersist, upsertSignals } from './store.ts';
@@ -90,6 +91,22 @@ faceIdRouter.post('/api/sessions/:id/faceid/start', (req, res) => {
     ]);
     schedulePersist();
     return res.status(409).json({ error: 'camera-virtuelle', camera: virtual[0] });
+  }
+
+  // Une caméra virtuelle installée (OBS pour le streaming, par exemple) n'est pas suspecte si la vérification
+  // se fait avec une vraie caméra : on la garde comme information, sans effet sur le score.
+  const installed = session.signals.find((s) => s.id === 'precheck.virtual-camera');
+  if (installed?.status === 'contradiction' && cameraLabel) {
+    const name = installed.detail.match(/« (.+?) »/)?.[1] ?? 'une caméra virtuelle';
+    upsertSignals(session, [
+      {
+        ...installed,
+        status: 'unknown',
+        at: Date.now(),
+        label: 'Caméra virtuelle installée, non utilisée',
+        detail: `« ${name} » est installée, mais la vérification du visage s'est faite avec « ${cameraLabel} ». Sans effet sur le score.`,
+      },
+    ]);
   }
 
   const hardened = session.signals.some((s) => s.status === 'contradiction');
@@ -178,6 +195,29 @@ faceIdRouter.post('/api/sessions/:id/faceid/submit', (req, res) => {
   });
 });
 
+// Pendant l'entretien (visio de secours), la page du candidat indique la caméra réellement utilisée.
+faceIdRouter.post('/api/sessions/:id/live-camera', (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'session inconnue' });
+  const cameraLabel = String((req.body as { cameraLabel?: string })?.cameraLabel ?? '').slice(0, 120);
+  const virtual = findVirtualCameras([cameraLabel]);
+  if (virtual.length > 0) {
+    upsertSignals(session, [
+      {
+        id: 'live.virtual-camera',
+        source: 'precheck',
+        severity: 'strong',
+        at: Date.now(),
+        status: 'contradiction',
+        label: "Caméra virtuelle utilisée pendant l'entretien",
+        detail: `Caméra du candidat : « ${virtual[0]} ». Un nom de périphérique n'est pas une preuve : à confirmer par un défi.`,
+      },
+    ]);
+    schedulePersist();
+  }
+  res.json({ checked: true });
+});
+
 // --- Pendant l'entretien : la personne est-elle la même qu'à la pré-vérification ? ---
 // Deux contrôles indépendants : l'empreinte faciale (calculée par l'agent sur les captures) et les proportions
 // du visage (mesurées par le panneau). Seules les mesures sont gardées, en mémoire, jamais les images.
@@ -259,7 +299,7 @@ function updateContinuity(session: Session) {
 }
 
 // Le panneau envoie les proportions du visage affiché ; comparées au profil de face ou sous l'angle le plus proche.
-faceIdRouter.post('/api/sessions/:id/face-sample', (req, res) => {
+faceIdRouter.post('/api/sessions/:id/face-sample', recruiterOnly, (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return res.status(404).json({ error: 'session inconnue' });
   if (!session.faceProfile) return res.json({ verdict: 'unknown', reason: 'pas de profil' });

@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ANGLE_MAX_YAW_DEG,
   ANGLE_MIN_YAW_DEG,
+  HAND_FRAMES,
+  HAND_POINTS_OVER_FACE,
   MIN_PROFILE_SAMPLES,
+  TURN_FRAMES,
+  TURN_YAW_DEG,
   angleProfiles,
   boundingBox,
   computeRatios,
@@ -35,12 +39,6 @@ const STEP_LABEL: Record<FaceIdStep, string> = {
 const FRAME_MS = 80; // ~12 analyses par seconde
 const CENTER_HOLD = 6; // images bien cadrées d'affilée avant de commencer à mesurer
 const CENTER_SAMPLES = 16; // mesures de face pour le profil
-// Angle estimé par MediaPipe (profondeur des joues). Mesuré en test : une rotation de 32° est vue vers 16-17°,
-// et de face le bruit reste sous 2°. 14° correspond donc à une rotation volontaire.
-const TURN_YAW_DEG = 14;
-const TURN_FRAMES = 4;
-const HAND_POINTS = 8;
-const HAND_FRAMES = 4;
 const CENTER_TIMEOUT_MS = 25000;
 const ACTION_TIMEOUT_MS = 12000;
 // Captures pour le détecteur passif : quelques-unes de face, et surtout PENDANT les défis,
@@ -304,8 +302,8 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
           const box = face ? boundingBox(face) : lastFaceBox;
           const over = box ? Math.max(0, ...hands.map((h) => handPointsOverFace(h, box))) : 0;
           // Main qui commence à couvrir le visage : c'est là que le mélange d'un face-swap se trahit.
-          if (face && over > 0 && over < HAND_POINTS && stepFrames < HAND_PASSIVE_FRAMES) sendPassiveFrame();
-          actionStreak = over >= HAND_POINTS ? actionStreak + 1 : 0;
+          if (face && over > 0 && over < HAND_POINTS_OVER_FACE && stepFrames < HAND_PASSIVE_FRAMES) sendPassiveFrame();
+          actionStreak = over >= HAND_POINTS_OVER_FACE ? actionStreak + 1 : 0;
           if (actionStreak >= HAND_FRAMES) finishStep('passed');
           else if (performance.now() - stepStart > ACTION_TIMEOUT_MS) finishStep(timeoutResult());
         }

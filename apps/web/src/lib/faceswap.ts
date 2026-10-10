@@ -33,6 +33,7 @@ const OVAL: number[] = (() => {
 
 const SOURCE_MAX = 640; // photo réduite : le déformer 852 fois par image reste rapide
 const FPS = 30;
+const LOCK_TIMEOUT_MS = 10000; // délai pour trouver le visage filmé au démarrage
 
 type Pt = [number, number];
 
@@ -182,7 +183,6 @@ export async function createFaceSwap(camera: MediaStream, face: HTMLImageElement
       out.width = warp.width = mask.width = W;
       out.height = warp.height = mask.height = H;
     }
-    outCtx.drawImage(video, 0, 0, W, H);
     let lm: NormalizedLandmark[] | undefined;
     try {
       lm = landmarker.detectForVideo(video, nextTs()).faceLandmarks[0];
@@ -195,9 +195,11 @@ export async function createFaceSwap(camera: MediaStream, face: HTMLImageElement
       lastDst = lm.map((p) => [p.x * W, p.y * H]);
       lastSeen = now;
     }
-    // Suivi perdu un instant : le faux visage reste à sa dernière place (un attaquant ne montre pas son vrai visage).
+    // Jamais l'image réelle à découvert : avant le premier visage trouvé, rien n'est émis ; suivi perdu plus d'une
+    // seconde, l'image reste figée sur la dernière image truquée (un attaquant ne montre pas son vrai visage).
     if (!lastDst || now - lastSeen > 1000) return;
     const dst = lastDst;
+    outCtx.drawImage(video, 0, 0, W, H);
 
     warpCtx.globalCompositeOperation = 'source-over';
     warpCtx.globalAlpha = 1;
@@ -241,10 +243,27 @@ export async function createFaceSwap(camera: MediaStream, face: HTMLImageElement
     warpCtx.globalCompositeOperation = 'source-over';
 
     outCtx.drawImage(warp, 0, 0);
+    onLock?.();
   };
 
+  // Le flux n'est rendu qu'une fois le visage remplacé : un essai lancé tout de suite ne voit jamais la vraie image.
+  let onLock: (() => void) | undefined;
+  const locked = new Promise<boolean>((resolve) => {
+    onLock = () => {
+      onLock = undefined;
+      resolve(true);
+    };
+    setTimeout(() => resolve(false), LOCK_TIMEOUT_MS);
+  });
   const timer = setInterval(render, 1000 / FPS);
   const stream = out.captureStream(FPS);
+  if (!(await locked)) {
+    clearInterval(timer);
+    stream.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+    landmarker.close();
+    throw new Error('le filtre ne trouve pas de visage dans l’image de la caméra');
+  }
   return {
     stream,
     setMatchLighting: (on) => (lighting = on),

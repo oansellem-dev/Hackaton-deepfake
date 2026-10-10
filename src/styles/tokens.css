@@ -1,33 +1,81 @@
-/* Oval — jetons de design, alignés sur la référence : gris clair, verre dépoli, noir, halo jaune, chiffres en points */
+/* ═══════════════════════════════════════════════════════════════
+   OVAL — SYSTÈME DE DESIGN (jetons)
+   Référence : dashboard RH gris-bleu, relief doux entre verre dépoli
+   et néomorphisme. Trois niveaux de relief : panneau, carte, creux.
+   ═══════════════════════════════════════════════════════════════ */
 :root {
-  --font: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-dot: "Doto", "Lexend", monospace;
+  --font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --page: #e4e4e4;
-  --page-2: #ececec;
-  --glass: rgba(255,255,255,.58);
-  --glass-strong: rgba(255,255,255,.8);
-  --glass-border: rgba(255,255,255,.7);
-  --chip: rgba(255,255,255,.7);
+  /* Neutres froids, légèrement bleutés (jamais de gris pur) */
+  --bg-outer: #a7aebd;        /* fond extérieur */
+  --shell:    #eceff5;        /* grande coque */
+  --panel:    #f3f5f9;        /* panneau posé sur la coque */
+  --card:     #f8f9fc;        /* carte dans un panneau */
+  --card-2:   #fbfcfe;        /* carte survolée / très claire */
+  --inset:    #e9ecf3;        /* élément en creux */
+  --hatch:    rgba(96,108,140,.16); /* hachures week-end */
 
-  --ink: #1b1b1b;
-  --ink-2: #5a5a5a;
-  --ink-3: #9a9a9a;
-  --line: rgba(0,0,0,.08);
+  /* Texte : contraste vérifié pour projection (ink-2 ≥ 7:1 sur panel) */
+  --ink:   #1b2032;
+  --ink-2: #525c73;
+  --ink-3: #7f889e;
+  --ink-on-color: #1b2032;
+  --line:  rgba(27,32,50,.06); /* filet très léger, uniquement dans les tableaux */
 
-  --yellow: #f7e27b;
-  --yellow-soft: #fdf3b8;
-  --yellow-glow: rgba(250,228,120,.85);
-  --green: #33c173;
-  --red: #e2503a;
+  /* Bleu vif : réservé à « aujourd'hui / maintenant » et à l'élément actif */
+  --blue:      #3a6cf6;
+  --blue-deep: #2f5be0;
+  --blue-soft: #e3ebff;
+  --blue-text: #2a56d6;
 
-  --r-card: 28px;
-  --r-pill: 999px;
-  --blur: blur(18px);
+  /* Dégradés doux à deux tons pour barres et étiquettes */
+  --g-green:  linear-gradient(135deg, #86e0b4 0%, #44c38b 100%);
+  --g-violet: linear-gradient(135deg, #b9a3f8 0%, #8363f2 100%);
+  --g-blue:   linear-gradient(135deg, #d6e4ff 0%, #a9c3fb 100%);
+  --g-gold:   linear-gradient(135deg, #ffdd82 0%, #f4bb45 100%);
+  --g-navy:   linear-gradient(135deg, #2a3147 0%, #161b2b 100%);
+  --sh-green:  0 10px 24px rgba(68,195,139,.35);
+  --sh-violet: 0 10px 24px rgba(131,99,242,.35);
+  --sh-blue:   0 10px 24px rgba(120,160,250,.35);
+  --sh-gold:   0 10px 24px rgba(244,187,69,.38);
+  --sh-navy:   0 10px 24px rgba(27,32,50,.35);
+  --reflect:   inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.05);
 
-  --shadow-card: 0 1px 0 rgba(255,255,255,.8) inset, 0 10px 30px rgba(0,0,0,.05);
-  --shadow-float: 0 14px 40px rgba(0,0,0,.12);
+  /* Teintes de statut pour les textes posés sur une couleur */
+  --green-text:  #0f6b45;
+  --violet-text: #4a2fb8;
+  --gold-text:   #7a4e00;
 
-  --ease: cubic-bezier(.2,.7,.2,1);
-  --spring: cubic-bezier(.34,1.56,.64,1);
+  /* Rayons */
+  --r-shell: 44px;
+  --r-panel: 32px;
+  --r-card:  22px;
+  --r-sm:    14px;
+  --r-pill:  999px;
+
+  /* Relief : lumière en haut à gauche, ombre froide large en bas à droite */
+  --hi:       inset 1.5px 1.5px 0 rgba(255,255,255,.95);
+  --hi-soft:  inset 1px 1px 0 rgba(255,255,255,.8);
+  --sh-panel: 12px 16px 40px rgba(62,74,110,.13), 2px 3px 8px rgba(62,74,110,.05);
+  --sh-card:  6px 8px 24px rgba(62,74,110,.10), 1px 2px 5px rgba(62,74,110,.04);
+  --sh-raise: 8px 12px 32px rgba(62,74,110,.16), 2px 3px 8px rgba(62,74,110,.06);
+  --sh-float: 20px 28px 64px rgba(62,74,110,.22), 4px 6px 14px rgba(62,74,110,.08);
+  --sh-inset: inset 2px 2px 6px rgba(62,74,110,.16), inset -1px -1px 0 rgba(255,255,255,.9);
+  --sh-inset-blue: inset 2px 2px 6px rgba(42,86,214,.22), inset -1px -1px 0 rgba(255,255,255,.7);
+
+  /* Verre : pastilles translucides posées sur une couleur */
+  --glass-bg:     rgba(255,255,255,.55);
+  --glass-border: rgba(255,255,255,.65);
+  --glass-blur:   blur(10px) saturate(1.5);
+
+  /* Mouvement : rapide et doux, ressort léger sur les pressions */
+  --t-fast: 180ms;
+  --t:      220ms;
+  --t-slow: 260ms;
+  --ease:   cubic-bezier(.2,.8,.2,1);
+  --spring: cubic-bezier(.34,1.45,.64,1);
+  --cascade: 40ms;
+
+  /* Espacements */
+  --s-1: 6px; --s-2: 10px; --s-3: 14px; --s-4: 18px; --s-5: 24px; --s-6: 32px;
 }

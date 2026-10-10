@@ -1,0 +1,46 @@
+/* ═══ Manta — raie nacrée, SVG + CSS, six états ═══
+   Elle flotte, respire, cligne des yeux, se déforme en ressort quand on la presse.
+   Jamais d'état rouge ou fâché. Jamais en dessous de 48 px. */
+.manta { display: inline-block; overflow: visible; --halo: #3a6cf6; --halo-soft: rgba(58,108,246,.55); cursor: pointer; }
+.manta * { transform-box: fill-box; transform-origin: center; }
+.manta__scene { animation: manta-float 3.6s ease-in-out infinite; }
+.manta__body { animation: manta-breathe 3.6s ease-in-out infinite; }
+.manta__halo { fill: var(--halo); opacity: .85; transition: fill .4s var(--ease), opacity .4s; }
+.manta__eye { animation: manta-blink 5.2s infinite; }
+.manta__brow { opacity: 0; transition: opacity .25s; }
+.manta__shadow { animation: manta-shadow 3.6s ease-in-out infinite; }
+
+/* Propose un défi : rebond */
+.manta[data-state="defi"] .manta__scene { animation: manta-bounce .9s var(--spring) 2, manta-float 3.6s ease-in-out 1.8s infinite; }
+/* Analyse en cours : halo qui pulse, regard qui balaie */
+.manta[data-state="analyse"] .manta__halo { animation: manta-pulse 1.3s ease-in-out infinite; }
+.manta[data-state="analyse"] .manta__pupils { animation: manta-scan 1.7s ease-in-out infinite; }
+/* Signal à vérifier : halo orange, sourcil levé, yeux plissés, tête penchée */
+.manta[data-state="signal"] { --halo: #f0a44a; --halo-soft: rgba(240,164,74,.55); }
+.manta[data-state="signal"] .manta__scene { animation: none; transform: rotate(-9deg); transition: transform .35s var(--ease); }
+.manta[data-state="signal"] .manta__eye { animation: none; transform: scaleY(.55); }
+.manta[data-state="signal"] .manta__brow { opacity: 1; }
+/* Présence vérifiée : halo vert, yeux rieurs, petit saut */
+.manta[data-state="verifie"] { --halo: #3fc38a; --halo-soft: rgba(63,195,138,.55); }
+.manta[data-state="verifie"] .manta__scene { animation: manta-jump .65s var(--spring) 1, manta-float 3.6s ease-in-out .65s infinite; }
+/* Test de lumière : halo renforcé, couleur fournie par la séquence */
+.manta[data-state="lumiere"] .manta__halo { opacity: 1; }
+.manta[data-state="lumiere"] .manta__glow { opacity: .5; }
+
+/* Pression : ressort */
+.manta.is-pressed .manta__scene { animation: manta-squish .55s var(--spring) 1; }
+
+@keyframes manta-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes manta-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.025, .985); } }
+@keyframes manta-shadow { 0%,100% { transform: scaleX(1); opacity: .5; } 50% { transform: scaleX(.86); opacity: .35; } }
+@keyframes manta-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+@keyframes manta-bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-12px); } 70% { transform: translateY(2px); } }
+@keyframes manta-jump { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-14px) scale(1.05); } 100% { transform: translateY(0) scale(1); } }
+@keyframes manta-pulse { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } }
+@keyframes manta-scan { 0%,100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+@keyframes manta-squish { 0% { transform: scale(1); } 30% { transform: scale(1.14, .84); } 60% { transform: scale(.92, 1.08); } 100% { transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .manta * { animation: none !important; }
+  .manta[data-state="signal"] .manta__scene { transition: none; }
+}

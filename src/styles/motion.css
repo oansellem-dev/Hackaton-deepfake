@@ -1,0 +1,48 @@
+/* ═══ Mouvement : 180–260 ms, courbe naturelle, ressort léger ═══
+   On n'anime que transform et opacity. */
+
+.lift { transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), background-color var(--t) var(--ease); will-change: transform; }
+.lift:hover { transform: translateY(-1.5px); }
+.lift:active { transform: translateY(1px) scale(.985); transition-duration: var(--t-fast); }
+
+/* Arrivée en cascade des panneaux (40 ms d'écart) */
+.rise { animation: rise var(--t-slow) var(--ease) both; animation-delay: calc(var(--i, 0) * var(--cascade)); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* Changement de page : fondu avec léger glissement */
+.page { animation: page-in var(--t-slow) var(--ease) both; }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Barres du calendrier : se déploient de gauche à droite */
+.grow-x { animation: grow-x 480ms var(--ease) both; animation-delay: calc(var(--i, 0) * var(--cascade) + 120ms); transform-origin: left center; }
+@keyframes grow-x { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+
+/* Pression ressort (Manta, boutons ronds) */
+.squish:active { animation: squish 420ms var(--spring); }
+@keyframes squish { 0% { transform: scale(1); } 30% { transform: scale(1.08, .9); } 60% { transform: scale(.96, 1.05); } 100% { transform: scale(1); } }
+
+/* Fenêtres et tiroirs */
+.backdrop { animation: fade var(--t) var(--ease) both; }
+.pop { animation: pop var(--t-slow) var(--spring) both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* Message discret */
+.toast-in { animation: toast-in var(--t-slow) var(--spring) both; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* Pulsation douce (halo « maintenant ») */
+.pulse { animation: pulse 2.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(58,108,246,.35); } 60% { box-shadow: 0 0 0 10px rgba(58,108,246,0); } }
+
+/* Transitions de vue (réorganisation des listes) */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--t); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover, .lift:active, .tilt:hover { transform: none; }
+  .rise, .page, .pop, .toast-in { animation-name: fade; animation-duration: var(--t); }
+  .grow-x { animation: fade var(--t) both; }
+  .squish:active { animation: none; }
+  .pulse { animation: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

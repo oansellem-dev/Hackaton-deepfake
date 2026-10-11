@@ -271,6 +271,7 @@ function AvantEntretien({ x }: { x: Entretien }) {
       {p.statut === "non_envoyee" && <Btn block icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>Envoyer le lien de pré-vérification</Btn>}
       {p.statut !== "non_envoyee" && p.statut !== "faite" && <Btn block icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer le lien{p.envoyeeLe ? ` · envoyé ${relatif(p.envoyeeLe).toLowerCase()}` : ""}</Btn>}
       <Btn block variant="ghost" icon={<IcArrowUR />} href={lienPanneau(x)} newTab>Ouvrir le panneau seul (360 px)</Btn>
+      {x.moteur && <Btn block variant="ghost" onClick={() => navigator.clipboard.writeText(`${x.moteur!.sessionId}:${x.moteur!.recruiterKey}`).then(() => toast("Code extension copié : collez-le dans le panneau Oval de Chrome"), () => toast("Copie impossible"))}>Copier le code extension</Btn>}
       <p className="t-small faint">La décision se prend après l'entretien. Le recruteur décide, l'outil éclaire.</p>
     </section>
   );

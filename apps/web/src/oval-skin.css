@@ -91,3 +91,31 @@ label { font-size: 13px; font-weight: 600; color: var(--ink-2); gap: 6px; margin
 .audit time { color: var(--ink-3); }
 
 @media (prefers-reduced-motion: reduce) { button.primary, button.secondary, .kyc-panel button { transition: none; } }
+
+/* ═══ Page /panel : en-tête, démarrage du partage (design Loom-like, Oval) ═══ */
+.panel-page { max-width: 420px; padding: 12px 12px 24px; display: flex; flex-direction: column; gap: 12px; }
+.pp-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; }
+.pp-logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+.pp-logo i { width: 11px; height: 17px; border: 3.5px solid var(--blue); border-radius: 50%; }
+.pp-state { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--ink-3); padding: 6px 11px; border-radius: 999px; background: var(--inset); box-shadow: var(--sh-inset); }
+.pp-state i { width: 7px; height: 7px; border-radius: 50%; background: #c3c9d8; }
+.pp-state.is-ready { color: var(--ink-2); } .pp-state.is-ready i { background: var(--blue); }
+.pp-state.is-live { color: var(--green-text); background: #dff6ea; box-shadow: none; } .pp-state.is-live i { background: #3fc088; animation: kyc-ping 1.8s ease-out infinite; }
+.pp-start { display: grid; gap: 12px; }
+button.pp-share { position: relative; display: grid; justify-items: center; gap: 4px; padding: 26px 18px 20px; border: 0; border-radius: 22px; background: #fff; color: var(--ink); box-shadow: 0 1px 0 #fff inset, 0 24px 60px -24px rgba(40,56,110,.35), 0 2px 6px rgba(40,56,110,.06); cursor: pointer; font: inherit; transition: transform var(--t) var(--spring); }
+button.pp-share:hover:not(:disabled) { transform: translateY(-2px); }
+button.pp-share:disabled { opacity: .6; cursor: default; }
+button.pp-share strong { font-size: 15px; font-weight: 700; margin-top: 10px; }
+button.pp-share small { font-size: 12.5px; color: var(--ink-2); }
+.pp-share-ic { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--g-now); color: #fff; box-shadow: var(--reflect), var(--sh-now); position: relative; z-index: 1; }
+.pp-share-ic svg { width: 28px; height: 28px; }
+.pp-share-ring { position: absolute; top: 26px; left: 50%; width: 64px; height: 64px; margin-left: -32px; border-radius: 50%; border: 2px solid var(--blue); opacity: 0; animation: pp-ring 2.2s ease-out infinite; }
+@keyframes pp-ring { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(1.9); opacity: 0; } }
+.pp-steps { list-style: none; margin: 0; padding: 0 4px; display: grid; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.pp-steps li { display: flex; gap: 10px; align-items: center; }
+.pp-steps b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--inset); color: var(--ink-2); font-size: 11.5px; font-weight: 700; box-shadow: var(--sh-inset); }
+.pp-sharing { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--ink-2); padding: 0 4px; }
+.pp-more { font-size: 13px; color: var(--ink-2); padding: 0 4px; }
+.pp-more summary { cursor: pointer; font-weight: 600; color: var(--ink-3); }
+.pp-more code { display: block; margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .pp-share-ring, .pp-state i { animation: none; } }

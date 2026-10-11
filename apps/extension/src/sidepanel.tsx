@@ -1,18 +1,22 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createApi, RecruiterPanel } from '@kyc/panel';
-import { captureVisioTab } from './capture.ts';
+import { createApi } from '@kyc/panel';
 import './sidepanel.css';
 
+/**
+ * Panneau latéral Chrome d'Oval. Le panneau recruteur lui-même est la page /panel/<id> du site du moteur, affichée
+ * ici dans un cadre : c'est là que tournent MediaPipe et les modèles ONNX (même origine que les modèles), donc la
+ * même détection que dans la visio. Aucune image ne quitte le navigateur.
+ */
 const API_BASE: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8787';
 const WEB_BASE: string = import.meta.env.VITE_WEB_URL ?? 'http://localhost:5173';
+const OVAL_BASE: string = import.meta.env.VITE_OVAL_URL ?? 'http://localhost:5174';
 const api = createApi(API_BASE);
 
 function App() {
   const [sessionId, setSessionId] = useState('');
   const [recruiterKey, setRecruiterKey] = useState<string | undefined>();
   const [draft, setDraft] = useState('');
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,89 +26,64 @@ function App() {
     });
   }, []);
 
-  // Code recruteur donné à la création de l'entretien : « identifiant:jeton ».
+  // Code recruteur donné à la création de l'entretien : « identifiant:clé » (dans Oval : rapport → « Code extension »).
   function selectSession(code: string) {
-    const [id, key] = code.split(':');
+    const [id, key] = code.trim().split(':');
+    if (!id) return;
     setSessionId(id);
     setRecruiterKey(key);
     chrome.storage.local.set({ sessionId: id, recruiterKey: key });
   }
 
   async function createSession() {
+    setError(null);
     try {
       const created = await api.createSession('Candidat');
       selectSession(`${created.id}:${created.recruiterKey}`);
     } catch (e) {
-      setError(String(e));
+      setError(`Serveur injoignable (${API_BASE}). Lancez npm run dev.`);
     }
   }
 
-  async function startCapture() {
-    try {
-      const s = await captureVisioTab();
-      s.getVideoTracks()[0]?.addEventListener('ended', () => setStream(null));
-      setStream(s);
-      setError(null);
-    } catch (e) {
-      setError(String(e));
-    }
+  function reset() {
+    setSessionId('');
+    setRecruiterKey(undefined);
+    chrome.storage.local.remove(['sessionId', 'recruiterKey']);
   }
 
-  function stopCapture() {
-    stream?.getTracks().forEach((t) => t.stop());
-    setStream(null);
-  }
+  const panelUrl = `${WEB_BASE}/panel/${sessionId}${recruiterKey ? `?key=${recruiterKey}` : ''}`;
+  // Fenêtre flottante (façon Loom) : le panneau à côté de la visio, hors du navigateur.
+  const detach = () => chrome.windows.create({ url: panelUrl, type: 'popup', width: 420, height: 760 });
 
   if (!sessionId) {
     return (
-      <div className="setup">
-        <h1>KYC Visio</h1>
-        <button onClick={createSession}>Nouvel entretien</button>
-        <p>ou reprendre un entretien existant :</p>
-        <input placeholder="Code recruteur (identifiant:jeton)" value={draft} onChange={(e) => setDraft(e.target.value)} />
-        <button disabled={!draft} onClick={() => selectSession(draft.trim())}>
-          Reprendre
-        </button>
-        {error && <p className="error">{error}</p>}
+      <div className="ext">
+        <header className="ext-head"><span className="ext-logo"><i />oval</span></header>
+        <section className="ext-card ext-pop">
+          <h1>Quel entretien ?</h1>
+          <p>Collez le code de l’extension donné par Oval (rapport de l’entretien → « Code extension »).</p>
+          <form onSubmit={(e) => { e.preventDefault(); selectSession(draft); }}>
+            <input placeholder="identifiant:clé" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
+            <button className="ext-primary" disabled={!draft.includes(':')}>Ouvrir le panneau</button>
+          </form>
+          <div className="ext-or"><span>ou</span></div>
+          <button className="ext-secondary" onClick={createSession}>Créer un entretien rapide</button>
+          <a className="ext-link" href={`${OVAL_BASE}/#/entretiens/nouveau`} target="_blank" rel="noreferrer">Créer un entretien complet dans Oval ↗</a>
+          {error && <p className="ext-error">{error}</p>}
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="setup">
-      <div className="session-bar">
-        <span>
-          Entretien <code>{sessionId}</code>
-        </span>
-        <button
-          className="link"
-          onClick={() => {
-            stopCapture();
-            setSessionId('');
-            chrome.storage.local.remove(['sessionId', 'recruiterKey']);
-          }}
-        >
-          Changer
-        </button>
-      </div>
-      <p className="hint">
-        Lien candidat : <code>{`${WEB_BASE}/check/${sessionId}`}</code>
-      </p>
-      {stream ? (
-        <button className="secondary" onClick={stopCapture}>
-          Arrêter la capture
-        </button>
-      ) : (
-        <button onClick={startCapture}>Capturer l'onglet de visio</button>
-      )}
-      {error && <p className="error">{error}</p>}
-      <RecruiterPanel
-        sessionId={sessionId}
-        stream={stream}
-        apiBase={API_BASE}
-        recruiterKey={recruiterKey}
-        reportUrl={`${WEB_BASE}/report/${sessionId}${recruiterKey ? `?key=${recruiterKey}` : ''}`}
-      />
+    <div className="ext ext--panel">
+      <header className="ext-head">
+        <span className="ext-logo"><i />oval</span>
+        <span className="ext-session"><code>{sessionId}</code></span>
+        <button className="ext-ghost" title="Ouvrir dans une fenêtre flottante" onClick={detach}>⧉</button>
+        <button className="ext-ghost" onClick={reset}>Changer</button>
+      </header>
+      <iframe className="ext-frame" src={panelUrl} title="Panneau recruteur Oval" allow="display-capture; camera; microphone" />
     </div>
   );
 }

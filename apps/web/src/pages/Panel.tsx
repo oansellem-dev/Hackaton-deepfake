@@ -8,7 +8,7 @@ import { loadTracker, sampleLive } from '../lib/tracker.ts';
 
 // Panneau recruteur pour une visio Teams, Meet ou Zoom : le recruteur garde son outil de visio et partage ici la
 // fenêtre de l'appel. Tout est analysé dans ce navigateur (plus grand visage affiché = le candidat) ; rien n'est
-// enregistré ni envoyé, seulement des mesures.
+// enregistré ni envoyé, seulement des mesures. Aussi affiché dans le panneau latéral de l'extension Chrome.
 export function Panel() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
@@ -18,6 +18,7 @@ export function Panel() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presenceUrl, setPresenceUrl] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   // Confirmation d'appareil : lien à usage unique à coller dans la discussion Teams ; le candidat confirme avec la
   // clé d'accès créée à la pré-vérification.
@@ -33,8 +34,7 @@ export function Panel() {
 
   // Analyse chargée dès l'ouverture : mesures et défis prêts quand le partage commence.
   useEffect(() => {
-    loadTracker().catch(() => undefined);
-    loadFaceModels().catch(() => undefined);
+    Promise.allSettled([loadTracker(), loadFaceModels()]).then(() => setReady(true));
   }, []);
 
   useEffect(() => () => stream?.getTracks().forEach((t) => t.stop()), [stream]);
@@ -57,42 +57,37 @@ export function Panel() {
 
   return (
     <div className="panel-page">
-      <header className="panel-header">
-        <h1>Vérification pendant la visio</h1>
-        {!stream ? (
-          <>
-            <ol>
-              <li>Lancez l’entretien dans Teams, Meet ou Zoom, comme d’habitude.</li>
-              <li>
-                Affichez le candidat en grand (épinglez sa vidéo) : c’est le plus grand visage à l’écran qui est analysé.
-              </li>
-              <li>Cliquez ci-dessous et choisissez la fenêtre de la visio.</li>
-            </ol>
-            <button className="primary" onClick={share}>
-              Partager la fenêtre de la visio
-            </button>
-            {error && <p className="faceid-error">{error}</p>}
-          </>
-        ) : (
-          <p className="muted">
-            Fenêtre partagée avec ce panneau seulement : analysée dans ce navigateur, rien n’est enregistré ni envoyé.{' '}
-            <button className="link" onClick={stop}>
-              Arrêter le partage
-            </button>
-          </p>
-        )}
-        <p className="presence-link">
-          <button className="link" onClick={requestPresence}>
-            Demander la confirmation d’appareil
-          </button>
-          {presenceUrl && (
-            <span>
-              À coller dans la discussion de la visio : <code>{presenceUrl}</code>
-            </span>
-          )}
-        </p>
-        {stream && error && <p className="faceid-error">{error}</p>}
+      <header className="pp-head">
+        <span className="pp-logo"><i />oval</span>
+        <span className={`pp-state${stream ? ' is-live' : ready ? ' is-ready' : ''}`}>
+          <i />{stream ? 'En direct' : ready ? 'Prêt' : 'Chargement de l’analyse…'}
+        </span>
       </header>
+
+      {!stream ? (
+        <section className="pp-start">
+          <button className="pp-share" onClick={share} disabled={!ready}>
+            <span className="pp-share-ring" aria-hidden />
+            <span className="pp-share-ic" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="13" rx="3" /><path d="M8 21h8M12 17v4M12 7v6M9 10l3-3 3 3" /></svg>
+            </span>
+            <strong>Partager la fenêtre de la visio</strong>
+            <small>Teams, Meet ou Zoom · analysé ici, rien n’est enregistré</small>
+          </button>
+          <ol className="pp-steps">
+            <li><b>1</b>Lancez l’entretien comme d’habitude.</li>
+            <li><b>2</b>Affichez le candidat en grand : le plus grand visage à l’écran est analysé.</li>
+            <li><b>3</b>Choisissez la fenêtre de la visio.</li>
+          </ol>
+          {error && <p className="faceid-error">{error}</p>}
+        </section>
+      ) : (
+        <p className="pp-sharing">
+          Fenêtre partagée avec ce panneau seulement.
+          <button className="link" onClick={stop}>Arrêter</button>
+        </p>
+      )}
+
       <RecruiterPanel
         sessionId={id}
         stream={stream}
@@ -102,6 +97,15 @@ export function Panel() {
         detector={detector}
         reportUrl={`/report/${id}${recruiterKey ? `?key=${recruiterKey}` : ''}`}
       />
+
+      <details className="pp-more">
+        <summary>Confirmation d’appareil (clé d’accès)</summary>
+        <p className="presence-link">
+          <button className="link" onClick={requestPresence}>Générer le lien à coller dans la discussion</button>
+          {presenceUrl && <code>{presenceUrl}</code>}
+        </p>
+        {stream && error && <p className="faceid-error">{error}</p>}
+      </details>
     </div>
   );
 }

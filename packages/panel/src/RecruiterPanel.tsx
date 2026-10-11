@@ -68,6 +68,8 @@ export function RecruiterPanel({
   const [error, setError] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<Challenge>(() => pickChallenge());
   const [running, setRunning] = useState(false);
+  const [faceSeen, setFaceSeen] = useState<boolean | null>(null); // dernier échantillon : visage suivi ?
+  const [showWhy, setShowWhy] = useState(false);
   const followedRec = useRef(false);
 
   // Flux capturé → <video> local. Analysé dans le navigateur, jamais enregistré.
@@ -86,6 +88,7 @@ export function RecruiterPanel({
       busy = true;
       try {
         const sample = await liveSampler(video);
+        setFaceSeen(!!sample);
         if (sample) await api.sendLiveSample(sessionId, sample);
       } catch {
         /* mesure impossible : sans effet sur le score */
@@ -161,34 +164,69 @@ export function RecruiterPanel({
 
   // Manta ne parle qu'au recruteur et n'accuse jamais : « signal » = un point à vérifier, pas un verdict.
   const mantaState: MantaState = !stream ? 'neutre' : running ? 'analyse' : session?.decision ? 'verifie' : session?.score.level && session.score.level !== 'green' ? 'signal' : 'defi';
+  const level = session?.score.level ?? 'green';
+  const R = 26;
+  const C = 2 * Math.PI * R;
+  const liveDone = session?.challenges.filter((c) => c.phase !== 'precheck') ?? [];
 
   return (
     <div className="kyc-panel">
-      <video ref={videoRef} className="kyc-preview" autoPlay playsInline muted />
+      {/* Aperçu : flux capturé, analysé ici, jamais enregistré */}
+      <div className={`kyc-stage${stream ? ' is-live' : ''}`}>
+        <video ref={videoRef} className="kyc-preview" autoPlay playsInline muted />
+        {stream ? (
+          <span className={`kyc-live${faceSeen === false ? ' is-lost' : ''}`}>
+            <i />
+            {faceSeen === false ? 'Aucun visage à l’écran' : faceSeen ? 'Visage suivi · analyse locale' : 'En direct'}
+          </span>
+        ) : (
+          <span className="kyc-stage-empty">En attente de la visio</span>
+        )}
+        {running && <div className="kyc-scanline" aria-hidden />}
+      </div>
 
+      {/* Indice : anneau animé, jamais un verdict */}
       {session && (
-        <div className={`kyc-score kyc-${session.score.level}`}>
+        <div className={`kyc-score kyc-${level}`}>
+          <svg className="kyc-ring" viewBox="0 0 64 64" aria-hidden>
+            <circle cx="32" cy="32" r={R} className="kyc-ring-bg" />
+            <circle cx="32" cy="32" r={R} className="kyc-ring-val" strokeDasharray={`${(session.score.value / 100) * C} ${C}`} transform="rotate(-90 32 32)" />
+          </svg>
           <span className="kyc-score-value">{session.score.value}</span>
-          <span className="kyc-score-label">{LEVEL_LABEL[session.score.level]}</span>
+          <span className="kyc-score-text">
+            <span className="kyc-score-label">{LEVEL_LABEL[level]}</span>
+            <button type="button" className="kyc-why" aria-expanded={showWhy} onClick={() => setShowWhy((v) => !v)}>
+              {showWhy ? 'Masquer le détail' : 'Pourquoi ?'}
+            </button>
+          </span>
         </div>
       )}
-
-      {session && (
-        <ul className="kyc-explanation">
+      {session && showWhy && (
+        <ul className="kyc-explanation kyc-pop">
           {session.score.explanation.map((line) => (
             <li key={line}>{line}</li>
           ))}
         </ul>
       )}
 
-      <div className="kyc-mascot">
+      {/* Manta propose le défi */}
+      <div className="kyc-mascot" key={mascotMessage}>
         <Manta size={56} state={mantaState} />
-        <p className="kyc-bubble">{mascotMessage}</p>
+        <p className="kyc-bubble kyc-pop">{mascotMessage}</p>
       </div>
 
       <div className="kyc-actions">
-        <button disabled={!stream || running} onClick={runChallenge}>
-          {running ? 'Analyse en cours…' : `J'ai proposé : ${challenge.label}`}
+        <button className={`kyc-main${running ? ' is-running' : ''}`} disabled={!stream || running} onClick={runChallenge}>
+          {running ? (
+            <>
+              <i className="kyc-spin" /> Analyse en cours…
+            </>
+          ) : (
+            <>
+              <strong>J’ai proposé le défi</strong>
+              <small>{challenge.label}</small>
+            </>
+          )}
         </button>
         {running ? (
           <button className="kyc-secondary" onClick={() => abortRef.current?.abort()}>
@@ -200,15 +238,29 @@ export function RecruiterPanel({
           </button>
         )}
       </div>
+      {!stream && <p className="kyc-hint">Partagez d’abord la fenêtre de la visio : le défi s’analyse sur l’image du candidat.</p>}
+      {liveDone.length > 0 && (
+        <ol className="kyc-done">
+          {liveDone.map((c, i) => (
+            <li key={i} className={`kyc-done-${c.result}`}>
+              <i />
+              <span>{getChallenge(c.challengeId)?.label ?? c.challengeId}</span>
+              <small>{c.result === 'passed' ? 'réussi' : c.result === 'failed' ? 'à vérifier' : 'non concluant'}</small>
+            </li>
+          ))}
+        </ol>
+      )}
 
       <div className="kyc-decision">
-        <span>Votre décision{session?.decision ? ' (enregistrée)' : ''}</span>
+        <span>Votre décision{session?.decision ? ' · enregistrée' : ''}</span>
         {DECISIONS.map((d) => (
           <button
             key={d.value}
             className={session?.decision?.value === d.value ? 'kyc-selected' : 'kyc-secondary'}
+            aria-pressed={session?.decision?.value === d.value}
             onClick={() => decide(d.value)}
           >
+            {session?.decision?.value === d.value && <i className="kyc-check" />}
             {d.label}
           </button>
         ))}
@@ -216,7 +268,7 @@ export function RecruiterPanel({
 
       {reportUrl && (
         <a className="kyc-report-link" href={reportUrl} target="_blank" rel="noreferrer">
-          Rapport d'entretien
+          Rapport d’entretien ↗
         </a>
       )}
       {error && <p className="kyc-error">Serveur injoignable : {error}</p>}

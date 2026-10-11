@@ -1,23 +1,37 @@
-body {
-  margin: 0;
-  padding: 12px;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #1e1e2e;
-  background: #fff;
-}
+/* Coquille du panneau latéral Chrome (design Oval). Le panneau lui-même est la page /panel du moteur, dans le cadre. */
+@import "@kyc/design/src/tokens.css";
 
-.setup { display: flex; flex-direction: column; gap: 10px; }
-.setup h1 { font-size: 18px; margin: 0; }
-.setup > button {
-  border: none; border-radius: 8px; padding: 10px 12px; font-size: 14px;
-  background: #6c5ce7; color: #fff; cursor: pointer;
-}
-.setup > button:disabled { opacity: 0.5; }
-.setup > button.secondary { background: #ecebfa; color: #3d3480; }
-.setup input { padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: var(--font); color: var(--ink); background: linear-gradient(180deg, #f7f8fc 0%, #e9edf6 100%); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; letter-spacing: inherit; }
 
-.session-bar { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-button.link { background: none; border: none; color: #6c5ce7; cursor: pointer; padding: 0; }
-.hint { font-size: 12px; color: #666; margin: 0; }
-code { background: #ecebfa; padding: 1px 4px; border-radius: 4px; word-break: break-all; }
-.error { color: #9b1c1c; font-size: 12px; }
+.ext { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.ext--panel { padding: 8px 8px 8px; gap: 8px; }
+.ext-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+.ext-logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; margin-right: auto; }
+.ext-logo i { width: 11px; height: 17px; border: 3.5px solid var(--blue); border-radius: 50%; }
+.ext-session code { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: var(--inset); box-shadow: var(--sh-inset); }
+.ext-ghost { border: 0; background: none; color: var(--ink-2); font-weight: 600; font-size: 12.5px; padding: 6px 8px; border-radius: 999px; cursor: pointer; }
+.ext-ghost:hover { background: rgba(27,32,50,.06); color: var(--ink); }
+.ext-frame { flex: 1; width: 100%; border: 0; border-radius: 22px; background: #fff; box-shadow: 0 1px 0 #fff inset, 0 24px 60px -24px rgba(40,56,110,.35), 0 2px 6px rgba(40,56,110,.06); }
+
+.ext-card { background: #fff; border-radius: 22px; padding: 22px 20px; display: grid; gap: 12px; box-shadow: 0 1px 0 #fff inset, 0 24px 60px -24px rgba(40,56,110,.35), 0 2px 6px rgba(40,56,110,.06); }
+.ext-card h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.ext-card p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
+.ext-card form { display: grid; gap: 8px; }
+.ext-card input { padding: 11px 14px; border: 0; border-radius: 14px; background: var(--inset); color: var(--ink); box-shadow: var(--sh-inset); }
+.ext-card input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.ext-primary, .ext-secondary { border: 0; border-radius: 999px; padding: 12px 18px; font-weight: 600; cursor: pointer; transition: transform var(--t) var(--spring); }
+.ext-primary { background: var(--g-navy); color: #fff; box-shadow: var(--reflect), var(--sh-navy); }
+.ext-secondary { background: var(--card); color: var(--ink); box-shadow: var(--hi-soft), var(--sh-card); }
+.ext-primary:hover:not(:disabled), .ext-secondary:hover { transform: translateY(-1.5px); }
+.ext-primary:disabled { opacity: .5; cursor: default; }
+.ext-or { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.ext-or::before, .ext-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.ext-link { font-size: 13px; font-weight: 600; color: var(--blue-text); text-decoration: none; justify-self: center; }
+.ext-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ext-error { color: var(--gold-text); background: #fdf0c6; border-radius: 12px; padding: 8px 12px; font-size: 12.5px; }
+.ext-pop { animation: ext-pop 260ms cubic-bezier(.2,.9,.3,1.2) backwards; }
+@keyframes ext-pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ext-pop { animation: none; } }

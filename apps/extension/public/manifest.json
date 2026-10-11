@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Oval — panneau recruteur",
-  "description": "Vérifie qu'un humain réel est présent en visio. Analyse dans le navigateur, aucune vidéo enregistrée.",
+  "description": "Vérifie qu'une présence humaine est bien là en visio. Analyse dans le navigateur, aucune vidéo enregistrée.",
   "version": "0.1.0",
   "action": {
     "default_title": "Ouvrir le panneau Oval"
@@ -13,6 +13,12 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["sidePanel", "tabCapture", "activeTab", "storage"],
-  "host_permissions": ["http://localhost:8787/*"]
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:8787/*",
+    "http://localhost:5173/*"
+  ]
 }

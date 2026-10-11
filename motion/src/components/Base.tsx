@@ -8,7 +8,7 @@ export const Scene = ({ children, dark = false, fade = 12, style }: { children: 
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   return (
-    <AbsoluteFill style={{ background: dark ? C.navy : C.bg, color: dark ? '#f3f5f9' : C.ink, fontFamily: FONT, opacity: kf(frame, durationInFrames, fade, fade), ...style }}>
+    <AbsoluteFill style={{ background: dark ? C.navy : C.bg, color: dark ? '#f3f5f9' : C.ink, fontFamily: FONT, opacity: fade > 0 ? kf(frame, durationInFrames, fade, fade) : 1, ...style }}>
       {children}
     </AbsoluteFill>
   );

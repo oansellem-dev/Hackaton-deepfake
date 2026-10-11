@@ -6,6 +6,7 @@ import { S4 } from './scenes/Lien';
 import { S6, S7 } from './scenes/Visage';
 import { S10, S5, S8, S9 } from './scenes/Murs';
 import { S11, S12 } from './scenes/Fin';
+import * as V4 from './scenes4';
 
 loadManrope('normal', { weights: ['400', '600', '700', '800'], subsets: ['latin', 'latin-ext'] });
 loadMono('normal', { weights: ['400', '700', '800'], subsets: ['latin'] });
@@ -38,8 +39,21 @@ const OvalV3 = () => (
   </>
 );
 
+/** V4 : même storyboard, direction « mockups qui flottent » + bruitages. */
+const SCENES4 = SCENES.map((s, i) => ({ ...s, C: [V4.S1, V4.S2, V4.S3, V4.S4, V4.S5, V4.S6, V4.S7, V4.S8, V4.S9, V4.S10, V4.S11, V4.S12][i] }));
+const OvalV4 = () => (
+  <>
+    {SCENES4.map((s) => (
+      <Sequence key={s.id} name={s.id} from={s.start * FPS} durationInFrames={s.dur * FPS}>
+        <s.C />
+      </Sequence>
+    ))}
+  </>
+);
+
 export const Root = () => (
   <>
+    <Composition id="OvalV4" component={OvalV4} durationInFrames={TOTAL} fps={FPS} width={1920} height={1080} />
     <Composition id="OvalV3" component={OvalV3} durationInFrames={TOTAL} fps={FPS} width={1920} height={1080} />
     {SCENES.map((s) => (
       <Composition key={s.id} id={s.id.replace(/[^A-Za-z0-9]/g, '')} component={s.C} durationInFrames={s.dur * FPS} fps={FPS} width={1920} height={1080} />

@@ -173,7 +173,7 @@ export function RecruiterPanel({
   return (
     <div className="kyc-panel">
       {/* Aperçu : flux capturé, analysé ici, jamais enregistré */}
-      <BorderBeam size="md" colorVariant="ocean" theme="light" strength={0.9} active={running}>
+      <BorderBeam size="md" colorVariant="mono" theme="light" strength={0.9} active={running}>
       <div className={`kyc-stage${stream ? ' is-live' : ''}`}>
         <video ref={videoRef} className="kyc-preview" autoPlay playsInline muted />
         {stream ? (

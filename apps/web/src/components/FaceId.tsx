@@ -399,7 +399,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         horaire et votre adresse IP.
       </p>
 
-      <BorderBeam size="md" colorVariant="ocean" theme="light" strength={0.9} active={phase === 'running'}>
+      <BorderBeam size="md" colorVariant="mono" theme="light" strength={0.9} active={phase === 'running'}>
       <div className={`faceid-stage ${centered && currentStep === 'center' ? 'faceid-ok' : ''}`}>
         <video ref={videoRef} playsInline muted />
         <canvas ref={meshRef} className="faceid-mesh" aria-hidden />

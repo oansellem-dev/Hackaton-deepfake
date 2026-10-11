@@ -189,4 +189,7 @@ export const EN_ECRANS: Record<string, string> = {
   "E-mail envoyé à {prenom} ({email})": "E-mail sent to {prenom} ({email})",
   "Mode test : e-mail enregistré dans outbox/, rien n'est parti": "Test mode: e-mail saved in outbox/, nothing was sent",
   "entretien non relié au moteur": "interview not linked to the engine",
+  "Voir plus": "Show more",
+  "Voir moins": "Show less",
+  "{n} sur {total}": "{n} of {total}",
 };

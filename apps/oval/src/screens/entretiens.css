@@ -16,6 +16,7 @@
 .ent__chip svg { width: 12px; height: 12px; }
 
 .tbl { display: grid; }
+.tbl__plus { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0 4px; }
 .tbl__head, .tbl__row { display: grid; grid-template-columns: minmax(200px, 1.5fr) minmax(130px, 1fr) minmax(150px, 1.1fr) minmax(150px, 1.1fr) 88px; gap: 12px; align-items: center; padding: 0 12px; }
 .tbl__head { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .tbl__row { min-height: 66px; border-bottom: 1px solid var(--line); cursor: pointer; border-radius: 14px; transition: background-color var(--t-fast); }

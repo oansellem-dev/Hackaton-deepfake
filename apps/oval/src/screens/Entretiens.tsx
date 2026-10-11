@@ -39,13 +39,15 @@ export function Entretiens() {
   const [poste, setPoste] = useState(route.query.poste ?? "");
   const [q, setQ] = useState(route.query.q ?? "");
   const [tri, setTri] = useState<"asc" | "desc">("asc");
+  const PAGE = 8; // lignes affichées avant « Voir plus » : la liste ne descend pas trop bas
+  const [visibles, setVisibles] = useState(PAGE);
   // Les liens (Manta, accueil, cloche) arrivent par l'adresse
   useEffect(() => { setFiltre(valide(route.query.filtre)); setPoste(route.query.poste ?? ""); setQ(route.query.q ?? ""); }, [route.query.filtre, route.query.poste, route.query.q]);
   const majUrl = (f: Filtre, p: string, r: string) => {
     const qs = new URLSearchParams({ ...(f !== "tous" ? { filtre: f } : {}), ...(p ? { poste: p } : {}), ...(r ? { q: r } : {}) }).toString();
     history.replaceState(null, "", `#/entretiens${qs ? `?${qs}` : ""}`);
   };
-  const changer = (f: Filtre, p = poste, r = q) => transition(() => { setFiltre(f); setPoste(p); setQ(r); majUrl(f, p, r); });
+  const changer = (f: Filtre, p = poste, r = q) => transition(() => { setFiltre(f); setPoste(p); setQ(r); setVisibles(PAGE); majUrl(f, p, r); });
 
   const base = etat.entretiens.filter((x) => (!poste || x.candidat.poste === poste) && (!q || norm(`${nomComplet(x)} ${x.candidat.poste} ${x.candidat.email}`).includes(norm(q))));
   const liste = base.filter((x) => TEST[filtre](x, ref)).sort((a, b) => (tri === "asc" ? 1 : -1) * (+new Date(a.date) - +new Date(b.date)));
@@ -81,12 +83,12 @@ export function Entretiens() {
 
           <div className="tbl" role="table" aria-label={t("Entretiens")}>
             <div className="tbl__head" role="row"><span>{t("Candidat")}</span><span>{t("Date")}</span><span>{t("Pré-vérification")}</span><span>{t("Statut")}</span><span /></div>
-            {liste.map((x, i) => {
+            {liste.slice(0, visibles).map((x, i) => {
               const pv = statutPreVerif(x, ref);
               const st = statutEntretien(x, ref);
               const enAttente = TEST.preverif(x, ref);
               return (
-                <div key={x.id} role="row" className="tbl__row rise" tabIndex={0} aria-label={t("Rapport de {nom}", { nom: nomComplet(x) })} style={{ "--i": Math.min(i, 10), viewTransitionName: `ent-${x.id}` } as CSSProperties} onClick={() => ouvrir(x)} onKeyDown={(e) => clavier(e, x)}>
+                <div key={x.id} role="row" className="tbl__row rise" tabIndex={0} aria-label={t("Rapport de {nom}", { nom: nomComplet(x) })} style={{ "--i": i % PAGE, viewTransitionName: `ent-${x.id}` } as CSSProperties} onClick={() => ouvrir(x)} onKeyDown={(e) => clavier(e, x)}>
                   <span className="tbl__who"><Avatar initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} /><span><b>{nomComplet(x)}</b><small>{x.candidat.poste}</small></span></span>
                   <span className="tbl__date"><b>{memeJour(new Date(x.date), ref) ? t("Aujourd'hui") : quand(x.date, ref).split(" · ")[0]}</b><small>{heure(x.date)}{x.statut === "termine" ? ` · ${x.dureeMin} min` : ""}</small></span>
                   <span><Pill ton={pv.ton} dot>{pv.texte}</Pill></span>
@@ -100,6 +102,15 @@ export function Entretiens() {
               );
             })}
           </div>
+          {liste.length > visibles && (
+            <div className="tbl__plus">
+              <Btn onClick={() => transition(() => setVisibles((v) => v + PAGE))}>{t("Voir plus")}</Btn>
+              <span className="t-small muted">{t("{n} sur {total}", { n: visibles, total: liste.length })}</span>
+            </div>
+          )}
+          {liste.length > PAGE && liste.length <= visibles && (
+            <div className="tbl__plus"><Btn variant="ghost" onClick={() => transition(() => setVisibles(PAGE))}>{t("Voir moins")}</Btn></div>
+          )}
           {!liste.length && <Vide titre={t("Aucun entretien ne correspond.")} texte={t("Changez de filtre, de poste ou de recherche.")} action={<Btn onClick={() => changer("tous", "", "")}>{t("Tout montrer")}</Btn>} />}
         </section>
 

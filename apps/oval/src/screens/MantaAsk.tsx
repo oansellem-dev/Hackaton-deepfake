@@ -8,6 +8,12 @@ import { toast } from "../ui/toast";
 import { IcArrowR, IcFlag, IcList, IcMail, IcPlus, IcX } from "../ui/icons";
 import { ouvrirNouvelEntretien } from "../app/events";
 
+// Faisceau mono renforcé : trait de 3 px, encre foncée, visible sur la carte claire (le réglage par défaut est un fil gris de 1 px).
+const FAISCEAU = `
+[data-beam="{id}"][data-active]::after, [data-beam="{id}"][data-fading]::after {
+  padding: 3px;
+  background: conic-gradient(from var(--beam-angle-{id}), transparent 0%, transparent 50%, rgba(27,32,50,.12) 56%, rgba(27,32,50,.55) 61%, #1b2032 66%, rgba(27,32,50,.55) 71%, rgba(27,32,50,.12) 76%, transparent 82%, transparent 100%);
+}`;
 const MAX = 300;
 
 /** Bloc Manta de l'accueil : salutation, actions rapides, champ « Demande à Manta ». */
@@ -53,7 +59,7 @@ export function MantaAsk() {
           {rep.suggestions && <div className="row wrap" style={{ gap: 8 }}>{rep.suggestions.map((s) => <Btn key={s.libelle} size="sm" onClick={() => { setRep(null); s.executer(); }}>{s.libelle}</Btn>)}</div>}
         </div>
       )}
-      <BorderBeam colorVariant="mono" theme="light" size="md" strength={0.8}>
+      <BorderBeam colorVariant="mono" theme="light" size="md" strength={1} brightness={2.4} glowSize={2} duration={2.6} css={FAISCEAU}>
       <form className="card ask" onSubmit={(e) => { e.preventDefault(); envoyer(); }}>
         <label className="sr-only" htmlFor="demande-manta">Demande à Manta</label>
         <textarea id="demande-manta" ref={zone} rows={2} maxLength={MAX} value={texte} placeholder="Demande à Manta… ex. « Envoie un lien à Camille Royer »"

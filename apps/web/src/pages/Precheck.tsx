@@ -373,53 +373,68 @@ export function Precheck() {
 
       {step === 'done' && (
         <div className="card">
-          <h2>Merci, c’est terminé</h2>
-          {(outcome || flash) && (
-            <>
-              <p>Ce que nous avons vérifié :</p>
-              <ul className="status-list">
-                {outcome?.environment.map((r) => (
-                  <li key={r.label} className={`status-${r.status === 'contradiction' ? 'unknown' : r.status}`}>
-                    <strong>{r.label}</strong>
-                  </li>
-                ))}
-                {outcome?.steps.map((s, i) => (
-                  <li key={i} className={s.result === 'passed' ? 'status-ok' : 'status-unknown'}>
-                    <strong>{STEP_NAME[s.step]}</strong> — {s.result === 'passed' ? 'réalisé' : 'non concluant'}
-                  </li>
-                ))}
-                {flash && (
-                  <li className={flash.result === 'passed' ? 'status-ok' : 'status-unknown'}>
-                    <strong>Reflet de l’écran</strong> — {FLASH_TEXT[flash.result]}
-                  </li>
-                )}
-              </ul>
-            </>
-          )}
-          {info?.optedOut && (
-            <p>Vous avez choisi la vérification sans biométrie : le recruteur vérifiera pendant l’entretien.</p>
-          )}
-          {withdrawn ? (
-            <p>
-              <strong>Votre accord est retiré : l’empreinte de votre visage est supprimée.</strong>
+          <div className="done-hero">
+            <span className="done-check" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            </span>
+            <h2>{info?.optedOut ? 'C’est noté, merci' : 'Pré-vérification terminée'}</h2>
+            <p className="muted">
+              {info?.optedOut
+                ? 'Vous avez choisi la vérification sans biométrie : le recruteur fera les vérifications en direct, sans aucune pénalité.'
+                : `${controller ? controller.name : 'Votre recruteur'} est prévenu. Vous n’avez rien d’autre à faire avant l’entretien.`}
             </p>
-          ) : (
-            !info?.optedOut && (
+          </div>
+
+          {(outcome || flash) && (
+            <ul className="done-list">
+              {outcome?.environment.map((r) => (
+                <li key={r.label} className={r.status === 'ok' ? '' : 'is-unknown'}>
+                  <i>{r.status === 'ok' ? '✓' : '·'}</i><span>{r.label}</span><small>{r.status === 'ok' ? 'vérifié' : 'relevé'}</small>
+                </li>
+              ))}
+              {outcome?.steps.map((s, i) => (
+                <li key={i} className={s.result === 'passed' ? '' : 'is-unknown'}>
+                  <i>{s.result === 'passed' ? '✓' : '·'}</i><span>{STEP_NAME[s.step]}</span><small>{s.result === 'passed' ? 'réalisé' : 'non concluant, sans effet'}</small>
+                </li>
+              ))}
+              {flash && (
+                <li className={flash.result === 'passed' ? '' : 'is-unknown'}>
+                  <i>{flash.result === 'passed' ? '✓' : '·'}</i><span>Reflet de l’écran</span><small>{FLASH_TEXT[flash.result]}</small>
+                </li>
+              )}
+              {info?.deviceBound && <li><i>✓</i><span>Appareil associé</span><small>clé d’accès créée</small></li>}
+            </ul>
+          )}
+
+          <div className="done-next">
+            <h3>Et maintenant ?</h3>
+            <ol>
+              <li><b>1</b>Le jour J, connectez-vous à la visio depuis cet ordinateur, avec la même caméra.</li>
+              <li><b>2</b>Pendant l’entretien, le recruteur pourra vous demander un geste simple (tourner la tête, passer la main devant le visage). C’est normal.</li>
+              <li><b>3</b>Aucune vidéo n’est enregistrée, à aucun moment. Le recruteur décide : cette vérification ne remplace pas son jugement.</li>
+            </ol>
+          </div>
+
+          <div className="done-privacy">
+            {withdrawn ? (
+              <strong>Votre accord est retiré : l’empreinte de votre visage est supprimée.</strong>
+            ) : info?.optedOut ? (
+              <span>Aucune donnée biométrique n’a été collectée.</span>
+            ) : (
               <>
-                <p className="muted">
-                  Une empreinte numérique de votre visage (des mesures, aucune image) est conservée, chiffrée, jusqu’à la
-                  décision du recruteur et au plus {retentionHours} heures. Le recruteur décide : cette vérification ne
-                  remplace pas son jugement.
-                </p>
+                <span>
+                  Une empreinte numérique de votre visage (des mesures, aucune image) est conservée, chiffrée, jusqu’à la décision
+                  du recruteur et au plus {retentionHours} heures.
+                </span>
                 <button className="secondary" disabled={running} onClick={withdraw}>
                   Retirer mon accord et supprimer mon empreinte
                 </button>
               </>
-            )
-          )}
-          <p className="muted">
-            <Link to={`/confidentialite/${token}`}>Mentions d’information</Link> · Vous pouvez fermer cette page.
-          </p>
+            )}
+            <span>
+              <Link to={`/confidentialite/${token}`}>Mentions d’information</Link> · Vous pouvez fermer cette page.
+            </span>
+          </div>
           {error && <p className="faceid-error">{error}</p>}
         </div>
       )}

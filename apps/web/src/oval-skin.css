@@ -119,3 +119,57 @@ button.pp-share small { font-size: 12.5px; color: var(--ink-2); }
 .pp-more summary { cursor: pointer; font-weight: 600; color: var(--ink-3); }
 .pp-more code { display: block; margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { .pp-share-ring, .pp-state i { animation: none; } }
+
+/* ═══ Vérification du visage : maillage, repères, balayage ═══ */
+.faceid-stage { max-width: 520px; }
+.faceid-mesh { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; mix-blend-mode: screen; }
+.faceid-oval { width: 46%; height: 74%; border-width: 2px; border-color: rgba(255,255,255,.55); box-shadow: 0 0 0 999px rgba(10,14,30,.38), 0 0 36px rgba(86,180,240,.35); }
+.faceid-ok .faceid-oval { border-color: #6ef0b4; box-shadow: 0 0 0 999px rgba(10,14,30,.38), 0 0 44px rgba(110,240,180,.55); animation: faceid-pulse 1.6s ease-in-out infinite; }
+@keyframes faceid-pulse { 50% { box-shadow: 0 0 0 999px rgba(10,14,30,.38), 0 0 64px rgba(110,240,180,.8); } }
+.faceid-corner { position: absolute; width: 22px; height: 22px; border: 2.5px solid rgba(255,255,255,.85); pointer-events: none; }
+.faceid-corner--tl { left: 12px; top: 12px; border-right: 0; border-bottom: 0; border-radius: 8px 0 0 0; }
+.faceid-corner--tr { right: 12px; top: 12px; border-left: 0; border-bottom: 0; border-radius: 0 8px 0 0; }
+.faceid-corner--bl { left: 12px; bottom: 12px; border-right: 0; border-top: 0; border-radius: 0 0 0 8px; }
+.faceid-corner--br { right: 12px; bottom: 12px; border-left: 0; border-top: 0; border-radius: 0 0 8px 0; }
+.faceid-ok .faceid-corner { border-color: #6ef0b4; }
+.faceid-scan { position: absolute; left: 0; right: 0; top: 0; height: 26%; background: linear-gradient(180deg, transparent, rgba(120,210,255,.18) 60%, rgba(120,210,255,.55)); animation: faceid-scan 2.2s linear infinite; pointer-events: none; }
+@keyframes faceid-scan { from { transform: translateY(-100%); } to { transform: translateY(385%); } }
+.faceid-live { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px; background: rgba(12,16,30,.72); color: #fff; font-size: 12px; font-weight: 700; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.16); }
+.faceid-live i { width: 7px; height: 7px; border-radius: 50%; background: #78d2ff; animation: kyc-ping 1.8s ease-out infinite; }
+.faceid-ok .faceid-live i { background: #6ef0b4; }
+.faceid-instruction { animation: kyc-pop 300ms cubic-bezier(.2,.9,.3,1.2) backwards; }
+.faceid-steps li { transition: transform var(--t) var(--spring), background-color var(--t), color var(--t); }
+.faceid-steps li.faceid-current { transform: scale(1.06); }
+.faceid-steps li.faceid-passed::before { content: "✓ "; }
+.card:has(.faceid-stage) h2 { display: flex; align-items: center; gap: 10px; }
+.card:has(.faceid-stage) h2::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 4px var(--blue-soft); }
+
+/* Reflet de l'écran */
+.flash-stage { max-width: 520px; }
+.flash-stage:not(.flash-active) .flash-placeholder { font-weight: 600; }
+.flash-stage:not(.flash-active)::after { content: ""; position: absolute; left: 50%; top: 50%; width: 140px; height: 190px; transform: translate(-50%,-50%); border-radius: 50%; border: 2px dashed rgba(255,255,255,.35); animation: flash-breathe 3s ease-in-out infinite; }
+@keyframes flash-breathe { 50% { transform: translate(-50%,-50%) scale(1.06); border-color: rgba(120,210,255,.7); } }
+
+/* Fin du parcours : récapitulatif */
+.done-hero { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 6px 0 14px; }
+.done-check { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: var(--g-green); color: var(--green-ink); box-shadow: var(--reflect), var(--sh-green); animation: done-pop 500ms cubic-bezier(.2,.9,.3,1.3) backwards; position: relative; }
+.done-check::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid #3fc088; opacity: 0; animation: pp-ring 1.8s ease-out .4s 2; }
+.done-check svg { width: 34px; height: 34px; }
+@keyframes done-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.done-hero h2 { margin: 6px 0 0; font-size: 24px; }
+.done-hero p { margin: 0; max-width: 420px; }
+.done-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.done-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--panel); font-size: 14px; animation: kyc-pop 300ms var(--ease) backwards; }
+.done-list li:nth-child(2) { animation-delay: 60ms; } .done-list li:nth-child(3) { animation-delay: 120ms; } .done-list li:nth-child(4) { animation-delay: 180ms; } .done-list li:nth-child(5) { animation-delay: 240ms; } .done-list li:nth-child(6) { animation-delay: 300ms; }
+.done-list li i { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; background: #dff6ea; color: var(--green-text); font-size: 12px; font-weight: 800; }
+.done-list li.is-unknown i { background: var(--inset); color: var(--ink-3); }
+.done-list li span { flex: 1; font-weight: 600; }
+.done-list li small { color: var(--ink-2); }
+.done-next { display: grid; gap: 8px; margin: 14px 0 6px; }
+.done-next h3 { margin: 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.done-next li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink-2); }
+.done-next ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.done-next b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--g-now); color: #fff; font-size: 11.5px; font-weight: 700; box-shadow: var(--reflect), var(--sh-now); }
+.done-privacy { margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: var(--blue-soft); font-size: 13px; color: var(--ink); display: grid; gap: 8px; }
+.done-privacy button { justify-self: start; }
+@media (prefers-reduced-motion: reduce) { .faceid-scan, .faceid-ok .faceid-oval, .faceid-live i, .done-check, .done-check::after, .flash-stage::after { animation: none; } }

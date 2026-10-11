@@ -24,6 +24,7 @@ import {
 import { api } from '../config.ts';
 import { analyzeSnapshot, loadFaceModels, snapshotFace } from '../lib/faceModels.ts';
 import { detect, loadTracker } from '../lib/tracker.ts';
+import { clearFaceMesh, drawFaceMesh } from './FaceMesh.ts';
 
 const STEP_TEXT: Record<FaceIdStep, string> = {
   center: 'Placez votre visage dans l’ovale, de face, bien éclairé.',
@@ -82,6 +83,8 @@ function openCamera(deviceId?: string): Promise<MediaStream> {
 // À n'afficher qu'après le consentement biométrique explicite (écran précédent).
 export function FaceId({ token, declaredCountry, onDone }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const meshRef = useRef<HTMLCanvasElement>(null); // maillage dessiné sur le visage (affichage seulement)
+  const centeredRef = useRef(false);
   const streamRef = useRef<MediaStream | null>(null);
   const stopRef = useRef<() => void>(() => undefined);
   const envRef = useRef<EnvResult[]>([]);
@@ -238,6 +241,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
       try {
         const current = p.steps[step];
         const { face, hands } = detect(tracker, video, current === 'hand');
+        drawFaceMesh(meshRef.current, video, face, hands, !face ? 'lost' : centeredRef.current || current !== 'center' ? 'ok' : 'track');
         frames += 1;
         if (face) {
           tracked += 1;
@@ -259,6 +263,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
           const framed = w > 0.25 && w < 0.65 && Math.abs(cx - 0.5) < 0.12 && Math.abs(cy - 0.5) < 0.15;
           const ok = !!face && framed && luma > 50 && Math.abs(yaw) < 8;
           setCentered(ok);
+          centeredRef.current = ok;
           setMessage(
             !face
               ? 'Je ne vois pas de visage.'
@@ -327,6 +332,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         }
       } catch (e) {
         finished = true;
+        clearFaceMesh(meshRef.current);
         clearInterval(timer);
         stopCamera();
         setPhase('error');
@@ -394,7 +400,11 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
 
       <div className={`faceid-stage ${centered && currentStep === 'center' ? 'faceid-ok' : ''}`}>
         <video ref={videoRef} playsInline muted />
+        <canvas ref={meshRef} className="faceid-mesh" aria-hidden />
         <div className="faceid-oval" />
+        <i className="faceid-corner faceid-corner--tl" aria-hidden /><i className="faceid-corner faceid-corner--tr" aria-hidden /><i className="faceid-corner faceid-corner--bl" aria-hidden /><i className="faceid-corner faceid-corner--br" aria-hidden />
+        {phase === 'running' && <i className="faceid-scan" aria-hidden />}
+        {phase === 'running' && <span className="faceid-live"><i />{centered && currentStep === 'center' ? 'Visage bien placé' : 'Analyse dans votre navigateur'}</span>}
       </div>
 
       {phase === 'running' && currentStep && (

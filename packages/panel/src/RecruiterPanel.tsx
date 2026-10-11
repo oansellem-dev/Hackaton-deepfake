@@ -10,6 +10,7 @@ import {
 import { createApi } from './api.ts';
 import { stubDetector, type ChallengeDetector } from './detector.ts';
 import { Manta, type MantaState } from '@kyc/design';
+import { BorderBeam } from 'border-beam';
 import './panel.css';
 
 // Mesure du visage affiché, faite dans le navigateur du recruteur (MediaPipe + ONNX côté site) : jamais d'image.
@@ -172,6 +173,7 @@ export function RecruiterPanel({
   return (
     <div className="kyc-panel">
       {/* Aperçu : flux capturé, analysé ici, jamais enregistré */}
+      <BorderBeam size="md" colorVariant="ocean" theme="light" strength={0.9} active={running}>
       <div className={`kyc-stage${stream ? ' is-live' : ''}`}>
         <video ref={videoRef} className="kyc-preview" autoPlay playsInline muted />
         {stream ? (
@@ -184,6 +186,7 @@ export function RecruiterPanel({
         )}
         {running && <div className="kyc-scanline" aria-hidden />}
       </div>
+      </BorderBeam>
 
       {/* Indice : anneau animé, jamais un verdict */}
       {session && (

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type { Entretien } from "../store/types";
 import { aujourdhui, initiales, memeJour, nbSignauxAVerifier, nomComplet, useEtat } from "../store/store";
 import { heure, quand, relatif } from "../store/format";
@@ -39,15 +39,37 @@ export function Entretiens() {
   const [poste, setPoste] = useState(route.query.poste ?? "");
   const [q, setQ] = useState(route.query.q ?? "");
   const [tri, setTri] = useState<"asc" | "desc">("asc");
-  const PAGE = 8; // lignes affichées avant « Voir plus » : la liste ne descend pas trop bas
+  const PAGE = 8; // lignes ajoutées par « Voir plus »
+  // Lignes affichées au départ : autant qu'il en faut pour que la liste descende aussi bas que la rubrique
+  // « Liens en attente » à côté (mesurée), 8 au moins ; en une colonne, 8.
+  const corps = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(PAGE);
   const [visibles, setVisibles] = useState(PAGE);
+  useLayoutEffect(() => {
+    const el = corps.current; if (!el) return;
+    const mesurer = () => {
+      const aside = el.querySelector<HTMLElement>(".ent__attente"), liste = el.querySelector<HTMLElement>(".ent__liste");
+      const tbl = el.querySelector<HTMLElement>(".tbl"), rangs = el.querySelectorAll<HTMLElement>(".tbl__row"), plus = el.querySelector<HTMLElement>(".tbl__plus");
+      if (!aside || !liste || !tbl || !rangs.length || !aside.lastElementChild) return;
+      const aTop = aside.getBoundingClientRect().top, lTop = liste.getBoundingClientRect().top;
+      if (Math.abs(aTop - lTop) > 2) { setPage(PAGE); return; } // une seule colonne : rien à caler
+      const contenu = aside.lastElementChild.getBoundingClientRect().bottom - aTop + parseFloat(getComputedStyle(aside).paddingBottom);
+      const pas = rangs.length > 1 ? rangs[1].getBoundingClientRect().top - rangs[0].getBoundingClientRect().top : rangs[0].offsetHeight;
+      const dispo = contenu - (rangs[0].getBoundingClientRect().top - lTop) - (plus?.offsetHeight ?? 56) - parseFloat(getComputedStyle(liste).paddingBottom);
+      setPage(Math.max(PAGE, Math.floor(dispo / pas)));
+    };
+    mesurer();
+    const ro = new ResizeObserver(mesurer); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => { setVisibles((v) => Math.max(v, page)); }, [page]);
   // Les liens (Manta, accueil, cloche) arrivent par l'adresse
   useEffect(() => { setFiltre(valide(route.query.filtre)); setPoste(route.query.poste ?? ""); setQ(route.query.q ?? ""); }, [route.query.filtre, route.query.poste, route.query.q]);
   const majUrl = (f: Filtre, p: string, r: string) => {
     const qs = new URLSearchParams({ ...(f !== "tous" ? { filtre: f } : {}), ...(p ? { poste: p } : {}), ...(r ? { q: r } : {}) }).toString();
     history.replaceState(null, "", `#/entretiens${qs ? `?${qs}` : ""}`);
   };
-  const changer = (f: Filtre, p = poste, r = q) => transition(() => { setFiltre(f); setPoste(p); setQ(r); setVisibles(PAGE); majUrl(f, p, r); });
+  const changer = (f: Filtre, p = poste, r = q) => transition(() => { setFiltre(f); setPoste(p); setQ(r); setVisibles(page); majUrl(f, p, r); });
 
   const base = etat.entretiens.filter((x) => (!poste || x.candidat.poste === poste) && (!q || norm(`${nomComplet(x)} ${x.candidat.poste} ${x.candidat.email}`).includes(norm(q))));
   const liste = base.filter((x) => TEST[filtre](x, ref)).sort((a, b) => (tri === "asc" ? 1 : -1) * (+new Date(a.date) - +new Date(b.date)));
@@ -64,7 +86,7 @@ export function Entretiens() {
         <Tabs raised value={speciale ? "" : filtre} onChange={(id) => changer(id as Filtre)} items={TUILES.map((tu) => ({ id: tu.id, label: tu.id === "tous" ? t("Tous") : tu.label, icon: tu.ic, count: base.filter((x) => TEST[tu.id](x, ref)).length }))} />
       </header>
 
-      <div className="ent__corps">
+      <div className="ent__corps" ref={corps}>
         <section className="panel ent__liste rise" style={{ "--i": 3 } as CSSProperties}>
           <div className="ent__tools">
             <label className="ent__search"><IcSearch /><Input value={q} placeholder={t("Nom, poste, e-mail…")} onChange={(e) => changer(filtre, poste, e.target.value)} />{q && <button type="button" aria-label={t("Effacer")} onClick={() => changer(filtre, poste, "")}><IcX /></button>}</label>
@@ -108,8 +130,8 @@ export function Entretiens() {
               <span className="t-small muted">{t("{n} sur {total}", { n: visibles, total: liste.length })}</span>
             </div>
           )}
-          {liste.length > PAGE && liste.length <= visibles && (
-            <div className="tbl__plus"><Btn variant="ghost" onClick={() => transition(() => setVisibles(PAGE))}>{t("Voir moins")}</Btn></div>
+          {liste.length > page && liste.length <= visibles && (
+            <div className="tbl__plus"><Btn variant="ghost" onClick={() => transition(() => setVisibles(page))}>{t("Voir moins")}</Btn></div>
           )}
           {!liste.length && <Vide titre={t("Aucun entretien ne correspond.")} texte={t("Changez de filtre, de poste ou de recherche.")} action={<Btn onClick={() => changer("tous", "", "")}>{t("Tout montrer")}</Btn>} />}
         </section>

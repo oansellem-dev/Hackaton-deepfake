@@ -4,6 +4,8 @@
 
 Oval vérifie qu'un humain réel, et le bon, est présent dans une visio de recrutement. Le recruteur décide, l'outil éclaire.
 
+- **Guide pour le jury (tester en 5 minutes, lancer en local)** : [docs/jury/README.md](docs/jury/README.md)
+- Dashboard recruteur en ligne : https://oval-moteur.onrender.com/app/
 - Démo publique du moteur (page candidat, panneau) : https://oval-moteur.onrender.com
 - Point d'étape complet : [docs/point-etape-2026-10-11.md](docs/point-etape-2026-10-11.md)
 - Fiche de défense (1 page) : [docs/fiche-defense.md](docs/fiche-defense.md)

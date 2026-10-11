@@ -18,6 +18,7 @@ import { attachSignaling } from './signaling.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 import { presenceRouter } from './webauthn.ts';
 import { rateLimit } from './ratelimit.ts';
+import { emailRouter } from './email.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -57,6 +58,8 @@ app.post('/api/sessions', rateLimit(20, 60_000, 'création'));
 app.use('/api/cv', rateLimit(10, 60_000, 'cv'));
 app.use('/api/check', rateLimit(120, 60_000, 'candidat'));
 app.use('/api/presence', rateLimit(60, 60_000, 'présence'));
+app.use('/api/email', rateLimit(10, 60_000, 'e-mail'));
+app.use(emailRouter);
 // Les entretiens sont sauvegardés après chaque requête qui les modifie.
 app.use((req, res, next) => {
   if (req.method !== 'GET') res.on('finish', schedulePersist);
@@ -173,6 +176,13 @@ app.post('/api/sessions/:id/decision', recruiterOnly, async (req, res) => {
 
 // Mode partage : le serveur sert aussi le site construit (apps/web/dist), donc un seul tunnel suffit.
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
+// Dashboard recruteur (apps/oval/dist) sous /app : même origine que l'API, donc /api/* fonctionne tel quel.
+const ovalDist = fileURLToPath(new URL('../../oval/dist', import.meta.url));
+if (existsSync(ovalDist)) {
+  app.use('/app', express.static(ovalDist));
+  app.get(['/app', '/app/'], (_req, res) => res.sendFile(join(ovalDist, 'index.html')));
+  app.use(express.static(ovalDist, { index: false })); // avatars et images référencés en absolu
+}
 if (existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get('*', (_req, res) => res.sendFile(join(webDist, 'index.html')));

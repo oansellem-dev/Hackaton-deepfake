@@ -41,7 +41,7 @@ export async function envoyerPreVerif(id: string, relance = false): Promise<void
     recruteur: recruteur(etat, x.recruteurId).nom, token: lien.token, relance: estRelance, moteur: !!lienMoteur,
     objet: etat.reglages.textesLien.objet, intro: etat.reglages.textesLien.intro,
   });
-  const r = await envoyerEmail(email);
+  const r = await envoyerEmail(email, moteur ? { sessionId: moteur.sessionId, recruiterKey: moteur.recruiterKey } : undefined);
   if (r.mode === "envoye") toast(estRelance ? t("E-mail de rappel envoyé à {prenom} ({email})", { prenom: x.candidat.prenom, email: x.candidat.email }) : t("E-mail envoyé à {prenom} ({email})", { prenom: x.candidat.prenom, email: x.candidat.email }));
   else if (r.mode === "test") toast(t("Mode test : e-mail enregistré dans outbox/, rien n'est parti"));
   else signaler({ email, detail: { mode: "manuel", raison: r.raison, entretienId: id, prev } });

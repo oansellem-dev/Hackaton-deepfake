@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: free
     branch: integration/oval-moteur
-    buildCommand: npm install && npm -w apps/web run build
+    buildCommand: npm install && npm -w apps/web run build && npm -w apps/oval run build
     startCommand: npm -w apps/server run start
     healthCheckPath: /api/health
     envVars:

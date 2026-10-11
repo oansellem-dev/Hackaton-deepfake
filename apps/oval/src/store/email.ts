@@ -14,7 +14,7 @@ export type ResultatEnvoi = { mode: "envoye" } | { mode: "test" } | { mode: "man
 export const baseUrl = () => (import.meta.env.VITE_PUBLIC_URL ?? "").replace(/\/+$/, "") || location.origin;
 export const lienCandidat = (token: string) => `${baseUrl()}/#/candidat/${token}`;
 /** Adresse du site du moteur (pages candidat, visio, panneau) : VITE_MOTEUR_URL, sinon http://localhost:5173. */
-export const moteurUrl = () => (import.meta.env.VITE_MOTEUR_URL ?? "http://localhost:5173").trim().replace(/\/+$/, "");
+export const moteurUrl = () => (import.meta.env.VITE_MOTEUR_URL ?? (import.meta.env.PROD ? location.origin : "http://localhost:5173")).trim().replace(/\/+$/, "");
 /** Lien candidat du moteur : /check/<jeton>, pré-vérification réelle (identité, Face ID, reflet de l'écran). */
 export const lienCandidatMoteur = (token: string) => `${moteurUrl()}/check/${token}`;
 
@@ -70,9 +70,9 @@ ${d.relance ? `<p style="margin:0 0 12px;color:#5c3a00;font-weight:700;">${rappe
   return { to: d.to, subject, html, text, lien };
 }
 
-export async function envoyerEmail(m: Email): Promise<ResultatEnvoi> {
+export async function envoyerEmail(m: Email, moteur?: { sessionId: string; recruiterKey: string }): Promise<ResultatEnvoi> {
   try {
-    const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: m.to, subject: m.subject, html: m.html, text: m.text }) });
+    const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: m.to, subject: m.subject, html: m.html, text: m.text, sessionId: moteur?.sessionId, key: moteur?.recruiterKey }) });
     const j = (await r.json().catch(() => ({}))) as { test?: boolean; erreur?: string };
     if (r.ok) return j.test ? { mode: "test" } : { mode: "envoye" };
     return { mode: "manuel", raison: j.erreur ?? `erreur ${r.status}` };

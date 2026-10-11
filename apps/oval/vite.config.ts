@@ -9,6 +9,8 @@ import { emailPlugin } from "./server/email";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
+    // En production, le dashboard est servi par le serveur du moteur sous /app/ (même origine : /api/* direct).
+    base: mode === "production" ? "/app/" : "/",
     plugins: [react(), emailPlugin(env)],
     // Une seule copie de React pour les paquets de l'espace de travail (packages/design, bot-avatars).
     resolve: { dedupe: ["react", "react-dom"] },

@@ -40,6 +40,8 @@ export interface PreVerification {
   ouverteLe?: ISODate;
   relanceeLe?: ISODate;
   lien?: LienPreVerif;
+  /** Le candidat a préféré ne pas faire la vérification : jamais un signal négatif. */
+  refuseeLe?: ISODate;
   faiteLe?: ISODate;
   /** Les quatre étapes du lien. `undefined` = pas encore faite. */
   etapes: { accord?: boolean; camera?: boolean; lumiere?: Resultat; geste?: Resultat };

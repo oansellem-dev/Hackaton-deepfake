@@ -42,6 +42,11 @@ export function interpreter(demande: string, e: Etat): Reponse {
     const relance = x.preVerification.statut !== "non_envoyee";
     return { comprise: true, message: relance ? `Je relance ${nomComplet(x)} par e-mail.` : `J'envoie le lien de pré-vérification à ${nomComplet(x)}.`, executer: () => { void envoyerPreVerif(x.id, relance); } };
   }
+  // Rejoindre l'entretien de Y (page de visio Oval)
+  if (/rejoin|visio|appel|lance l.entretien/.test(t)) {
+    const x = trouver(e, t);
+    if (x) return { comprise: true, message: `On rejoint l'entretien de ${nomComplet(x)}.`, executer: aller(`#/visio/${x.id}`) };
+  }
   // Ouvrir le rapport de Y
   if (/rapport|resultat|deroule/.test(t)) {
     const x = trouver(e, t);

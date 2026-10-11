@@ -32,3 +32,8 @@ export const IcPrint = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><path d="M
 export const IcGrid = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>;
 export const IcInfo = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>;
 export const IcCopy = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>;
+export const IcLock = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="5" y="11" width="14" height="10" rx="2.5" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
+export const IcMic = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+export const IcMicOff = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M3 3l18 18" /></svg>;
+export const IcCamOff = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)}><rect x="3" y="7" width="13" height="10" rx="2.5" /><path d="M16 11l5-3v8l-5-3zM2 3l20 18" /></svg>;
+export const IcHangup = (p: SVGProps<SVGSVGElement>) => <svg {...P(p)} fill="currentColor" stroke="none"><path d="M2.6 14.6c5.3-4.8 13.5-4.8 18.8 0 .4.4.5 1 .1 1.5l-1.9 2.2a1.1 1.1 0 0 1-1.4.2l-2.7-1.6a1.1 1.1 0 0 1-.5-1v-1.8a9.6 9.6 0 0 0-6 0v1.8c0 .4-.2.8-.5 1l-2.7 1.6a1.1 1.1 0 0 1-1.4-.2l-1.9-2.2a1.1 1.1 0 0 1 .1-1.5z" /></svg>;

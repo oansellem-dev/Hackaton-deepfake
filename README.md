@@ -14,6 +14,17 @@ Après une modification, cliquer sur « Recharger » dans `chrome://extensions`.
 
 ## Tester à deux (deux machines)
 
+### Candidat sur une autre machine du même réseau
+
+La caméra n'est autorisée qu'en HTTPS (ou sur `localhost`). Sur le même Wi-Fi, sans tunnel :
+
+1. `apps/web/.env` : `HTTPS=1` (certificat auto-signé, le candidat accepte l'avertissement une fois).
+2. `apps/oval/.env` : `VITE_MOTEUR_URL=https://<IP de l'hôte>:5173` (IP : `ipconfig getifaddr en0` sur Mac). Le lien envoyé par Oval devient `https://<IP>:5173/check/<jeton>`.
+3. Relancer `npm run dev`. L'hôte accepte lui aussi l'avertissement sur `https://localhost:5173` et `https://<IP>:5173`.
+
+La clé d'accès (passkey) ne fonctionne pas sur une adresse IP : le candidat clique « Passer » à cette étape facultative. Pour un réseau qui bloque les appareils entre eux, voir le tunnel ci-dessous.
+
+
 La caméra n'est autorisée qu'en HTTPS (ou sur `localhost`). Le serveur sert donc le site lui-même et un seul tunnel HTTPS suffit.
 
 **Hôte (le recruteur)** — deux terminaux, dans le dossier du projet :

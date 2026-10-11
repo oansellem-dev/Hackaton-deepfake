@@ -25,7 +25,6 @@ import { api } from '../config.ts';
 import { analyzeSnapshot, loadFaceModels, snapshotFace } from '../lib/faceModels.ts';
 import { detect, loadTracker } from '../lib/tracker.ts';
 import { clearFaceMesh, drawFaceMesh } from './FaceMesh.ts';
-import { BorderBeam } from 'border-beam';
 
 const STEP_TEXT: Record<FaceIdStep, string> = {
   center: 'Placez votre visage dans l’ovale, de face, bien éclairé.',
@@ -399,7 +398,6 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         horaire et votre adresse IP.
       </p>
 
-      <BorderBeam size="md" colorVariant="mono" theme="light" strength={0.9} active={phase === 'running'}>
       <div className={`faceid-stage ${centered && currentStep === 'center' ? 'faceid-ok' : ''}`}>
         <video ref={videoRef} playsInline muted />
         <canvas ref={meshRef} className="faceid-mesh" aria-hidden />
@@ -408,7 +406,6 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         {phase === 'running' && <i className="faceid-scan" aria-hidden />}
         {phase === 'running' && <span className="faceid-live"><i />{centered && currentStep === 'center' ? 'Visage bien placé' : 'Analyse dans votre navigateur'}</span>}
       </div>
-      </BorderBeam>
 
       {phase === 'running' && currentStep && (
         <>

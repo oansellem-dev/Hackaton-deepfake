@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import { nomComplet, recruteur, useEtat } from "../store/store";
 import { ACTIONS_RAPIDES, interpreter, type Reponse } from "../store/manta-commands";
 import { Manta, type MantaState } from "../manta/Manta";
+import { BorderBeam } from "@kyc/design";
 import { Btn, ICirc, Pop } from "../ui/ui";
 import { toast } from "../ui/toast";
 import { IcArrowR, IcFlag, IcList, IcMail, IcPlus, IcX } from "../ui/icons";
@@ -38,6 +39,7 @@ export function MantaAsk() {
   };
 
   return (
+    <BorderBeam colorVariant="mono" theme="light" size="md" strength={0.8}>
     <section className="panel bloc manta-bloc rise" style={{ "--i": 4 } as CSSProperties}>
       <Manta state={mstate} size={124} title="Manta" />
       <h2 className="manta-bloc__hello">Bonjour {prenom},<br />que veux-tu vérifier aujourd'hui ?</h2>
@@ -66,5 +68,6 @@ export function MantaAsk() {
         </div>
       </form>
     </section>
+    </BorderBeam>
   );
 }

@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { RecruiterPanel, createApi } from '@kyc/panel';
 import type { SessionView } from '@kyc/shared';
 import { API_BASE, recruiterKeyFor } from '../config.ts';
+import { LogoMark } from '../components/Logo.tsx';
 import { loadFaceModels } from '../lib/faceModels.ts';
 import { createLiveDetector } from '../lib/liveDetector.ts';
 import { loadTracker, sampleLive } from '../lib/tracker.ts';
@@ -73,7 +74,7 @@ export function Panel() {
   return (
     <div className={`panel-page${widget ? ' panel-page--widget' : ''}`}>
       <header className="pp-head">
-        <span className="pp-logo"><i />oval</span>
+        <span className="pp-logo"><LogoMark size={22} />Oval</span>
         <span className={`pp-state${stream ? ' is-live' : ready ? ' is-ready' : ''}`}>
           <i />{stream ? 'En direct' : ready ? 'Prêt' : 'Chargement de l’analyse…'}
         </span>

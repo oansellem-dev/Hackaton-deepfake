@@ -16,7 +16,7 @@ interface Props {
 }
 
 /**
- * Manta = avatar « ghost » de bot-avatars, figé (paused) sauf pendant l'analyse et la vérification (canvas 2D, aucun WebGL, prefers-reduced-motion respecté).
+ * Manta = avatar « ghost » de bot-avatars, animé en continu (canvas 2D, aucun WebGL, prefers-reduced-motion respecté).
  * Les six états d'Oval se traduisent en état de l'avatar et en couleur du corps : jamais de rouge, le signal est doré.
  */
 const ETATS: Record<MantaState, { state: "default" | "working" | "sleeping"; color?: string; face?: "mouth" }> = {
@@ -34,7 +34,7 @@ export function Manta({ state = "neutre", size = 96, haloColor, className = "", 
   const style: CSSProperties = { width: px, height: px, display: "inline-block", lineHeight: 0, cursor: onClick ? "pointer" : undefined };
   return (
     <span className={`manta ${className}`} data-state={state} style={style} role="img" aria-label={title ?? "Manta"} onClick={onClick}>
-      <BotAvatar type="ghost" size={px} state={e.state} face={e.face} color={state === "lumiere" ? haloColor : e.color} paused={e.state !== "working"} />
+      <BotAvatar type="ghost" size={px} state={e.state} face={e.face} color={state === "lumiere" ? haloColor : e.color} />
     </span>
   );
 }

@@ -1,6 +1,6 @@
 /* ═══ Micro-interactions ═══ */
 
-/* Hôtes : un contexte de position pour l'ondulation et la lueur */
+/* Hôtes : un contexte de position pour l'ondulation */
 .btn, .icirc, .rail__item, .tabs__tab, .bar, .bcard, .plan__who, .tbl__row, .menu__item, .bacc__tete, .auj__card, .switch, .depli__btn,
 .card.lift, .defi-card, .bacc__item { position: relative; }
 
@@ -13,14 +13,7 @@
 .rail__item, .icirc, .btn--primary, .btn--now { will-change: translate; }
 .fx-retour { transition: translate .6s cubic-bezier(.22,1.4,.36,1) !important; }
 
-/* Lueur : un disque flou déplacé par transform (compositeur), visible uniquement au survol */
-.fx-glow { position: absolute; left: 0; top: 0; width: 240px; height: 240px; border-radius: 50%; pointer-events: none; z-index: 0;
-  background: radial-gradient(circle, rgba(52,99,234,.13) 0%, rgba(52,99,234,.05) 40%, transparent 70%);
-  opacity: 0; transition: opacity .35s ease; will-change: transform, opacity; }
-.fx-lit > .fx-glow { opacity: 1; }
-.auj__card--now > .fx-glow { background: radial-gradient(circle, rgba(255,255,255,.28) 0%, rgba(255,255,255,.1) 40%, transparent 70%); }
 .card.lift, .auj__card, .bcard, .tbl__row, .defi-card, .bacc__item { overflow: hidden; }
-.card.lift > :not(.fx-glow), .auj__card > :not(.fx-glow), .bcard > :not(.fx-glow), .tbl__row > :not(.fx-glow), .defi-card > :not(.fx-glow) { position: relative; z-index: 1; }
 
 /* Balayage lumineux sur les boutons principaux (shimmer), une fois par survol */
 .btn--primary, .btn--now { overflow: hidden; isolation: isolate; }
@@ -34,4 +27,4 @@
 .btn, .icirc, .rail__item { transition: transform .35s cubic-bezier(.22,1,.36,1), background-color var(--t) var(--ease), color var(--t) var(--ease), box-shadow .35s var(--ease); }
 .btn:active, .icirc:active, .rail__item:active, .tabs__tab:active { transition-duration: 90ms; }
 
-@media (prefers-reduced-motion: reduce) { .fx-ripple, .fx-glow, .btn--primary::before, .btn--now::before { display: none; } }
+@media (prefers-reduced-motion: reduce) { .fx-ripple, .btn--primary::before, .btn--now::before { display: none; } }

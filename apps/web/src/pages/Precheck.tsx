@@ -87,7 +87,9 @@ export function Precheck() {
   useEffect(() => {
     refresh().then((i) => {
       if (!i) return;
-      if (i.candidateFirstName) setForm((f) => ({ ...f, firstName: i.candidateFirstName! }));
+      // Pré-rempli par le recruteur (nom, e-mail) et par le CV qu'il a chargé : le candidat vérifie et corrige.
+      if (i.prefill) setForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(i.prefill!).filter(([, v]) => !!v)) }));
+      else if (i.candidateFirstName) setForm((f) => ({ ...f, firstName: i.candidateFirstName! }));
       let suite: Step;
       if (i.status === 'open') suite = i.schedule && !i.schedule.response ? 'slot' : i.identityDone ? 'consent' : 'identity';
       else if (i.faceDone && !i.flashDone && !i.optedOut && !i.withdrawn && i.status === 'used') suite = 'flash';
@@ -148,7 +150,8 @@ export function Precheck() {
   const controller = info?.controller;
   const entreprise = controller?.name ?? 'Le recruteur';
   const retentionHours = info?.biometricRetentionHours ?? 24;
-  const iEtape = ETAPES.findIndex((e) => e.id === (step === 'device' ? 'flash' : step));
+  const etapes = info?.schedule ? ETAPES : ETAPES.filter((e) => e.id !== 'slot');
+  const iEtape = etapes.findIndex((e) => e.id === (step === 'device' ? 'flash' : step));
   const prenom = form.firstName || info?.candidateFirstName || '';
 
   if (step === 'loading') return <div className="pc"><div className="pc-intro pc-intro--calme"><LogoIntro /></div></div>;
@@ -172,7 +175,7 @@ export function Precheck() {
 
   return (
     <div className="pc">
-      <Tete etape={iEtape} />
+      <Tete etape={iEtape} etapes={etapes} />
       <main className="pc-main" key={step}>
         {step === 'slot' && schedule && (
           <section className="pc-card pc-screen">
@@ -223,6 +226,7 @@ export function Precheck() {
               <>
                 <h2>Qui êtes-vous ?</h2>
                 <p className="muted">{entreprise} vous propose une vérification de deux minutes avant l’entretien, pour s’assurer que la personne en visio sera bien vous.</p>
+                {info?.prefill && Object.values(info.prefill).some(Boolean) && <p className="pc-note">Certains champs sont pré-remplis d’après votre CV : vérifiez-les et corrigez si besoin.</p>}
                 <div className="pc-grille">
                   <label className="pc-field"><span>Prénom</span><input value={form.firstName} onChange={set('firstName')} autoComplete="given-name" autoFocus /></label>
                   <label className="pc-field"><span>Nom</span><input value={form.lastName} onChange={set('lastName')} autoComplete="family-name" /></label>
@@ -369,13 +373,13 @@ export function Precheck() {
   );
 }
 
-function Tete({ etape = -1 }: { etape?: number }) {
+function Tete({ etape = -1, etapes = ETAPES }: { etape?: number; etapes?: typeof ETAPES }) {
   return (
     <header className="pc-tete">
       <span className="pc-marque"><LogoMark size={26} />Oval</span>
       {etape >= 0 && (
         <ol className="pc-prog" aria-label="Progression">
-          {ETAPES.map((e, i) => <li key={e.id} className={i < etape ? 'is-fait' : i === etape ? 'is-actif' : ''}><i /><span>{e.label}</span></li>)}
+          {etapes.map((e, i) => <li key={e.id} className={i < etape ? 'is-fait' : i === etape ? 'is-actif' : ''}><i /><span>{e.label}</span></li>)}
         </ol>
       )}
     </header>

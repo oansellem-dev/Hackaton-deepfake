@@ -1,11 +1,12 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { actions, aujourdhui, recruteur, useEtat } from "../store/store";
 import { envoyerPreVerif, apercuEmail } from "../store/envoi";
 import { composerEmail } from "../store/email";
 import { debutJour, isoDate, plusJours } from "../store/format";
 import { Btn, Field, Input, Select } from "../ui/ui";
 import { toast } from "../ui/toast";
-import { IcMail } from "../ui/icons";
+import { IcCheck, IcDownload, IcMail, IcX } from "../ui/icons";
+import { cvEnAttente, extraireCv, modeMoteur } from "../store/moteur";
 import { CREER, Logo, NOMS, fournisseurDe, lienValide } from "../ui/visio";
 import { Manta } from "../manta/Manta";
 
@@ -18,6 +19,30 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
   const etat = useEtat();
   const [f, setF] = useState<F>(() => ({ nom: "", email: "", poste: POSTES[0], date: initial?.date ?? isoDate(plusJours(debutJour(aujourdhui(etat)), 1)), heure: initial?.heure ?? "10:00", visio: "" }));
   const [err, setErr] = useState<Partial<Record<keyof F, string>>>({});
+  const [cv, setCv] = useState<File | null>(null);
+  const [cvEtat, setCvEtat] = useState<"" | "lecture" | "lu" | "erreur">("");
+  const [cvTrouve, setCvTrouve] = useState<string[]>([]);
+  const fichier = useRef<HTMLInputElement>(null);
+  /** CV déposé : le moteur le lit, et ce qu'il trouve pré-remplit les champs encore vides. */
+  const prendreCv = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { toast("Le CV doit être un PDF"); return; }
+    setCv(file); setCvEtat("lecture"); setCvTrouve([]);
+    if (!modeMoteur()) { setCvEtat("lu"); return; }
+    try {
+      const r = await extraireCv(file);
+      const p = r.prefill;
+      setF((cur) => ({
+        ...cur,
+        nom: cur.nom.trim() || [p.firstName, p.lastName].filter(Boolean).join(" "),
+        email: cur.email.trim() || p.email || "",
+        poste: POSTES.includes(p.jobTitle ?? "") ? (p.jobTitle as string) : cur.poste,
+      }));
+      setCvTrouve([p.firstName || p.lastName ? "nom" : "", p.email ? "e-mail" : "", p.phone ? "téléphone" : "", p.githubUrl ? "GitHub" : "", p.linkedinUrl ? "LinkedIn" : "", r.found.schools.length ? `${r.found.schools.length} formation${r.found.schools.length > 1 ? "s" : ""}` : ""].filter(Boolean));
+      setCvEtat("lu");
+    } catch (e) { setCvEtat("erreur"); toast(`CV illisible (${e instanceof Error ? e.message : e})`); }
+  };
+  const deposer = (e: DragEvent) => { e.preventDefault(); void prendreCv(e.dataTransfer.files?.[0]); };
   const set = (k: keyof F) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setF({ ...f, [k]: e.target.value }); if (err[k]) setErr({ ...err, [k]: undefined }); };
 
   const valider = (): Date | null => {
@@ -37,9 +62,11 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
     if (!quand) return;
     const [prenom, ...reste] = f.nom.trim().split(/\s+/);
     const x = actions.creerEntretien({ prenom, nom: reste.join(" "), email: f.email.trim(), poste: f.poste, date: quand.toISOString(), visio: f.visio.trim() || undefined }, false);
+    if (cv) cvEnAttente.set(x.id, cv);
     toast(lien ? `Entretien créé pour ${prenom}` : `Entretien créé pour ${prenom}, sans pré-vérification`);
     if (lien) void envoyerPreVerif(x.id);
     setF({ ...f, nom: "", email: "", visio: "" });
+    setCv(null); setCvEtat(""); setCvTrouve([]);
     onDone?.(x.id);
   };
   const prenom = f.nom.trim().split(/\s+/)[0];
@@ -50,6 +77,16 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
 
   return (
     <form className="nouvel" noValidate onSubmit={(e: FormEvent) => { e.preventDefault(); creer(true); }}>
+      <div className={`cvzone${cv ? " cvzone--plein" : ""}${cvEtat === "lecture" ? " cvzone--lecture" : ""}`} onDragOver={(e) => e.preventDefault()} onDrop={deposer} onClick={() => !cv && fichier.current?.click()} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") fichier.current?.click(); }}>
+        <input ref={fichier} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => void prendreCv(e.target.files?.[0])} />
+        {!cv ? (
+          <><span className="cvzone__ic"><IcDownload /></span><span className="cvzone__txt"><strong>Déposer le CV du candidat (PDF)</strong><small>Ses informations seront pré-remplies sur son lien, puis comparées à ce qu'il déclare et aux sources publiques.</small></span></>
+        ) : (
+          <><span className={`cvzone__ic${cvEtat === "lu" ? " is-ok" : ""}`}>{cvEtat === "lecture" ? <span className="progress" style={{ width: 18, marginTop: 0 }}><i /></span> : <IcCheck />}</span>
+            <span className="cvzone__txt"><strong>{cv.name}</strong><small>{cvEtat === "lecture" ? "Lecture du CV…" : cvEtat === "erreur" ? "Illisible : il sera tout de même joint." : cvTrouve.length ? `Trouvé : ${cvTrouve.join(", ")}` : modeMoteur() ? "Rien d'exploitable trouvé, le CV sera joint." : "Joint à l'entretien (mode moteur requis pour l'analyse)."}</small></span>
+            <button type="button" className="icirc icirc--sm" aria-label="Retirer le CV" onClick={(e) => { e.stopPropagation(); setCv(null); setCvEtat(""); setCvTrouve([]); }}><IcX /></button></>
+        )}
+      </div>
       <Field label="Candidat" error={err.nom}><Input value={f.nom} onChange={set("nom")} placeholder="Prénom Nom" autoFocus error={!!err.nom} /></Field>
       <Field label="E-mail" error={err.email}><Input type="email" value={f.email} onChange={set("email")} placeholder="prenom.nom@exemple.fr" error={!!err.email} /></Field>
       <Field label="Poste"><Select value={f.poste} onChange={set("poste")}>{POSTES.map((p) => <option key={p}>{p}</option>)}</Select></Field>

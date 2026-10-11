@@ -98,6 +98,7 @@
 .pc-bilan li.is-unknown i { background: var(--inset); color: var(--ink-3); }
 .pc-bilan span { flex: 1; font-weight: 600; } .pc-bilan small { color: var(--ink-2); }
 .pc-pied { display: grid; gap: 10px; font-size: 13px; color: var(--ink-2); padding-top: 4px; border-top: 1px solid var(--line); }
+.pc-note { font-size: 13.5px !important; color: var(--blue-text); background: var(--blue-soft); border-radius: 12px; padding: 9px 12px; }
 .pc-erreur { color: var(--gold-text); background: #fdf0c6; border-radius: 12px; padding: 9px 12px; font-size: 13.5px; }
 
 @media (max-width: 560px) { .pc-grille { grid-template-columns: 1fr; } .pc-faits > div { grid-template-columns: 1fr; } .pc-prog li { width: 38px; } .pc-prog li span { display: none; } .pc-card { padding: 22px 18px; border-radius: 22px; } }

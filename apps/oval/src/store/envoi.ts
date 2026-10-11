@@ -7,7 +7,7 @@ import type { PreVerification } from "./types";
 import { actions, getEtat, parId, recruteur } from "./store";
 import { composerEmail, envoyerEmail, type Email } from "./email";
 import { toast } from "../ui/toast";
-import { creerSession, modeMoteur } from "./moteur";
+import { creerSession, cvEnAttente, envoyerCv, modeMoteur } from "./moteur";
 
 export type DetailEmail = { mode: "apercu" } | { mode: "manuel"; raison: string; entretienId: string; prev: PreVerification };
 export interface EvenementEmail { email: Email; detail: DetailEmail }
@@ -24,6 +24,10 @@ export async function envoyerPreVerif(id: string, relance = false): Promise<void
   let moteur = x.moteur;
   if (!moteur && modeMoteur()) {
     try { moteur = await creerSession(x); } catch (e) { toast(`Moteur injoignable, lien de démo utilisé (${e instanceof Error ? e.message : e})`); }
+  }
+  const cv = cvEnAttente.get(id);
+  if (cv && moteur) {
+    try { await envoyerCv(id, cv); cvEnAttente.delete(id); } catch (e) { toast(`CV non analysé (${e instanceof Error ? e.message : e})`); }
   }
   const lienMoteur = moteur?.lienToken ? parId(getEtat(), id)?.preVerification.lien : undefined;
   const encoreValide = prev.lien && new Date(prev.lien.expireLe).getTime() > Date.now() ? prev.lien : undefined;

@@ -63,11 +63,32 @@ export async function creerSession(x: Entretien): Promise<Entretien["moteur"]> {
   const entreprise = e.reglages.entreprise?.trim();
   const v = await appel<SessionView & { recruiterKey: string }>("/api/sessions", {
     method: "POST",
-    body: JSON.stringify({ candidateLabel: `${x.candidat.prenom} ${x.candidat.nom}`.trim(), controllerName: entreprise || undefined, controllerContact: entreprise ? e.recruteurs.find((r) => r.id === e.moi)?.nom : undefined, schedule: chargeCreneau(x) }),
+    body: JSON.stringify({ candidateLabel: `${x.candidat.prenom} ${x.candidat.nom}`.trim(), controllerName: entreprise || undefined, controllerContact: entreprise ? e.recruteurs.find((r) => r.id === e.moi)?.nom : undefined, schedule: chargeCreneau(x), candidateEmail: x.candidat.email }),
   });
   const moteur = { sessionId: v.id, recruiterKey: v.recruiterKey, lienToken: v.candidateLink?.token };
   actions.lierMoteur(x.id, moteur, { token: v.candidateLink?.token ?? "", expireLe: iso(v.candidateLink?.expiresAt ?? Date.now()) });
   return moteur;
+}
+
+/* ── CV du candidat (PDF) : lu par le moteur, jamais conservé ── */
+export interface CvExtrait { found: { emails: string[]; phones: string[]; github: string[]; linkedin: string[]; schools: string[] }; prefill: { firstName?: string; lastName?: string; email?: string; phone?: string; jobTitle?: string; company?: string; city?: string; githubUrl?: string; linkedinUrl?: string } }
+const pdf = (f: File, cle?: string): RequestInit => ({ method: "POST", body: f, headers: { "Content-Type": "application/pdf", ...(cle ? { "X-Recruiter-Key": cle } : {}) } });
+async function appelPdf<T>(chemin: string, f: File, cle?: string): Promise<T> {
+  const r = await fetch(chemin, pdf(f, cle));
+  if (!r.ok) throw new Error(`${r.status} ${await r.text().catch(() => "")}`.trim());
+  return r.json() as Promise<T>;
+}
+/** Avant la création : ce que le CV contient, pour pré-remplir le formulaire du recruteur. */
+export const extraireCv = (f: File) => appelPdf<CvExtrait>("/api/cv/extract", f);
+/** CV en attente d'envoi : la session du moteur n'existe qu'au moment d'envoyer le lien. */
+export const cvEnAttente = new Map<string, File>();
+/** Joint le CV à l'entretien du moteur : le candidat trouvera ses informations pré-remplies, et le serveur comparera. */
+export async function envoyerCv(id: string, f: File): Promise<void> {
+  const x = getEtat().entretiens.find((e) => e.id === id);
+  if (!x?.moteur) return;
+  const v = await appelPdf<SessionView>(`/api/sessions/${x.moteur.sessionId}/cv`, f, x.moteur.recruiterKey);
+  const frais = getEtat().entretiens.find((e) => e.id === id);
+  if (frais) actions.remplacer(versEntretien(v, frais));
 }
 
 /** Après un déplacement dans le calendrier, ou pour accepter la proposition du candidat : le moteur reçoit le créneau à jour. */

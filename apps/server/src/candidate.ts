@@ -20,6 +20,7 @@ import {
   type Session,
 } from '@kyc/shared';
 import { audit } from './audit.ts';
+import { comparerCv } from './cv.ts';
 import { recordChallenge } from './challenges.ts';
 import { retention } from './config.ts';
 import { declaredInfoSignals, lookupWebPresence, sanitizeIdentity } from './identity.ts';
@@ -83,6 +84,12 @@ candidateRouter.get('/api/check/:token', link('any'), (_req, res) => {
   const info: CandidateLinkInfo = {
     candidateFirstName: session.candidateLabel.split(' ')[0] || undefined,
     schedule: session.schedule,
+    prefill: {
+      firstName: session.candidateLabel.split(' ')[0] || undefined,
+      lastName: session.candidateLabel.split(' ').slice(1).join(' ') || undefined,
+      email: session.candidateEmail,
+      ...Object.fromEntries(Object.entries(session.cv?.prefill ?? {}).filter(([, v]) => !!v)),
+    },
     status: linkStatus(session),
     expiresAt: session.candidateLink!.expiresAt,
     controller: session.controller,
@@ -114,8 +121,14 @@ candidateRouter.post('/api/check/:token/identity', link('open'), async (req, res
     declaredInfoSignals(identity),
   ]);
   // Une nouvelle saisie remplace la précédente (correction d'une faute de frappe).
-  session.signals = session.signals.filter((s) => s.source !== 'identity');
+  session.signals = session.signals.filter((s) => s.source !== 'identity' && s.source !== 'cv');
   upsertSignals(session, [presence, ...declared]);
+  // CV chargé par le recruteur : ce que le candidat déclare est comparé à ce qu'il y a écrit.
+  if (session.cv) {
+    const cmp = comparerCv(session.cv.found, identity);
+    session.cv.consistent = cmp.consistent;
+    upsertSignals(session, cmp.signals);
+  }
   audit(session, 'candidat', 'Informations déclarées', 'accord pour leur vérification dans des sources publiques');
   schedulePersist();
   res.json({ checked: true });

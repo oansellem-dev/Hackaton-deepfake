@@ -4,9 +4,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import { getChallenge, type ChallengeResult, type Decision, type Schedule } from '@kyc/shared';
+import { getChallenge, type ChallengeResult, type Decision, type Schedule, type CvAnalysis } from '@kyc/shared';
 import { analyzeCv, viewWithAgent, type CvResult } from './agent.ts';
 import { audit } from './audit.ts';
+import { analyserTexte, comparerCv, extraireTexte } from './cv.ts';
 import { recruiterOnly } from './auth.ts';
 import { candidateRouter } from './candidate.ts';
 import { cleanMetrics, recordChallenge } from './challenges.ts';
@@ -60,13 +61,14 @@ app.get('/api/health', (_req, res) => {
 
 // Création par le recruteur : il indique le responsable du traitement (son entreprise) et un contact pour les droits.
 app.post('/api/sessions', async (req, res) => {
-  const body = (req.body ?? {}) as { candidateLabel?: string; controllerName?: string; controllerContact?: string; schedule?: unknown };
+  const body = (req.body ?? {}) as { candidateLabel?: string; candidateEmail?: string; controllerName?: string; controllerContact?: string; schedule?: unknown };
   const name = String(body.controllerName ?? '').trim().slice(0, 120);
   const contact = String(body.controllerContact ?? '').trim().slice(0, 160);
   const session = createSession(
     String(body.candidateLabel ?? 'Candidat').slice(0, 120),
     name ? { name, contact } : undefined,
     cleanSchedule(body.schedule),
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.candidateEmail ?? '')) ? String(body.candidateEmail).slice(0, 160) : undefined,
   );
   // Seule réponse qui contient le jeton du recruteur : à garder, il donne accès aux signaux et au rapport.
   res.status(201).json({ ...(await viewWithAgent(session)), recruiterKey: session.recruiterKey });
@@ -112,61 +114,45 @@ app.use(flashRouter);
 app.use(liveRouter);
 app.use(presenceRouter);
 
-// CV chargé par le recruteur (jamais par le candidat : son parcours reste léger). Comparé à ses déclarations,
-// puis oublié : on garde seulement les écarts, les éléments concordants et les liens de vérification.
+// CV chargé par le recruteur à la création de l'entretien (jamais par le candidat). Lu puis oublié : on garde ce qui
+// a été trouvé pour pré-remplir le candidat, et pour comparer ensuite ses déclarations à son CV.
 app.post('/api/sessions/:id/cv', recruiterOnly, express.raw({ type: 'application/pdf', limit: '8mb' }), async (req, res) => {
   const session = getSession(req.params.id)!;
-  if (!session.identity) {
-    return res.status(409).json({ error: "le candidat n'a pas encore rempli ses informations" });
-  }
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'PDF manquant' });
-  try {
-    const { status, body } = await analyzeCv(session, req.body);
-    if (status !== 200) return res.status(status).json({ error: (body as { detail?: string }).detail ?? 'CV illisible' });
-    const cv = body as CvResult;
-    session.cv = { analyzedAt: Date.now(), found: cv.found, consistent: cv.consistent, links: cv.links };
-    session.signals = session.signals.filter((s) => s.source !== 'cv');
-    const at = Date.now();
-    upsertSignals(session, [
-      ...cv.inconsistencies.map((i) => ({
-        id: i.field,
-        source: 'cv' as const,
-        severity: 'medium' as const,
-        status: 'contradiction' as const,
-        label: i.label,
-        detail: i.detail,
-        at,
-      })),
-      ...(cv.consistent.length
-        ? [
-            {
-              id: 'cv.consistent',
-              source: 'cv' as const,
-              severity: 'medium' as const,
-              status: 'ok' as const,
-              label: 'Concordant avec le CV',
-              detail: `Identique dans le CV et la pré-vérification : ${cv.consistent.join(', ')}.`,
-              at,
-            },
-          ]
-        : []),
-    ]);
-    audit(session, 'recruteur', 'CV comparé aux déclarations', `${cv.inconsistencies.length} écart(s), CV non conservé`);
-    res.json(await viewWithAgent(session));
-  } catch {
-    res.status(503).json({ error: 'agent injoignable' });
+  let texte: string;
+  try { texte = await extraireTexte(req.body); } catch { return res.status(422).json({ error: 'CV illisible (PDF scanné ou protégé)' }); }
+  const local = analyserTexte(texte);
+  let found = local.found, consistent: string[] = [], links: CvAnalysis['links'] = [], inconsistencies: CvResult['inconsistencies'] = [];
+  // L'agent, s'il répond et si le candidat a déjà déclaré ses informations, affine la comparaison et donne les liens.
+  if (session.identity) {
+    try {
+      const { status, body } = await analyzeCv(session, req.body);
+      if (status === 200) { const cv = body as CvResult; found = { ...local.found, ...cv.found }; consistent = cv.consistent; links = cv.links; inconsistencies = cv.inconsistencies; }
+    } catch { /* agent absent : comparaison locale ci-dessous */ }
   }
-});
-
-// Suppression manuelle du gabarit biométrique par le recruteur, à tout moment.
-app.delete('/api/sessions/:id/biometrics', recruiterOnly, async (req, res) => {
-  const session = getSession(req.params.id)!;
-  purgeBiometrics(session, 'suppression manuelle', 'recruteur');
+  session.cv = { analyzedAt: Date.now(), found, consistent, links, prefill: local.prefill };
+  session.signals = session.signals.filter((s) => s.source !== 'cv');
+  const at = Date.now();
+  if (session.identity) {
+    const { consentAt, ...declared } = session.identity;
+    const cmp = comparerCv(found, declared, at);
+    session.cv.consistent = [...new Set([...consistent, ...cmp.consistent])];
+    upsertSignals(session, [
+      ...cmp.signals,
+      ...inconsistencies.map((i) => ({ id: i.field, source: 'cv' as const, severity: 'medium' as const, status: 'contradiction' as const, label: i.label, detail: i.detail, at })),
+    ]);
+  }
+  audit(session, 'recruteur', 'CV chargé', `${found.emails.length} e-mail(s), ${found.phones.length} téléphone(s), ${found.github.length + found.linkedin.length} profil(s), ${found.schools.length} formation(s)`);
+  schedulePersist();
   res.json(await viewWithAgent(session));
 });
 
-// Règle n°2 : la décision appartient au recruteur, on la trace pour le rapport (brique E).
-// Elle clôt l'entretien : le gabarit biométrique est supprimé.
+// Lecture d'un CV avant même la création de l'entretien : de quoi pré-remplir le formulaire du recruteur.
+app.post('/api/cv/extract', express.raw({ type: 'application/pdf', limit: '8mb' }), async (req, res) => {
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'PDF manquant' });
+  try { res.json(analyserTexte(await extraireTexte(req.body))); } catch { res.status(422).json({ error: 'CV illisible (PDF scanné ou protégé)' }); }
+});
+
 app.post('/api/sessions/:id/decision', recruiterOnly, async (req, res) => {
   const session = getSession(req.params.id)!;
   const { value, note } = req.body as { value: Decision; note?: string };

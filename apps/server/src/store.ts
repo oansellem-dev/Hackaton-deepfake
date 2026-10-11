@@ -114,7 +114,7 @@ setInterval(sweepExpiredBiometrics, retention.sweepMs).unref();
 
 // --- Entretiens et liens ---
 
-export function createSession(candidateLabel: string, controller?: Controller, schedule?: Schedule): Session {
+export function createSession(candidateLabel: string, controller?: Controller, schedule?: Schedule, candidateEmail?: string): Session {
   const session: Session = {
     id: randomUUID().slice(0, 8),
     createdAt: Date.now(),
@@ -127,6 +127,7 @@ export function createSession(candidateLabel: string, controller?: Controller, s
     candidateLink: { token: newToken(24), expiresAt: Date.now() + retention.candidateLinkTtlMs },
     ...(controller ? { controller } : {}),
     ...(schedule ? { schedule } : {}),
+    ...(candidateEmail ? { candidateEmail } : {}),
   };
   sessions.set(session.id, session);
   index(session);

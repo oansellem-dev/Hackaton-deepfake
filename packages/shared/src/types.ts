@@ -73,6 +73,8 @@ export interface CvAnalysis {
   found: { emails: string[]; phones: string[]; github: string[]; linkedin: string[]; schools: string[] };
   consistent: string[]; // éléments identiques entre le CV et les déclarations
   links: { categorie: string; label: string; url: string }[];
+  // Ce que le CV permet de pré-remplir sur la page du candidat (il vérifie et corrige, puis le serveur compare).
+  prefill?: Partial<Omit<IdentityPayload, 'consent'>>;
 }
 
 // Version du texte de consentement biométrique affiché au candidat (à changer à chaque modification du texte).
@@ -131,6 +133,7 @@ export interface Session {
   id: string;
   createdAt: number;
   candidateLabel: string;
+  candidateEmail?: string; // adresse connue du recruteur, pour pré-remplir le candidat
   precheckDone: boolean;
   controller?: Controller;
   candidateLink?: CandidateLink;
@@ -203,4 +206,5 @@ export interface CandidateLinkInfo {
   deviceBound: boolean;
   candidateFirstName?: string; // prénom donné par le recruteur, pour l'accueil
   schedule?: Schedule;
+  prefill?: Partial<Omit<IdentityPayload, 'consent'>>; // depuis le CV chargé par le recruteur, à vérifier par le candidat
 }

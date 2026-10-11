@@ -45,7 +45,8 @@
 .manta-bloc__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .reponse { width: 100%; text-align: left; padding: 12px 14px; display: grid; gap: 10px; font-size: 14px; }
 .reponse__top { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; }
-.ask { width: 100%; text-align: left; padding: 12px 12px 10px 14px; display: grid; gap: 8px; margin-top: auto; }
+.manta-bloc > :last-child { width: 100%; margin-top: auto; }
+.ask { width: 100%; text-align: left; padding: 12px 12px 10px 14px; display: grid; gap: 8px; }
 .ask:focus-within { box-shadow: var(--hi-soft), var(--sh-card), 0 0 0 2px var(--blue); }
 .ask textarea { width: 100%; border: 0; background: transparent; outline: 0; resize: none; font: inherit; font-weight: 500; color: var(--ink); min-height: 46px; line-height: 1.4; }
 .ask textarea::placeholder { color: var(--ink-3); }

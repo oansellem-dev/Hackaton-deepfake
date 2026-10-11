@@ -39,7 +39,6 @@ export function MantaAsk() {
   };
 
   return (
-    <BorderBeam colorVariant="mono" theme="light" size="md" strength={0.8}>
     <section className="panel bloc manta-bloc rise" style={{ "--i": 4 } as CSSProperties}>
       <Manta state={mstate} size={124} title="Manta" />
       <h2 className="manta-bloc__hello">Bonjour {prenom},<br />que veux-tu vérifier aujourd'hui ?</h2>
@@ -54,6 +53,7 @@ export function MantaAsk() {
           {rep.suggestions && <div className="row wrap" style={{ gap: 8 }}>{rep.suggestions.map((s) => <Btn key={s.libelle} size="sm" onClick={() => { setRep(null); s.executer(); }}>{s.libelle}</Btn>)}</div>}
         </div>
       )}
+      <BorderBeam colorVariant="mono" theme="light" size="md" strength={0.8}>
       <form className="card ask" onSubmit={(e) => { e.preventDefault(); envoyer(); }}>
         <label className="sr-only" htmlFor="demande-manta">Demande à Manta</label>
         <textarea id="demande-manta" ref={zone} rows={2} maxLength={MAX} value={texte} placeholder="Demande à Manta… ex. « Envoie un lien à Camille Royer »"
@@ -67,7 +67,7 @@ export function MantaAsk() {
           <ICirc size="sm" label="Envoyer à Manta" type="submit"><IcArrowR /></ICirc>
         </div>
       </form>
+      </BorderBeam>
     </section>
-    </BorderBeam>
   );
 }

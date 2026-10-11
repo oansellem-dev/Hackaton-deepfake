@@ -9,7 +9,7 @@ import {
 } from '@kyc/shared';
 import { createApi } from './api.ts';
 import { stubDetector, type ChallengeDetector } from './detector.ts';
-import { Mascot } from './Mascot.tsx';
+import { Manta, type MantaState } from '@kyc/design';
 import './panel.css';
 
 // Mesure du visage affiché, faite dans le navigateur du recruteur (MediaPipe + ONNX côté site) : jamais d'image.
@@ -159,6 +159,9 @@ export function RecruiterPanel({
         ? `Un signal est à vérifier, rien n'est confirmé. ${challenge.mascotLine}`
         : challenge.mascotLine;
 
+  // Manta ne parle qu'au recruteur et n'accuse jamais : « signal » = un point à vérifier, pas un verdict.
+  const mantaState: MantaState = !stream ? 'neutre' : running ? 'analyse' : session?.decision ? 'verifie' : session?.score.level && session.score.level !== 'green' ? 'signal' : 'defi';
+
   return (
     <div className="kyc-panel">
       <video ref={videoRef} className="kyc-preview" autoPlay playsInline muted />
@@ -178,7 +181,10 @@ export function RecruiterPanel({
         </ul>
       )}
 
-      <Mascot message={mascotMessage} busy={running} />
+      <div className="kyc-mascot">
+        <Manta size={56} state={mantaState} />
+        <p className="kyc-bubble">{mascotMessage}</p>
+      </div>
 
       <div className="kyc-actions">
         <button disabled={!stream || running} onClick={runChallenge}>

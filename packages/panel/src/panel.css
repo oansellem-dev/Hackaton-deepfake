@@ -1,3 +1,6 @@
+/* Jetons du système de design d'Oval (packages/design) : le panneau a le même habillage dans la visio et l'extension. */
+@import "@kyc/design/src/tokens.css";
+
 .kyc-panel {
   display: flex;
   flex-direction: column;
@@ -62,3 +65,19 @@
 
 .kyc-report-link { font-size: 13px; color: #6c5ce7; }
 .kyc-error { color: #9b1c1c; font-size: 12px; }
+
+/* ═══ Habillage Oval (après les règles de base ci-dessus) ═══ */
+.kyc-panel { font-family: var(--font); color: var(--ink); gap: 12px; }
+.kyc-panel button { padding: 11px 14px; font-size: 13.5px; }
+.kyc-preview { border-radius: 18px; background: #0d1122; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.kyc-score { border-radius: 18px; padding: 12px 14px; gap: 12px; }
+.kyc-score-value { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kyc-green { background: var(--g-green); color: var(--green-ink); box-shadow: var(--reflect), var(--sh-green); }
+.kyc-orange, .kyc-red { background: var(--g-gold); color: var(--gold-text); box-shadow: var(--reflect), var(--sh-gold); }
+.kyc-explanation { color: var(--ink-2); }
+.kyc-mascot { display: flex; gap: 10px; align-items: center; }
+.kyc-bubble { background: var(--blue-soft); color: var(--ink); border-radius: 18px; padding: 10px 14px; font-size: 14px; line-height: 1.45; }
+.kyc-decision { gap: 8px; }
+.kyc-decision > span { font-weight: 600; color: var(--ink-2); font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; }
+.kyc-report-link { color: var(--blue-text); font-weight: 600; }
+.kyc-error { color: var(--gold-text); }

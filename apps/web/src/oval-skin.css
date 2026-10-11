@@ -1,0 +1,93 @@
+/* ═══ Habillage Oval des pages caméra du moteur (CSS seulement, aucune logique touchée) ═══
+   Jetons et matières : @kyc/design. Les sélecteurs reprennent ceux de styles.css et panel.css, chargés avant. */
+@import "@kyc/design/src/tokens.css";
+@import "@kyc/design/src/motion.css";
+
+body { font-family: var(--font); color: var(--ink); background: linear-gradient(180deg, #f7f8fc 0%, #e9edf6 100%); min-height: 100vh; -webkit-font-smoothing: antialiased; font-size: 15px; line-height: 1.45; font-weight: 500; letter-spacing: -0.005em; }
+h1, h2, h3 { letter-spacing: -0.02em; font-weight: 600; }
+.page { max-width: 640px; padding: 28px 16px 40px; }
+.page > h1 { font-size: 26px; margin: 0 0 14px; }
+.page > h1::before { content: ""; display: inline-block; width: 11px; height: 17px; margin: 0 10px -2px 0; border: 3.5px solid var(--blue); border-radius: 50%; }
+.card { background: #fff; border-radius: 24px; padding: 24px 26px; box-shadow: 0 1px 0 #fff inset, 0 24px 60px -24px rgba(40,56,110,.35), 0 2px 6px rgba(40,56,110,.06); margin-bottom: 16px; }
+.card h2 { font-size: 20px; margin: 0 0 10px; }
+.muted { color: var(--ink-2); font-size: 14px; }
+a { color: var(--blue-text); }
+code { background: var(--inset); color: var(--ink); border-radius: 6px; }
+
+/* Boutons : pilules du système Oval */
+button.primary, button.secondary, button.danger, button.secondary-button, .kyc-panel button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; padding: 12px 20px;
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 1; cursor: pointer; letter-spacing: inherit;
+  transition: transform var(--t) var(--spring), background-color var(--t) var(--ease), opacity var(--t);
+}
+button.primary, .kyc-panel button { background: var(--g-navy); color: #fff; box-shadow: var(--reflect), var(--sh-navy); }
+button.secondary, button.secondary-button, .kyc-panel button.kyc-secondary { background: var(--card); color: var(--ink); box-shadow: var(--hi-soft), var(--sh-card); }
+button.danger { background: #fff; color: var(--gold-text); box-shadow: inset 0 0 0 1.5px #f0b43c; }
+.kyc-panel button.kyc-selected { background: var(--g-now); color: #fff; box-shadow: var(--reflect), var(--sh-now); }
+button.primary:hover, button.secondary:hover, button.secondary-button:hover, .kyc-panel button:hover { transform: translateY(-1.5px); }
+button.primary:active, button.secondary:active, .kyc-panel button:active { transform: translateY(1px) scale(.97); }
+button.primary:disabled, button.secondary:disabled, button.secondary-button:disabled, .kyc-panel button:disabled { opacity: .5; transform: none; cursor: default; }
+button.link, button.link-button { background: none; border: 0; padding: 0; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+button.link:hover, button.link-button:hover { color: var(--ink); }
+.row-buttons { gap: 10px; }
+
+/* Champs : encastrés */
+input, select, textarea { font: inherit; padding: 11px 14px; border: 0; border-radius: 14px; background: var(--inset); color: var(--ink); box-shadow: var(--sh-inset); letter-spacing: inherit; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+label { font-size: 13px; font-weight: 600; color: var(--ink-2); gap: 6px; margin-bottom: 12px; }
+.consent, label.consent { background: var(--blue-soft); color: var(--ink); border-radius: 16px; padding: 12px 14px; font-weight: 500; font-size: 14px; line-height: 1.45; }
+.consent input { accent-color: var(--blue); width: 16px; height: 16px; padding: 0; box-shadow: none; }
+.what-we-check { background: var(--panel); border-radius: 16px; padding: 14px 16px; font-size: 14px; color: var(--ink-2); }
+.what-we-check strong { color: var(--ink); }
+.flash-warning { background: #fdf0c6; color: var(--gold-text); border-radius: 16px; padding: 12px 14px; }
+.flash-tips { color: var(--ink-2); }
+.facts th { color: var(--ink-3); font-weight: 600; }
+.facts td { color: var(--ink); }
+
+/* Fil d'Ariane : segments comme la page candidat d'Oval */
+.stepper { gap: 6px; margin: 0 0 18px; font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.stepper li { border-bottom: 0; padding: 0 0 10px; position: relative; }
+.stepper li::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; border-radius: 99px; background: #d7dce8; }
+.stepper li.active { color: var(--ink); }
+.stepper li.active::after, .stepper li.finished::after { background: var(--blue); }
+.stepper li.finished { color: var(--ink-2); }
+
+/* Listes de résultats : pastilles vertes / neutres / dorées, jamais de rouge */
+.status-list li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; display: flex; align-items: center; gap: 10px; }
+.status-list li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; flex: none; color: transparent; }
+.status-ok::before { background: #3fc088; }
+.status-unknown::before { background: #c3c9d8; }
+.status-contradiction::before { background: #f0b43c; }
+
+/* Scènes caméra : cadre sombre arrondi, ovale lumineux */
+.faceid-stage, .flash-stage { border-radius: 22px; background: radial-gradient(120% 100% at 50% 0%, #2a3350 0%, #141a30 60%, #0d1122 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.faceid-oval { border: 3px solid rgba(255,255,255,.75); box-shadow: 0 0 0 999px rgba(10,14,30,.42), 0 0 40px rgba(86,180,240,.35); transition: border-color var(--t), box-shadow var(--t); }
+.faceid-ok .faceid-oval { border-color: #4cd69a; box-shadow: 0 0 0 999px rgba(10,14,30,.42), 0 0 40px rgba(76,214,154,.45); }
+.faceid-instruction { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; }
+.faceid-hint { color: var(--ink-2); }
+.faceid-steps li { padding: 6px 12px; border-radius: 999px; background: var(--inset); color: var(--ink-2); font-weight: 600; box-shadow: var(--sh-inset); }
+.faceid-steps li.faceid-current { background: var(--g-now); color: #fff; box-shadow: var(--reflect), var(--sh-now); }
+.faceid-steps li.faceid-passed { background: #dff6ea; color: var(--green-text); box-shadow: none; }
+.faceid-steps li.faceid-failed, .faceid-steps li.faceid-inconclusive { background: #fdf0c6; color: var(--gold-text); box-shadow: none; }
+.faceid-error { color: var(--gold-text); background: #fdf0c6; border-radius: 12px; padding: 8px 12px; font-size: 14px; }
+.flash-placeholder { color: rgba(255,255,255,.7); }
+.flash-hud { background: rgba(255,255,255,.94); color: var(--ink); border-radius: 999px; font-weight: 600; box-shadow: 0 16px 40px rgba(0,0,0,.18); }
+.flash-progress { background: rgba(27,32,50,.12); border-radius: 99px; height: 6px; }
+.flash-progress > div { background: var(--blue); }
+.flash-stage.flash-active video, .flash-stage:fullscreen video { border-radius: 14px; }
+
+/* Visio du moteur */
+.visio { gap: 16px; padding: 16px; }
+.visio-stage { border-radius: 24px; background: #0d1122; box-shadow: var(--sh-panel); }
+.visio-stage video.local { border: 0; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.visio-side { background: var(--panel); border-radius: 24px; padding: 16px; box-shadow: var(--hi), var(--sh-panel); }
+.visio-banner { background: rgba(255,255,255,.92); color: var(--ink); border-radius: 999px; padding: 8px 14px; font-weight: 600; }
+
+/* Panneau recruteur (visio et extension) */
+.panel-page { max-width: 400px; padding: 14px; }
+.panel-header h1 { font-size: 18px; }
+.panel-header ol { color: var(--ink-2); font-size: 13.5px; }
+.audit li { border-bottom: 1px solid var(--line); }
+.audit time { color: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) { button.primary, button.secondary, .kyc-panel button { transition: none; } }

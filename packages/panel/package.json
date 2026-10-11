@@ -6,7 +6,8 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@kyc/shared": "*"
+    "@kyc/shared": "*",
+    "@kyc/design": "*"
   },
   "peerDependencies": {
     "react": "18.3.1"

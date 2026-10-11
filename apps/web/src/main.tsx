@@ -10,6 +10,7 @@ import { Privacy } from './pages/Privacy.tsx';
 import { Report } from './pages/Report.tsx';
 import { Visio } from './pages/Visio.tsx';
 import './styles.css';
+import './oval-skin.css'; // habillage Oval (jetons de @kyc/design), chargé après styles.css
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

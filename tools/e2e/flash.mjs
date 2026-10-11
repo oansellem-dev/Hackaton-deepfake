@@ -261,7 +261,7 @@ console.log('--- Règles du serveur');
 {
   const { body: s } = await api('/api/sessions', { candidateLabel: 'Ordre' });
   await api(check(s.id, '/identity'), { firstName: 'Test', lastName: 'Ordre', consent: true });
-  ok((await api(check(s.id, '/flash'), { skipped: true, final: true })).status === 410, 'refusé avant la vérification du visage (lien encore ouvert, fenêtre non commencée)');
+  ok((await api(check(s.id, '/flash'), { skipped: true, final: true })).status === 409, 'refusé avant la vérification du visage');
 
   const id = await sessionAtFlashStep('Validation');
   ok((await api(check(id, '/flash'), { attempt: { result: 'passed', correlation: 7 }, final: true })).status === 400, 'essai invalide refusé');

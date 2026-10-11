@@ -10,6 +10,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [react(), emailPlugin(env)],
+    // Port fixe 5174 (le site du moteur est sur 5173). /api/* est relayé vers le serveur du moteur (8787),
+    // sauf /api/email, servi ici par emailPlugin (même origine : pas de CORS).
+    server: {
+      port: 5174,
+      strictPort: true,
+      proxy: { "^/api/(?!email)": { target: env.MOTEUR_API_URL || "http://localhost:8787", changeOrigin: true } },
+    },
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, "index.html"), sidepanel: resolve(__dirname, "sidepanel.html") },

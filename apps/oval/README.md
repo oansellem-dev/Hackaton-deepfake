@@ -13,17 +13,17 @@ npm run dev
 
 | Écran | Adresse |
 |---|---|
-| Accueil (planning) | http://localhost:5173/#/ |
-| Entretiens | http://localhost:5173/#/entretiens |
-| Rapport d'un entretien | http://localhost:5173/#/rapport/e-noah |
-| Rapport imprimable | http://localhost:5173/#/rapport/e-noah/imprimer |
-| Visio Oval (appel + panneau, plan B) | http://localhost:5173/#/visio/e-emma |
-| Page candidat | http://localhost:5173/#/candidat/e-camille |
-| Page candidat, directement au test de lumière | http://localhost:5173/#/candidat/e-camille?etape=lumiere |
-| Bibliothèque de défis | http://localhost:5173/#/defis |
-| Réglages | http://localhost:5173/#/reglages |
-| Panneau recruteur seul (360 px) | http://localhost:5173/sidepanel.html?e=e-emma |
-| Système de design | http://localhost:5173/#/styleguide |
+| Accueil (planning) | http://localhost:5174/#/ |
+| Entretiens | http://localhost:5174/#/entretiens |
+| Rapport d'un entretien | http://localhost:5174/#/rapport/e-noah |
+| Rapport imprimable | http://localhost:5174/#/rapport/e-noah/imprimer |
+| Visio Oval (appel + panneau, plan B) | http://localhost:5174/#/visio/e-emma |
+| Page candidat | http://localhost:5174/#/candidat/e-camille |
+| Page candidat, directement au test de lumière | http://localhost:5174/#/candidat/e-camille?etape=lumiere |
+| Bibliothèque de défis | http://localhost:5174/#/defis |
+| Réglages | http://localhost:5174/#/reglages |
+| Panneau recruteur seul (360 px) | http://localhost:5174/sidepanel.html?e=e-emma |
+| Système de design | http://localhost:5174/#/styleguide |
 
 Extension Chrome : `npm run build`, puis `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » → dossier `dist/`.
 

@@ -82,7 +82,33 @@ git fetch && git merge -X subtree=apps/oval origin/Jules-architecture
 
 Le plus simple reste que chacun travaille désormais à partir de `main`, Jules dans `apps/oval/`.
 
-## Parcours de démo
+## Lancer la démo (interface Oval + moteur)
+
+```bash
+npm install
+npm run dev        # serveur :8787, site du moteur :5173, interface Oval :5174, extension
+```
+
+| Quoi | Adresse |
+|---|---|
+| Interface Oval (recruteur) | http://localhost:5174 |
+| Page candidat du moteur (envoyée par e-mail) | http://localhost:5173/check/<jeton> |
+| Visio du moteur (plan B) | http://localhost:5173/visio/<id>?key=<clé recruteur> |
+| Panneau pour Teams, Meet, Zoom | http://localhost:5173/panel/<id>?key=<clé recruteur> |
+| Rapport du moteur | http://localhost:5173/report/<id>?key=<clé recruteur> |
+| Contrat front–back | `docs/contrat-front-back.md` |
+
+Scénario en cinq étapes :
+
+1. **Créer l'entretien dans Oval** (`Nouvel entretien`, « Envoyer le lien de pré-vérification »). En mode « moteur » (Réglages → Données ; choisi tout seul si le serveur répond), la session est créée sur le serveur et l'e-mail contient le lien `/check/<jeton>` du moteur. Sans SMTP, la fenêtre « E-mail prêt à partir » donne le lien à copier.
+2. **Pré-vérification du candidat** : ouvrir le lien dans un autre onglet (ou une autre machine) : informations, consentement, Face ID, reflet de l'écran, clé d'accès facultative.
+3. **Résultats dans Oval** : en moins de 5 s, l'entretien passe à « Pré-vérif. faite », avec les étapes, les signaux et l'indice (synchronisation toutes les 4 s).
+4. **Visio et défis** : « Rejoindre avec Oval » ouvre la visio du moteur ; le panneau propose les défis, Manta commente, les résultats remontent dans Oval.
+5. **Décision et rapport** : la décision prise dans Oval part au serveur (qui efface les biométries) et apparaît dans le rapport du moteur ; « Exporter » donne la version imprimable d'Oval.
+
+Mode démo : sans serveur, Oval tourne seul avec ses données d'exemple (badge « Démo » dans la barre du haut, bouton « Réinitialiser la démo » dans Réglages).
+
+## Parcours de démo (moteur seul)
 
 1. Sur `http://localhost:5173`, créer un entretien.
 2. Envoyer `/check/<id>` au candidat : caméra virtuelle, fuseau horaire, IP.

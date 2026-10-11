@@ -6,16 +6,17 @@ import { debutJour, isoDate, plusJours } from "../store/format";
 import { Btn, Field, Input, Select } from "../ui/ui";
 import { toast } from "../ui/toast";
 import { IcMail } from "../ui/icons";
+import { CREER, Logo, NOMS, fournisseurDe, lienValide } from "../ui/visio";
 import { Manta } from "../manta/Manta";
 
 export const POSTES = ["Développeuse front-end", "Développeur back-end", "Développeur full-stack", "Développeur mobile", "Designer UI/UX", "Architecte cloud", "Data analyst", "Cheffe de produit", "Ingénieure QA", "Rédactrice"];
 
-interface F { nom: string; email: string; poste: string; date: string; heure: string }
+interface F { nom: string; email: string; poste: string; date: string; heure: string; visio: string }
 
 /** Création d'un entretien. Réutilisé par la fenêtre « Nouvel entretien » et l'écran Entretiens. */
-export function NouvelEntretienForm({ onDone }: { onDone?: (id: string) => void }) {
+export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string) => void; initial?: { date: string; heure: string } }) {
   const etat = useEtat();
-  const [f, setF] = useState<F>(() => ({ nom: "", email: "", poste: POSTES[0], date: isoDate(plusJours(debutJour(aujourdhui(etat)), 1)), heure: "10:00" }));
+  const [f, setF] = useState<F>(() => ({ nom: "", email: "", poste: POSTES[0], date: initial?.date ?? isoDate(plusJours(debutJour(aujourdhui(etat)), 1)), heure: initial?.heure ?? "10:00", visio: "" }));
   const [err, setErr] = useState<Partial<Record<keyof F, string>>>({});
   const set = (k: keyof F) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setF({ ...f, [k]: e.target.value }); if (err[k]) setErr({ ...err, [k]: undefined }); };
 
@@ -27,6 +28,7 @@ export function NouvelEntretienForm({ onDone }: { onDone?: (id: string) => void 
     if (!f.heure) e.heure = "Choisissez une heure.";
     const quand = new Date(`${f.date}T${f.heure || "00:00"}`);
     if (!e.date && !e.heure && quand.getTime() < Date.now()) e.date = "Cette date est déjà passée.";
+    if (f.visio.trim() && !lienValide(f.visio)) e.visio = "Collez un lien complet (https://…).";
     setErr(e);
     return Object.keys(e).length ? null : quand;
   };
@@ -34,10 +36,10 @@ export function NouvelEntretienForm({ onDone }: { onDone?: (id: string) => void 
     const quand = valider();
     if (!quand) return;
     const [prenom, ...reste] = f.nom.trim().split(/\s+/);
-    const x = actions.creerEntretien({ prenom, nom: reste.join(" "), email: f.email.trim(), poste: f.poste, date: quand.toISOString() }, false);
+    const x = actions.creerEntretien({ prenom, nom: reste.join(" "), email: f.email.trim(), poste: f.poste, date: quand.toISOString(), visio: f.visio.trim() || undefined }, false);
     toast(lien ? `Entretien créé pour ${prenom}` : `Entretien créé pour ${prenom}, sans pré-vérification`);
     if (lien) void envoyerPreVerif(x.id);
-    setF({ ...f, nom: "", email: "" });
+    setF({ ...f, nom: "", email: "", visio: "" });
     onDone?.(x.id);
   };
   const prenom = f.nom.trim().split(/\s+/)[0];
@@ -54,6 +56,12 @@ export function NouvelEntretienForm({ onDone }: { onDone?: (id: string) => void 
       <div className="nouvel__2">
         <Field label="Date" error={err.date}><Input type="date" value={f.date} onChange={set("date")} error={!!err.date} /></Field>
         <Field label="Heure" error={err.heure}><Input type="time" value={f.heure} onChange={set("heure")} error={!!err.heure} /></Field>
+      </div>
+      <Field label="Visio (Google Meet, Zoom, Teams)" error={err.visio} hint={f.visio.trim() ? `Le bouton « Rejoindre » ouvrira ${NOMS[fournisseurDe(f.visio)]}.` : "Facultatif : créez la réunion puis collez son lien. Oval ne fait aucun appel lui-même."}>
+        <Input value={f.visio} onChange={set("visio")} placeholder="https://meet.google.com/abc-defg-hij" error={!!err.visio} />
+      </Field>
+      <div className="row wrap nouvel__visios" style={{ gap: 8 }}>
+        {CREER.map((c) => <Btn key={c.id} size="sm" variant="ghost" icon={<Logo f={c.id} />} href={c.url} newTab>Créer sur {NOMS[c.id]}</Btn>)}
       </div>
       <div className="card nouvel__info">
         <Manta size={48} />

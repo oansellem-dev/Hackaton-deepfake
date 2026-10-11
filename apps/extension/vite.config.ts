@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         sidepanel: resolve(__dirname, 'sidepanel.html'),
         background: resolve(__dirname, 'src/background.ts'),
+        widget: resolve(__dirname, 'src/widget.ts'),
       },
       output: {
         entryFileNames: '[name].js',

@@ -9,6 +9,7 @@ import {
   judgeContinuity,
   judgeIdentity,
   median,
+  passiveSignal,
   ratioDistance,
   referenceFor,
   type LiveSample,
@@ -97,7 +98,12 @@ liveRouter.post('/api/sessions/:id/live-sample', recruiterOnly, (req, res) => {
   if (!req.is('application/json')) return res.status(415).json({ error: "mesures uniquement, jamais d'image" });
   const session = getSession(req.params.id)!;
   const { ratios, yawDeg, embedding, fakeProbability } = (req.body ?? {}) as LiveSample;
-  if (isProbability(fakeProbability)) session.passiveScores = [...(session.passiveScores ?? []), fakeProbability].slice(-15);
+  if (isProbability(fakeProbability)) {
+    session.passiveScores = [...(session.passiveScores ?? []), fakeProbability].slice(-15);
+    // Le détecteur compte dans le score local, agent ou pas : un filtre ou un face-swap ne reste plus à 100.
+    upsertSignals(session, [passiveSignal(session.passiveScores)]);
+    schedulePersist();
+  }
 
   // Pas de gabarit (vérification sans biométrie, consentement retiré, gabarit supprimé) : aucune comparaison.
   const profile = getFaceProfile(session);

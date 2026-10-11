@@ -1,18 +1,7 @@
 /* ═══ Entretiens ═══ */
 .ent { display: flex; flex-direction: column; gap: 18px; }
-.ent__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 4px 6px; }
+.ent__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 4px 6px; }
 .ent__head p { margin-top: 4px; }
-.ent__tuiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.etuile { padding: 16px 18px; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 14px; align-items: center; text-align: left; cursor: pointer; transition: transform var(--t) var(--spring), box-shadow var(--t); }
-.etuile:hover { transform: translateY(-2px); }
-.etuile.is-on { box-shadow: var(--sh-panel), 0 0 0 2px var(--blue) inset; }
-.etuile__ic { grid-row: 1 / 3; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: var(--inset); color: var(--ink-2); box-shadow: var(--sh-inset); }
-.etuile__ic svg { width: 18px; height: 18px; }
-.etuile--blue .etuile__ic { background: var(--g-blue); color: var(--blue-text); box-shadow: var(--reflect), var(--sh-blue); }
-.etuile--gold .etuile__ic { background: var(--g-gold); color: var(--gold-text); box-shadow: var(--reflect), var(--sh-gold); }
-.etuile--green .etuile__ic { background: var(--g-green); color: var(--green-ink); box-shadow: var(--reflect), var(--sh-green); }
-.etuile b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
-.etuile__label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 
 .ent__corps { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 .ent__liste { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -54,4 +43,4 @@
 .attente__txt small { font-size: 12px; color: var(--ink-2); }
 
 @media (max-width: 1240px) { .ent__corps { grid-template-columns: 1fr; } }
-@media (max-width: 980px) { .ent__tuiles { grid-template-columns: 1fr 1fr; } .tbl__head { display: none; } .tbl__row { grid-template-columns: 1fr 1fr; padding: 12px; row-gap: 8px; } .tbl__who { grid-column: 1 / -1; } .tbl__act { grid-column: 1 / -1; justify-content: flex-start; } }
+@media (max-width: 980px) { .tbl__head { display: none; } .tbl__row { grid-template-columns: 1fr 1fr; padding: 12px; row-gap: 8px; } .tbl__who { grid-column: 1 / -1; } .tbl__act { grid-column: 1 / -1; justify-content: flex-start; } }

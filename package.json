@@ -15,10 +15,13 @@
     "share": "npm -w apps/web run build && npm -w apps/server run start",
     "build": "npm -w apps/web run build && npm -w apps/extension run build && npm -w apps/oval run build",
     "test": "node --test packages/shared/test/*.test.ts",
-    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension && tsc --noEmit -p apps/oval"
+    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/extension && tsc --noEmit -p apps/oval",
+    "tunnel": "node scripts/tunnel.mjs"
   },
   "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "concurrently": "9.1.0",
+    "localtunnel": "^2.0.2",
     "typescript": "5.6.3"
   }
 }

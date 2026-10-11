@@ -100,6 +100,7 @@ export async function viewWithAgent(session: Session): Promise<SessionView> {
         value: out.score ?? local.value,
         level: out.level === 'insufficient_data' ? local.level : out.level,
         explanation: insufficient ? local.explanation : explanation,
+        evidence: local.evidence,
       },
       agent,
     };

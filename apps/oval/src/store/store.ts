@@ -31,15 +31,17 @@ export function aujourdhui(e: Etat = etat): Date { return e.reglages.dateDemo ? 
 
 const maj = (id: string, fn: (x: Entretien) => Entretien) => setEtat((e) => ({ ...e, entretiens: e.entretiens.map((x) => (x.id === id ? fn(x) : x)) }));
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 8)}`;
+const fournisseur = (url: string): NonNullable<Entretien["visio"]>["fournisseur"] => { const u = url.toLowerCase(); return u.includes("meet.google.") ? "meet" : u.includes("zoom.") ? "zoom" : u.includes("teams.") ? "teams" : "autre"; };
 const iso = () => new Date().toISOString();
 
 export const actions = {
-  creerEntretien(c: { prenom: string; nom: string; email: string; poste: string; date: string }, envoyerLien: boolean): Entretien {
+  creerEntretien(c: { prenom: string; nom: string; email: string; poste: string; date: string; visio?: string }, envoyerLien: boolean): Entretien {
     const couleurs = ["blue", "violet", "green", "gold", "coral", "navy", "pink", "teal"] as const;
     const ent: Entretien = {
       id: uid("e"), creeLe: iso(), dureeMin: 45, statut: "a_venir", recruteurId: etat.moi,
       candidat: { prenom: c.prenom, nom: c.nom, email: c.email, poste: c.poste, couleur: couleurs[(c.nom.length + c.prenom.length) % couleurs.length] },
       date: c.date,
+      visio: c.visio ? { url: c.visio, fournisseur: fournisseur(c.visio) } : undefined,
       preVerification: { statut: envoyerLien ? "envoyee" : "non_envoyee", envoyeeLe: envoyerLien ? iso() : undefined, etapes: {}, signaux: [] },
       defis: [], signaux: [], decision: { valeur: "non_prise" },
     };
@@ -78,6 +80,11 @@ export const actions = {
   terminer(id: string) { maj(id, (x) => (x.statut === "termine" ? x : { ...x, statut: "termine", dureeMin: Math.max(10, ...x.defis.map((d) => (d.finMin ?? d.debutMin ?? 0) + 4)) })); },
   decider(id: string, valeur: Decision["valeur"], note?: string) { maj(id, (x) => ({ ...x, decision: { valeur, note: note ?? x.decision.note, par: etat.moi, le: iso() } })); },
   noter(id: string, note: string) { maj(id, (x) => ({ ...x, decision: { ...x.decision, note } })); },
+  /** Lien de la réunion externe (Google Meet, Zoom…), ou retrait. */
+  definirVisio(id: string, url: string | undefined) { maj(id, (x) => ({ ...x, visio: url ? { url, fournisseur: fournisseur(url) } : undefined })); },
+  /** Calendrier : nouvelle date (et durée) d'un entretien à venir. */
+  deplacer(id: string, date: string, dureeMin?: number) { maj(id, (x) => ({ ...x, date, dureeMin: dureeMin ?? x.dureeMin })); },
+  supprimer(id: string) { setEtat((e) => ({ ...e, entretiens: e.entretiens.filter((x) => x.id !== id) })); },
   reglages(r: Partial<Reglages>) { setEtat((e) => ({ ...e, reglages: { ...e.reglages, ...r } })); },
   reinitialiser() { try { localStorage.removeItem(KEY); } catch { /* ignore */ } setEtat(() => seed()); },
 };

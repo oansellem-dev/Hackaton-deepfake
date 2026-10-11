@@ -81,6 +81,8 @@ function shuffle<T>(items: T[]): T[] {
 candidateRouter.get('/api/check/:token', link('any'), (_req, res) => {
   const session = sessionOf(res);
   const info: CandidateLinkInfo = {
+    candidateFirstName: session.candidateLabel.split(' ')[0] || undefined,
+    schedule: session.schedule,
     status: linkStatus(session),
     expiresAt: session.candidateLink!.expiresAt,
     controller: session.controller,
@@ -278,6 +280,25 @@ candidateRouter.post('/api/check/:token/faceid/submit', link('open'), (req, res)
 });
 
 // Alternative sans biométrie : aucune caméra, aucun gabarit, et aucune pénalité. Le recruteur vérifie lui-même.
+// Créneau : le candidat confirme le créneau proposé, ou en propose un autre (le recruteur est prévenu sur son dashboard).
+candidateRouter.post('/api/check/:token/schedule', link('any'), (req, res) => {
+  const session = sessionOf(res);
+  if (!session.schedule) return res.status(409).json({ error: 'aucun créneau proposé' });
+  const body = (req.body ?? {}) as { confirm?: boolean; proposeAt?: number; message?: string };
+  const message = typeof body.message === 'string' ? body.message.trim().slice(0, 300) : undefined;
+  if (body.confirm) {
+    session.schedule.response = { kind: 'confirmed', at: Date.now(), slot: session.schedule.at, message };
+    audit(session, 'candidat', 'Créneau confirmé', new Date(session.schedule.at).toISOString());
+  } else {
+    const slot = Number(body.proposeAt);
+    if (!Number.isFinite(slot) || slot < Date.now()) return res.status(400).json({ error: 'créneau invalide' });
+    session.schedule.response = { kind: 'proposed', at: Date.now(), slot, message };
+    audit(session, 'candidat', 'Autre créneau proposé', new Date(slot).toISOString());
+  }
+  schedulePersist();
+  res.json({ schedule: session.schedule });
+});
+
 candidateRouter.post('/api/check/:token/optout', link('open'), (_req, res) => {
   const session = sessionOf(res);
   session.biometricOptOut = { at: Date.now() };

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import { getChallenge, type ChallengeResult, type Decision } from '@kyc/shared';
+import { getChallenge, type ChallengeResult, type Decision, type Schedule } from '@kyc/shared';
 import { analyzeCv, viewWithAgent, type CvResult } from './agent.ts';
 import { audit } from './audit.ts';
 import { recruiterOnly } from './auth.ts';
@@ -18,6 +18,19 @@ import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSign
 import { presenceRouter } from './webauthn.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
+
+// Créneau envoyé par le dashboard : seulement des dates plausibles, 12 alternatives au plus.
+export function cleanSchedule(raw: unknown): Schedule | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const at = Number(r.at);
+  if (!Number.isFinite(at) || at < Date.now() - 365 * 86400000 || at > Date.now() + 2 * 365 * 86400000) return undefined;
+  const durationMin = Math.min(240, Math.max(10, Math.round(Number(r.durationMin) || 45)));
+  const visioUrl = typeof r.visioUrl === 'string' && /^https:\/\/\S+$/.test(r.visioUrl) ? r.visioUrl.slice(0, 300) : undefined;
+  const recruiterName = typeof r.recruiterName === 'string' ? r.recruiterName.slice(0, 80) : undefined;
+  const alternatives = Array.isArray(r.alternatives) ? r.alternatives.map(Number).filter((n) => Number.isFinite(n) && n > Date.now() - 86400000).slice(0, 12) : undefined;
+  return { at, durationMin, visioUrl, recruiterName, alternatives };
+}
 
 const app = express();
 app.set('trust proxy', true);
@@ -47,15 +60,30 @@ app.get('/api/health', (_req, res) => {
 
 // Création par le recruteur : il indique le responsable du traitement (son entreprise) et un contact pour les droits.
 app.post('/api/sessions', async (req, res) => {
-  const body = (req.body ?? {}) as { candidateLabel?: string; controllerName?: string; controllerContact?: string };
+  const body = (req.body ?? {}) as { candidateLabel?: string; controllerName?: string; controllerContact?: string; schedule?: unknown };
   const name = String(body.controllerName ?? '').trim().slice(0, 120);
   const contact = String(body.controllerContact ?? '').trim().slice(0, 160);
   const session = createSession(
     String(body.candidateLabel ?? 'Candidat').slice(0, 120),
     name ? { name, contact } : undefined,
+    cleanSchedule(body.schedule),
   );
   // Seule réponse qui contient le jeton du recruteur : à garder, il donne accès aux signaux et au rapport.
   res.status(201).json({ ...(await viewWithAgent(session)), recruiterKey: session.recruiterKey });
+});
+
+// Créneau : le recruteur le fixe, le déplace, ou accepte la contre-proposition du candidat.
+app.post('/api/sessions/:id/schedule', recruiterOnly, async (req, res) => {
+  const session = getSession(req.params.id)!;
+  const next = cleanSchedule(req.body);
+  if (!next) return res.status(400).json({ error: 'créneau invalide' });
+  const prev = session.schedule;
+  // Même créneau que la contre-proposition du candidat : elle devient une confirmation.
+  const confirme = prev?.response?.kind === 'proposed' && prev.response.slot === next.at;
+  session.schedule = { ...next, response: confirme ? { kind: 'confirmed', at: Date.now(), slot: next.at } : prev?.response?.kind === 'confirmed' && prev.at === next.at ? prev.response : undefined };
+  audit(session, 'recruteur', 'Créneau', `${new Date(next.at).toISOString()} · ${next.durationMin} min${confirme ? ' (proposition du candidat acceptée)' : ''}`);
+  schedulePersist();
+  res.json(await viewWithAgent(session));
 });
 
 app.get('/api/sessions/:id', recruiterOnly, async (req, res) => {

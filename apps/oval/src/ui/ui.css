@@ -118,6 +118,8 @@ textarea.field__ctl { resize: none; min-height: 84px; line-height: 1.45; }
 .avatar--green { background: linear-gradient(135deg, #8fe3ba, #4cc792); } .avatar--gold { background: linear-gradient(135deg, #ffdf8a, #f0b63f); }
 .avatar--coral { background: linear-gradient(135deg, #ffad98, #e86b57); } .avatar--pink { background: linear-gradient(135deg, #f7b0d2, #e0609f); }
 .avatar--teal { background: linear-gradient(135deg, #7fdde3, #26a7b2); }
+.avatar--photo { overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .avatars { display: inline-flex; }
 .avatars .avatar { margin-left: -10px; transition: transform var(--t) var(--spring); }
 .avatars .avatar:first-child { margin-left: 0; }
@@ -162,6 +164,7 @@ textarea.field__ctl { resize: none; min-height: 84px; line-height: 1.45; }
 .rail__logo { display: grid; place-items: center; width: 56px; height: 56px; }
 .rail__spacer { flex: 1; }
 .rail__item { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; text-align: center; font-size: 11px; font-weight: 700; line-height: 1.05; color: var(--ink-2); background: var(--card); box-shadow: var(--hi-soft), var(--sh-card); transition: transform var(--t) var(--spring), color var(--t), background-color var(--t); }
+.rail__item svg { width: 22px; height: 22px; }
 .rail__item:hover { transform: translateY(-1.5px); color: var(--ink); }
 .rail__item:active { transform: scale(.94); }
 .rail__item[aria-current="page"] { background: var(--blue-soft); color: var(--blue-text); box-shadow: var(--sh-inset-blue), 0 0 0 2px var(--blue); }
@@ -169,6 +172,8 @@ textarea.field__ctl { resize: none; min-height: 84px; line-height: 1.45; }
 /* Logo : le « o » est un ovale */
 .logo-o { display: inline-block; width: 24px; height: 36px; border-radius: 50%; border: 5px solid var(--blue); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 6px 14px rgba(52,99,234,.3); transition: transform var(--t-slow) var(--spring); }
 .logo-o:hover { transform: scaleX(1.12) rotate(6deg); }
+.logo-mark { display: block; width: 22px; height: 44px; color: #222; transition: transform var(--t-slow) var(--spring); }
+.logo-mark:hover { transform: scale(1.08) rotate(6deg); }
 
 /* Divers */
 .kbd { font: 600 11px/1 var(--font); padding: 4px 6px; border-radius: 6px; background: var(--inset); box-shadow: var(--sh-inset); color: var(--ink-2); }
@@ -201,3 +206,25 @@ textarea.field__ctl { resize: none; min-height: 84px; line-height: 1.45; }
 .kv dt { color: var(--ink-3); font-weight: 600; }
 .kv dd { margin: 0; }
 .code { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--inset); box-shadow: var(--sh-inset); padding: 10px 12px; border-radius: 12px; color: var(--ink); }
+
+/* Dépliant */
+.depli { display: grid; }
+.depli__btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); text-align: left; transition: background-color var(--t), color var(--t); }
+.depli__btn:hover { background: rgba(27,32,50,.05); color: var(--ink); }
+.depli__btn svg { width: 15px; height: 15px; margin-left: auto; transition: transform .45s var(--spring); }
+.depli.is-on .depli__btn svg { transform: rotate(180deg); }
+.depli__zone { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .4s var(--ease); }
+.depli.is-on .depli__zone { grid-template-rows: 1fr; }
+.depli__in { overflow: hidden; min-height: 0; opacity: 0; transform: translateY(-4px); transition: opacity .3s ease, transform .3s var(--ease); }
+.depli.is-on .depli__in { opacity: 1; transform: none; transition-delay: .08s; }
+.depli__in > * { padding: 4px 12px 10px; }
+
+/* Visio externe */
+.visio__coller { display: flex; gap: 8px; padding: 4px 6px 6px; }
+.visio__coller .field__ctl { padding: 9px 12px; font-size: 13.5px; }
+.visio__ligne { display: inline-flex; align-items: center; gap: 6px; }
+.menu__item svg:first-child { width: 16px; height: 16px; }
+.nouvel__visios { margin-top: -6px; }
+
+.menu__item--bloc { align-items: flex-start; cursor: default; }
+.menu__item--bloc:hover { background: transparent; }

@@ -24,6 +24,7 @@ interface Props {
   // Absent : pas de comparaison avec la pré-vérification ni de détecteur passif.
   liveSampler?: LiveSampler;
   recruiterKey?: string; // jeton donné à la création de l'entretien
+  onSession?: (session: SessionView) => void; // hôte du panneau (widget flottant) : score et niveau
 }
 
 const LEVEL_LABEL = {
@@ -60,11 +61,13 @@ export function RecruiterPanel({
   reportUrl,
   liveSampler,
   recruiterKey,
+  onSession,
 }: Props) {
   const api = useMemo(() => createApi(apiBase, recruiterKey), [apiBase, recruiterKey]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [session, setSession] = useState<SessionView | null>(null);
+  const [session, setSessionRaw] = useState<SessionView | null>(null);
+  const setSession = (s: SessionView) => { setSessionRaw(s); onSession?.(s); };
   const [error, setError] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<Challenge>(() => pickChallenge());
   const [running, setRunning] = useState(false);
@@ -164,6 +167,7 @@ export function RecruiterPanel({
 
   // Manta ne parle qu'au recruteur et n'accuse jamais : « signal » = un point à vérifier, pas un verdict.
   const mantaState: MantaState = !stream ? 'neutre' : running ? 'analyse' : session?.decision ? 'verifie' : session?.score.level && session.score.level !== 'green' ? 'signal' : 'defi';
+  const verified = (session?.score.evidence ?? 0) > 0 || (session?.score.level ?? 'green') !== 'green';
   const level = session?.score.level ?? 'green';
   const R = 26;
   const C = 2 * Math.PI * R;
@@ -187,14 +191,14 @@ export function RecruiterPanel({
 
       {/* Indice : anneau animé, jamais un verdict */}
       {session && (
-        <div className={`kyc-score kyc-${level}`}>
+        <div className={`kyc-score ${verified ? `kyc-${level}` : 'kyc-none'}`}>
           <svg className="kyc-ring" viewBox="0 0 64 64" aria-hidden>
             <circle cx="32" cy="32" r={R} className="kyc-ring-bg" />
-            <circle cx="32" cy="32" r={R} className="kyc-ring-val" strokeDasharray={`${(session.score.value / 100) * C} ${C}`} transform="rotate(-90 32 32)" />
+            <circle cx="32" cy="32" r={R} className="kyc-ring-val" strokeDasharray={`${(verified ? session.score.value / 100 : 0) * C} ${C}`} transform="rotate(-90 32 32)" />
           </svg>
-          <span className="kyc-score-value">{session.score.value}</span>
+          <span className="kyc-score-value">{verified ? session.score.value : '—'}</span>
           <span className="kyc-score-text">
-            <span className="kyc-score-label">{LEVEL_LABEL[level]}</span>
+            <span className="kyc-score-label">{verified ? LEVEL_LABEL[level] : 'Pas encore vérifié'}</span>
             <button type="button" className="kyc-why" aria-expanded={showWhy} onClick={() => setShowWhy((v) => !v)}>
               {showWhy ? 'Masquer le détail' : 'Pourquoi ?'}
             </button>

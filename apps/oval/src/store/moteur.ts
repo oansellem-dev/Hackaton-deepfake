@@ -34,17 +34,49 @@ export async function moteurDisponible(): Promise<boolean> {
 /** Mode courant : « moteur » si réglé ainsi, « démo » sinon. */
 export const modeMoteur = () => getEtat().reglages.donnees === "moteur";
 
+/** Créneaux libres du recruteur sur les dix prochains jours ouvrés (09:30, 11:00, 14:00, 16:00), hors chevauchement. */
+export function disponibilites(x: Entretien, max = 6): number[] {
+  const e = getEtat();
+  const pris = e.entretiens.filter((y) => y.id !== x.id && y.recruteurId === x.recruteurId && y.statut !== "termine").map((y) => ({ a: +new Date(y.date), b: +new Date(y.date) + y.dureeMin * 60000 }));
+  const out: number[] = [];
+  const j = new Date(); j.setHours(0, 0, 0, 0);
+  for (let n = 0; n < 14 && out.length < max; n++) {
+    j.setDate(j.getDate() + 1);
+    if (j.getDay() === 0 || j.getDay() === 6) continue;
+    for (const [h, m] of [[9, 30], [11, 0], [14, 0], [16, 0]]) {
+      const d = new Date(j); d.setHours(h, m, 0, 0);
+      const a = d.getTime(), b = a + x.dureeMin * 60000;
+      if (a < Date.now() + 3600000 || Math.abs(a - +new Date(x.date)) < 60000) continue;
+      if (pris.some((p) => a < p.b && b > p.a)) continue;
+      out.push(a);
+      if (out.length >= max) break;
+    }
+  }
+  return out;
+}
+
+const chargeCreneau = (x: Entretien) => ({ at: +new Date(x.date), durationMin: x.dureeMin, visioUrl: x.visio?.url, recruiterName: getEtat().recruteurs.find((r) => r.id === x.recruteurId)?.nom, alternatives: disponibilites(x) });
+
 /** Crée la session côté serveur et relie l'entretien : identifiants, clé recruteur, lien candidat du moteur. */
 export async function creerSession(x: Entretien): Promise<Entretien["moteur"]> {
   const e = getEtat();
   const entreprise = e.reglages.entreprise?.trim();
   const v = await appel<SessionView & { recruiterKey: string }>("/api/sessions", {
     method: "POST",
-    body: JSON.stringify({ candidateLabel: `${x.candidat.prenom} ${x.candidat.nom}`.trim(), controllerName: entreprise || undefined, controllerContact: entreprise ? e.recruteurs.find((r) => r.id === e.moi)?.nom : undefined }),
+    body: JSON.stringify({ candidateLabel: `${x.candidat.prenom} ${x.candidat.nom}`.trim(), controllerName: entreprise || undefined, controllerContact: entreprise ? e.recruteurs.find((r) => r.id === e.moi)?.nom : undefined, schedule: chargeCreneau(x) }),
   });
   const moteur = { sessionId: v.id, recruiterKey: v.recruiterKey, lienToken: v.candidateLink?.token };
   actions.lierMoteur(x.id, moteur, { token: v.candidateLink?.token ?? "", expireLe: iso(v.candidateLink?.expiresAt ?? Date.now()) });
   return moteur;
+}
+
+/** Après un déplacement dans le calendrier, ou pour accepter la proposition du candidat : le moteur reçoit le créneau à jour. */
+export async function envoyerCreneau(id: string): Promise<void> {
+  const x = getEtat().entretiens.find((e) => e.id === id);
+  if (!x?.moteur) return;
+  const v = await appel<SessionView>(`/api/sessions/${x.moteur.sessionId}/schedule`, { method: "POST", body: JSON.stringify(chargeCreneau(x)) }, x.moteur.recruiterKey);
+  const frais = getEtat().entretiens.find((e) => e.id === id);
+  if (frais) actions.remplacer(versEntretien(v, frais));
 }
 
 export async function lireSession(x: Entretien): Promise<SessionView> {
@@ -59,9 +91,8 @@ export async function envoyerDecision(x: Entretien, valeur: DecisionMoteur, note
   actions.remplacer(versEntretien(v, { ...x, decision: { ...x.decision, valeur, note } }));
 }
 
-/** Adresse de la visio : page du moteur (clé recruteur) si l'entretien y est relié, sinon la visio de démo d'Oval. */
-export const lienVisio = (x: Entretien) => (x.moteur ? `${moteurUrl()}/visio/${x.moteur.sessionId}?key=${x.moteur.recruiterKey}` : `#/visio/${x.id}`);
-export const lienPanneau = (x: Entretien) => (x.moteur ? `${moteurUrl()}/panel/${x.moteur.sessionId}?key=${x.moteur.recruiterKey}` : `/sidepanel.html?e=${x.id}`);
+/** Panneau recruteur du moteur (le même que dans le widget de l'extension), pour un entretien qui y est relié. */
+export const lienPanneau = (x: Entretien) => (x.moteur ? `${moteurUrl()}/panel/${x.moteur.sessionId}?key=${x.moteur.recruiterKey}` : null);
 
 /* ── Correspondance session → Entretien ─────────────────────── */
 const DEFIS: Record<string, DefiType> = { "hand-over-face": "main_devant_visage", "head-turn": "rotation_tete", "random-phrase": "phrase_aleatoire" };
@@ -116,8 +147,16 @@ export function versEntretien(v: SessionView, x: Entretien): Entretien {
   const decision = v.decision ? { ...x.decision, valeur: v.decision.value, note: v.decision.note ?? x.decision.note, le: iso(v.decision.at), par: x.decision.par ?? getEtat().moi } : x.decision;
   const statutEntretien = v.decision ? "termine" : live.length && x.statut === "a_venir" ? "en_cours" : x.statut;
 
+  const rep = v.schedule?.response;
+  const creneau: Entretien["creneau"] = v.schedule
+    ? rep?.kind === "confirmed" ? { statut: "confirme", repondueLe: iso(rep.at), message: rep.message }
+      : rep?.kind === "proposed" ? { statut: "propose", propose: iso(rep.slot ?? rep.at), repondueLe: iso(rep.at), message: rep.message }
+        : { statut: "attente" }
+    : x.creneau;
+
   return {
     ...x,
+    creneau,
     candidat: { ...x.candidat, prenom: v.identity?.firstName || x.candidat.prenom, nom: v.identity?.lastName || x.candidat.nom, email: v.identity?.email || x.candidat.email, villeDeclaree: v.identity?.city || x.candidat.villeDeclaree },
     preVerification: {
       ...p, statut, lien,

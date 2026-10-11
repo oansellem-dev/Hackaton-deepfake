@@ -1,19 +1,23 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { Entretien } from "../store/types";
-import { initiales, nbSignauxAVerifier, nomComplet, useEtat } from "../store/store";
+import { actions, initiales, nbSignauxAVerifier, nomComplet, useEtat } from "../store/store";
 import { premierSignal } from "../store/statuts";
-import { Avatar, Avatars, Btn, ICirc, Modal, Pill, Pop, Tabs } from "../ui/ui";
-import { IcBell, IcGrid, IcList, IcPlus, IcSearch, IcSpark } from "../ui/icons";
+import { Avatar, Avatars, Btn, ICirc, Modal, Pill, Pop } from "../ui/ui";
+import { IcBell, IcGear, IcHome, IcList, IcLogo, IcPlus, IcSearch, IcSpark } from "../ui/icons";
 import { NouvelEntretienForm } from "../screens/NouvelEntretien";
+import type { Creneau } from "./events";
 import { EmailPret } from "./EmailPret";
 import { useMoteur } from "../store/useMoteur";
 import { aller, useRoute } from "./router";
+import { envoyerCreneau } from "../store/moteur";
+import { heure, jourLong } from "../store/format";
+import { toast } from "../ui/toast";
 import "./shell.css";
 
-const RAIL: { id: string; label: ReactNode; href: string }[] = [
-  { id: "accueil", label: "Accueil", href: "#/" },
-  { id: "entretiens", label: <>Entre-<br />tiens</>, href: "#/entretiens" },
-  { id: "defis", label: "Défis", href: "#/defis" },
+const RAIL: { id: string; label: string; icone: ReactNode; href: string }[] = [
+  { id: "accueil", label: "Accueil", icone: <IcHome />, href: "#/" },
+  { id: "entretiens", label: "Entretiens", icone: <IcList />, href: "#/entretiens" },
+  { id: "defis", label: "Défis", icone: <IcSpark />, href: "#/defis" },
 ];
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -23,43 +27,38 @@ export function Shell({ actif, children }: { actif: string; children: ReactNode 
   useMoteur();
   const route = useRoute();
   const [nouveau, setNouveau] = useState(false);
+  const [creneau, setCreneau] = useState<Creneau | undefined>();
   useEffect(() => { if (route.parts[0] === "entretiens" && route.parts[1] === "nouveau") setNouveau(true); }, [route.path, route.parts]);
-  useEffect(() => { const f = () => setNouveau(true); addEventListener("oval:nouvel-entretien", f); return () => removeEventListener("oval:nouvel-entretien", f); }, []);
+  useEffect(() => { const f = (e: Event) => { setCreneau((e as CustomEvent<Creneau | undefined>).detail); setNouveau(true); }; addEventListener("oval:nouvel-entretien", f); return () => removeEventListener("oval:nouvel-entretien", f); }, []);
   const fermer = () => { setNouveau(false); if (route.parts[1] === "nouveau") aller("#/entretiens"); };
   const signaux = etat.entretiens.filter((x) => nbSignauxAVerifier(x) > 0 && x.decision.valeur === "non_prise");
-  const onglet = ["accueil", "entretiens", "defis"].includes(actif) ? actif : "";
-  const demo = etat.reglages.donnees !== "moteur";
+  const propositions = etat.entretiens.filter((x) => x.statut !== "termine" && x.creneau?.statut === "propose" && x.creneau.propose);
+  const titre = { accueil: "Tableau de bord", entretiens: "Entretiens", defis: "Défis", reglages: "Réglages" }[actif] ?? "Oval";
 
   return (
     <div className="app">
       <div className="shell app__shell">
         <aside className="panel rail" aria-label="Navigation">
-          <a className="rail__logo" href="#/" aria-label="Oval, accueil"><span className="logo-o" /></a>
+          <a className="rail__logo" href="#/" aria-label="Oval, accueil"><IcLogo className="logo-mark" /></a>
           <div className="rail__spacer" />
-          {RAIL.map((r) => <a key={r.id} className="rail__item" href={r.href} aria-current={actif === r.id ? "page" : undefined}>{r.label}</a>)}
+          {RAIL.map((r) => <a key={r.id} className="rail__item" href={r.href} aria-label={r.label} title={r.label} aria-current={actif === r.id ? "page" : undefined}>{r.icone}</a>)}
           <div className="rail__spacer" />
-          <a className="rail__item" href="#/reglages" aria-current={actif === "reglages" ? "page" : undefined}>Réglages</a>
+          <a className="rail__item" href="#/reglages" aria-label="Réglages" title="Réglages" aria-current={actif === "reglages" ? "page" : undefined}><IcGear /></a>
         </aside>
 
         <div className="app__main">
           <header className="panel topbar rise" style={{ "--i": 0 } as CSSProperties}>
-            <Tabs pills value={onglet} onChange={(id) => aller(id === "accueil" ? "#/" : `#/${id}`)} items={[
-              { id: "accueil", label: "Tableau de bord", icon: <IcGrid /> },
-              { id: "entretiens", label: "Entretiens", icon: <IcList /> },
-              { id: "defis", label: "Défis", icon: <IcSpark /> },
-            ]} />
+            <span className="topbar__titre">{titre}</span>
+            <div className="topbar__spacer" />
             <Recherche />
-            <div className="topbar__spacer" />
-            <Avatars>{etat.recruteurs.map((r) => <Avatar key={r.id} initiales={r.initiales} couleur={r.couleur} title={`Équipe : ${r.nom}`} />)}</Avatars>
-            <Btn icon={<IcPlus />} onClick={() => setNouveau(true)}>Nouvel entretien</Btn>
-            {demo && <a className="pill pill--soft-gold topbar__demo" href="#/reglages" title="Données d'exemple, tout en local. Changer dans Réglages.">Démo</a>}
-            <div className="topbar__spacer" />
-            <Cloche signaux={signaux} />
+            <Cloche signaux={signaux} propositions={propositions} />
+            <Avatars>{etat.recruteurs.map((r) => <Avatar key={r.id} initiales={r.initiales} couleur={r.couleur} photo={r.photo} title={`Équipe : ${r.nom}`} />)}</Avatars>
+            <Btn variant="primary" icon={<IcPlus />} onClick={() => { setCreneau(undefined); setNouveau(true); }}>Nouvel entretien</Btn>
           </header>
           <main className="page app__page" key={route.path}>{children}</main>
         </div>
       </div>
-      <Modal open={nouveau} onClose={fermer} title="Nouvel entretien"><NouvelEntretienForm onDone={fermer} /></Modal>
+      <Modal open={nouveau} onClose={fermer} title="Nouvel entretien"><NouvelEntretienForm key={creneau ? `${creneau.date}T${creneau.heure}` : "libre"} initial={creneau} onDone={fermer} /></Modal>
       <EmailPret />
     </div>
   );
@@ -78,7 +77,7 @@ function Recherche() {
           {q.trim() && !res.length && <div className="menu__empty">Aucun candidat ne correspond.</div>}
           {res.map((x) => (
             <button key={x.id} type="button" className="menu__item" onClick={() => ouvrir(x, close)}>
-              <Avatar size="sm" initiales={initiales(x)} couleur={x.candidat.couleur} />
+              <Avatar size="sm" initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} />
               <span className="grow">{nomComplet(x)}<span className="menu__sub" style={{ display: "block" }}>{x.candidat.poste}</span></span>
             </button>
           ))}
@@ -89,16 +88,33 @@ function Recherche() {
   );
 }
 
-function Cloche({ signaux }: { signaux: Entretien[] }) {
+function Cloche({ signaux, propositions }: { signaux: Entretien[]; propositions: Entretien[] }) {
+  const total = signaux.length + propositions.length;
+  const accepter = async (x: Entretien) => {
+    actions.deplacer(x.id, x.creneau!.propose!);
+    try { await envoyerCreneau(x.id); toast(`${x.candidat.prenom} : créneau accepté, ${jourLong(x.creneau!.propose!)} à ${heure(x.creneau!.propose!)}`); } catch { toast("Moteur injoignable, réessayez"); }
+  };
+  const garder = async (x: Entretien) => {
+    try { await envoyerCreneau(x.id); toast(`Créneau initial conservé pour ${x.candidat.prenom}`); } catch { toast("Moteur injoignable, réessayez"); }
+  };
   return (
-    <Pop align="right" width={360} button={({ open, toggle }) => <ICirc label={`Signaux à vérifier : ${signaux.length}`} active={open} badge={signaux.length || undefined} onClick={toggle}><IcBell /></ICirc>}>
+    <Pop align="right" width={380} button={({ open, toggle }) => <ICirc label={`Notifications : ${total}`} active={open} badge={total || undefined} onClick={toggle}><IcBell /></ICirc>}>
       {(close) => (
         <>
+          {propositions.length > 0 && <div className="menu__title">Créneaux proposés par les candidats</div>}
+          {propositions.map((x) => (
+            <div key={`c-${x.id}`} className="menu__item menu__item--bloc">
+              <Avatar size="sm" initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} />
+              <span className="grow">{nomComplet(x)}<span className="menu__sub" style={{ display: "block" }}>Propose {jourLong(x.creneau!.propose!)} à {heure(x.creneau!.propose!)}{x.creneau!.message ? ` · « ${x.creneau!.message} »` : ""}</span>
+                <span className="row" style={{ gap: 6, marginTop: 6 }}><Btn size="sm" variant="primary" onClick={() => void accepter(x)}>Accepter</Btn><Btn size="sm" variant="ghost" onClick={() => void garder(x)}>Garder le mien</Btn></span>
+              </span>
+            </div>
+          ))}
           <div className="menu__title">Signaux à vérifier</div>
           {!signaux.length && <div className="menu__empty">Rien à vérifier pour l'instant.</div>}
           {signaux.map((x) => (
             <button key={x.id} type="button" className="menu__item" onClick={() => { aller(`#/rapport/${x.id}`); close(); }}>
-              <Avatar size="sm" initiales={initiales(x)} couleur={x.candidat.couleur} />
+              <Avatar size="sm" initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} />
               <span className="grow">{nomComplet(x)}<span className="menu__sub" style={{ display: "block" }}>{premierSignal(x)}</span></span>
               <Pill ton="soft-gold" dot>À vérifier</Pill>
             </button>

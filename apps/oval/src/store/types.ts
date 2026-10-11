@@ -21,9 +21,10 @@ export interface Candidat {
   email: string;
   poste: string;              // "Développeuse back-end"
   villeDeclaree?: string;
-  couleur: Couleur;           // couleur de l'avatar (initiales, pas de photo)
+  couleur: Couleur;           // couleur de l'avatar (initiales, repli si pas de photo)
+  photo?: string;             // URL de la photo de profil (facultatif)
 }
-export interface Recruteur { id: string; initiales: string; nom: string; couleur: Couleur }
+export interface Recruteur { id: string; initiales: string; nom: string; couleur: Couleur; photo?: string }
 export type Couleur = "blue" | "violet" | "green" | "gold" | "coral" | "navy" | "pink" | "teal";
 
 // ── Résultats : jamais de verdict ───────────────────────────────────────
@@ -106,6 +107,10 @@ export interface Entretien {
   creeLe: ISODate;
   /** Entretien relié au moteur (apps/server) : identifiant de session, clé recruteur, jeton du lien candidat. */
   moteur?: { sessionId: string; recruiterKey: string; lienToken?: string };
+  /** Réunion externe (Google Meet, Zoom, Teams…) : Oval n'héberge aucun appel, l'extension s'ouvre à côté. */
+  visio?: { url: string; fournisseur: "meet" | "zoom" | "teams" | "autre" };
+  /** Réponse du candidat au créneau proposé (depuis son lien de pré-vérification). */
+  creneau?: { statut: "attente" | "confirme" | "propose"; propose?: ISODate; message?: string; repondueLe?: ISODate };
 }
 
 // ── État global du magasin ──────────────────────────────────────────────

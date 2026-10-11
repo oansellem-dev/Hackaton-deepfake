@@ -9,6 +9,7 @@ import type {
   IdentityPayload,
   LiveSample,
   PrecheckPayload,
+  Schedule,
   SessionView,
   SignalStatus,
 } from '@kyc/shared';
@@ -78,6 +79,8 @@ export function createApi(base: string = DEFAULT_API_BASE, recruiterKey?: string
     // Test du reflet de l'écran (après le Face ID) : résumé d'un essai analysé dans le navigateur, ou « passer ».
     sendFlash: (token: string, payload: FlashSubmission) =>
       post<{ recorded: boolean; final: boolean }>(`/api/check/${token}/flash`, payload),
+    // Créneau : confirmer celui proposé, ou en proposer un autre (le recruteur est prévenu sur son dashboard).
+    sendSchedule: (token: string, body: { confirm?: boolean; proposeAt?: number; message?: string }) => post<{ schedule: Schedule }>(`/api/check/${token}/schedule`, body),
     optOut: (token: string) => post<{ optedOut: boolean }>(`/api/check/${token}/optout`),
     withdraw: (token: string) => post<{ withdrawn: boolean }>(`/api/check/${token}/withdraw`),
     deviceOptions: (token: string) => post<Record<string, unknown>>(`/api/check/${token}/device/options`),

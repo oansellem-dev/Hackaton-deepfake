@@ -5,9 +5,8 @@ import { heure, quand, relatif } from "../store/format";
 import { DECISIONS_COURT } from "../store/texts";
 import { doux, statutEntretien, statutPreVerif } from "../store/statuts";
 import { envoyerPreVerif } from "../store/envoi";
-import { ouvrirNouvelEntretien } from "../app/events";
-import { Avatar, Btn, Input, Pill, Pop, Vide, transition } from "../ui/ui";
-import { IcArrowR, IcCal, IcCheck, IcChevron, IcFilter, IcFlag, IcMail, IcPlay, IcPlus, IcRefresh, IcSearch, IcSort, IcX } from "../ui/icons";
+import { Avatar, Btn, Input, Pill, Pop, Tabs, Vide, transition } from "../ui/ui";
+import { IcArrowR, IcCal, IcCheck, IcChevron, IcFilter, IcFlag, IcMail, IcPlay, IcRefresh, IcSearch, IcSort, IcX } from "../ui/icons";
 import { aller, useRoute } from "../app/router";
 import "./entretiens.css";
 
@@ -58,20 +57,9 @@ export function Entretiens() {
   return (
     <div className="ent">
       <header className="ent__head rise" style={{ "--i": 1 } as CSSProperties}>
-        <div><h1 className="t-display">Entretiens</h1><p className="muted">Cliquez sur une ligne pour ouvrir le rapport.</p></div>
-        <Btn variant="primary" icon={<IcPlus />} onClick={ouvrirNouvelEntretien}>Nouvel entretien</Btn>
+        <h1 className="t-display">Entretiens</h1>
+        <Tabs raised value={speciale ? "" : filtre} onChange={(id) => changer(id as Filtre)} items={TUILES.map((t) => ({ id: t.id, label: t.id === "tous" ? "Tous" : t.label, icon: t.ic, count: base.filter((x) => TEST[t.id](x, ref)).length }))} />
       </header>
-
-      <div className="ent__tuiles rise" style={{ "--i": 2 } as CSSProperties}>
-        {TUILES.map((t) => {
-          const n = base.filter((x) => TEST[t.id](x, ref)).length;
-          return (
-            <button key={t.id} type="button" className={`panel etuile etuile--${t.ton}${filtre === t.id ? " is-on" : ""}`} aria-pressed={filtre === t.id} onClick={() => changer(t.id)}>
-              <span className="etuile__ic">{t.ic}</span><b className="num">{n}</b><span className="etuile__label">{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
 
       <div className="ent__corps">
         <section className="panel ent__liste rise" style={{ "--i": 3 } as CSSProperties}>
@@ -86,7 +74,7 @@ export function Entretiens() {
                 </>
               )}
             </Pop>
-            <Btn icon={<IcSort />} onClick={() => transition(() => setTri((t) => (t === "asc" ? "desc" : "asc")))}>{tri === "asc" ? "Plus proches d'abord" : "Plus récents d'abord"}</Btn>
+            <Btn variant="ghost" icon={<IcSort />} onClick={() => transition(() => setTri((t) => (t === "asc" ? "desc" : "asc")))} title={tri === "asc" ? "Plus proches d'abord" : "Plus récents d'abord"}>{tri === "asc" ? "Proches" : "Récents"}</Btn>
             {speciale && <button type="button" className="pill pill--soft-blue ent__chip" onClick={() => changer("tous")}>{LIBELLES[filtre]} <IcX /></button>}
           </div>
 
@@ -98,7 +86,7 @@ export function Entretiens() {
               const enAttente = TEST.preverif(x, ref);
               return (
                 <div key={x.id} role="row" className="tbl__row rise" tabIndex={0} aria-label={`Rapport de ${nomComplet(x)}`} style={{ "--i": Math.min(i, 10), viewTransitionName: `ent-${x.id}` } as CSSProperties} onClick={() => ouvrir(x)} onKeyDown={(e) => clavier(e, x)}>
-                  <span className="tbl__who"><Avatar initiales={initiales(x)} couleur={x.candidat.couleur} /><span><b>{nomComplet(x)}</b><small>{x.candidat.poste}</small></span></span>
+                  <span className="tbl__who"><Avatar initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} /><span><b>{nomComplet(x)}</b><small>{x.candidat.poste}</small></span></span>
                   <span className="tbl__date"><b>{memeJour(new Date(x.date), ref) ? "Aujourd'hui" : quand(x.date, ref).split(" · ")[0]}</b><small>{heure(x.date)}{x.statut === "termine" ? ` · ${x.dureeMin} min` : ""}</small></span>
                   <span><Pill ton={pv.ton} dot>{pv.texte}</Pill></span>
                   <span className="tbl__statut"><Pill ton={doux(st.ton)} dot>{st.texte}</Pill>{x.decision.valeur !== "non_prise" && <small>Décision : {DECISIONS_COURT[x.decision.valeur]}</small>}</span>
@@ -121,7 +109,7 @@ export function Entretiens() {
             <ul className="attente">
               {attente.map((x) => (
                 <li key={x.id}>
-                  <Avatar initiales={initiales(x)} couleur={x.candidat.couleur} size="sm" />
+                  <Avatar initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} size="sm" />
                   <span className="attente__txt"><a href={`#/rapport/${x.id}`}>{nomComplet(x)}</a><small>{x.preVerification.statut === "ouverte" ? "Lien ouvert, pas terminé" : x.preVerification.relanceeLe ? `Relancé ${relatif(x.preVerification.relanceeLe, ref).toLowerCase()}` : `Envoyé ${relatif(x.preVerification.envoyeeLe ?? x.creeLe, ref).toLowerCase()}`} · entretien {quand(x.date, ref).toLowerCase()}</small></span>
                   <Btn size="sm" icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer</Btn>
                 </li>

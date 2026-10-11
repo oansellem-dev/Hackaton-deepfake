@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { RecruiterPanel, createApi } from '@kyc/panel';
+import type { SessionView } from '@kyc/shared';
 import { API_BASE, recruiterKeyFor } from '../config.ts';
 import { loadFaceModels } from '../lib/faceModels.ts';
 import { createLiveDetector } from '../lib/liveDetector.ts';
@@ -13,6 +14,8 @@ export function Panel() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
   const recruiterKey = recruiterKeyFor(id, params.get('key'));
+  // Mode widget : affiché dans la bulle flottante de l'extension, sans en-tête ni pied, et le score remonte à l'hôte.
+  const widget = params.get('widget') === '1';
   const detector = useMemo(() => createLiveDetector(id, recruiterKey), [id, recruiterKey]);
   const api = useMemo(() => createApi(API_BASE, recruiterKey), [recruiterKey]);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -39,6 +42,13 @@ export function Panel() {
 
   useEffect(() => () => stream?.getTracks().forEach((t) => t.stop()), [stream]);
 
+  const [session, setSession] = useState<SessionView | null>(null);
+  const onSession = useCallback((s: SessionView) => setSession(s), []);
+  useEffect(() => {
+    if (!widget || !session) return;
+    window.parent.postMessage({ type: 'oval:score', value: session.score.value, level: session.score.level, evidence: session.score.evidence, live: !!stream }, '*');
+  }, [widget, session, stream]);
+
   async function share() {
     setError(null);
     try {
@@ -56,7 +66,7 @@ export function Panel() {
   }
 
   return (
-    <div className="panel-page">
+    <div className={`panel-page${widget ? ' panel-page--widget' : ''}`}>
       <header className="pp-head">
         <span className="pp-logo"><i />oval</span>
         <span className={`pp-state${stream ? ' is-live' : ready ? ' is-ready' : ''}`}>
@@ -95,6 +105,7 @@ export function Panel() {
         recruiterKey={recruiterKey}
         liveSampler={sampleLive}
         detector={detector}
+        onSession={onSession}
         reportUrl={`/report/${id}${recruiterKey ? `?key=${recruiterKey}` : ''}`}
       />
 

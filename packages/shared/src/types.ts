@@ -43,6 +43,9 @@ export interface Score {
   value: number; // 0 à 100
   level: ScoreLevel;
   explanation: string[]; // 3 lignes max
+  // Nombre de vérifications réellement faites (défis réussis, même visage, reflet de l'écran, détecteur passif, appareil).
+  // 0 = rien n'a encore été vérifié : le panneau n'affiche alors pas « aucun signal » mais « pas encore vérifié ».
+  evidence: number;
 }
 
 // Identité et informations écrites déclarées par le candidat, avec son consentement explicite (RGPD).
@@ -114,6 +117,16 @@ export interface DeviceBinding {
   registeredAt: number;
 }
 
+// Créneau de l'entretien proposé par le recruteur, et réponse du candidat (confirmation ou contre-proposition).
+export interface Schedule {
+  at: number; // début proposé (ms)
+  durationMin: number;
+  visioUrl?: string; // réunion Google Meet, Zoom, Teams…
+  recruiterName?: string;
+  alternatives?: number[]; // autres créneaux libres du recruteur (ms)
+  response?: { kind: 'confirmed' | 'proposed'; at: number; slot?: number; message?: string };
+}
+
 export interface Session {
   id: string;
   createdAt: number;
@@ -124,6 +137,7 @@ export interface Session {
   consent?: ConsentRecord;
   biometricOptOut?: { at: number }; // vérification sans biométrie choisie par le candidat
   identity?: DeclaredIdentity;
+  schedule?: Schedule;
   faceId?: FaceIdPlan & { startedAt: number; completedAt?: number };
   // Gabarit biométrique : stocké à part (templates.json), chiffré, sous un identifiant aléatoire sans lien avec
   // l'identité ; jamais renvoyé au client, effacé à la décision, au retrait ou à expiration (serveur seulement).
@@ -187,4 +201,6 @@ export interface CandidateLinkInfo {
   optedOut: boolean;
   withdrawn: boolean;
   deviceBound: boolean;
+  candidateFirstName?: string; // prénom donné par le recruteur, pour l'accueil
+  schedule?: Schedule;
 }

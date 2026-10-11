@@ -3,8 +3,8 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { emailPlugin } from "./server/email";
 
-// Deux pages : index.html (dashboard + page candidat) et sidepanel.html (extension).
-// `npm run build` produit dist/, chargeable tel quel comme extension non empaquetée.
+// Une page : index.html (dashboard + page candidat). Le panneau recruteur vit dans l'extension (apps/extension)
+// et le site du moteur (apps/web), jamais ici.
 // Le serveur de dev expose aussi /api/email (envoi des liens de pré-vérification, voir server/email.ts).
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, "index.html"), sidepanel: resolve(__dirname, "sidepanel.html") },
+        input: { index: resolve(__dirname, "index.html") },
       },
     },
   };

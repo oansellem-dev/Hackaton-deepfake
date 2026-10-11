@@ -3,14 +3,14 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { font-family: var(--font); color: var(--ink); background: linear-gradient(180deg, #f7f8fc 0%, #e9edf6 100%); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+body { font-family: var(--font); color: var(--ink); background: var(--panel); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; letter-spacing: inherit; }
 
 .ext { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 12px; }
 .ext--panel { padding: 8px 8px 8px; gap: 8px; }
 .ext-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
-.ext-logo { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; margin-right: auto; }
-.ext-logo i { width: 11px; height: 17px; border: 3.5px solid var(--blue); border-radius: 50%; }
+.ext-logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; letter-spacing: -0.02em; margin-right: auto; }
+.ext-logo svg { width: 12px; height: 24px; fill: #222; }
 .ext-session code { font-size: 12px; padding: 4px 8px; border-radius: 999px; background: var(--inset); box-shadow: var(--sh-inset); }
 .ext-ghost { border: 0; background: none; color: var(--ink-2); font-weight: 600; font-size: 12.5px; padding: 6px 8px; border-radius: 999px; cursor: pointer; }
 .ext-ghost:hover { background: rgba(27,32,50,.06); color: var(--ink); }

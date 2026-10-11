@@ -4,7 +4,8 @@
 .app__main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; position: relative; z-index: 20; }
 .topbar__spacer { flex: 1; }
-.topbar__demo { cursor: pointer; }
+.topbar__titre { font-size: 15px; font-weight: 700; color: var(--ink); padding-left: 10px; letter-spacing: -.01em; }
+.topbar .avatars { margin: 0 4px; }
 .app__page { min-width: 0; }
 .search--menu { width: 100%; margin-bottom: 6px; }
 .en-construction { padding: 56px 24px; display: grid; justify-items: center; gap: 16px; text-align: center; }

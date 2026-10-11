@@ -1,5 +1,10 @@
-import { getChallenge, type ChallengeResult, type Session } from '@kyc/shared';
+import { getChallenge, type ChallengeResult, type Session, type Signal } from '@kyc/shared';
 import { upsertSignals } from './store.ts';
+
+// Main devant le visage : si le visage reste entièrement détecté pendant que la main le couvre, c'est qu'il est
+// dessiné par-dessus l'image (face-swap en direct). Une vraie main fait disparaître le maillage du visage.
+const OVERLAY_MIN_COVER_FRAMES = 6;
+const OVERLAY_MIN_RATIO = 0.9;
 
 // Mesures envoyées par le détecteur : seulement des nombres finis, 8 au plus.
 export function cleanMetrics(raw: unknown): Record<string, number> | undefined {
@@ -25,7 +30,20 @@ export function recordChallenge(
   const at = Date.now();
   session.challenges.push({ challengeId, result, durationMs, at, phase, ...(metrics ? { metrics } : {}) });
   const where = phase === 'precheck' ? ' (pré-vérification)' : '';
+  const extra: Signal[] = [];
+  if (challengeId === 'hand-over-face' && metrics && (metrics.coverFrames ?? 0) >= OVERLAY_MIN_COVER_FRAMES && (metrics.faceUnderHandRatio ?? 0) >= OVERLAY_MIN_RATIO) {
+    extra.push({
+      id: `challenge.hand-overlay.${session.challenges.length}`,
+      source: 'challenge',
+      severity: 'strong',
+      at,
+      status: 'contradiction',
+      label: 'Visage encore dessiné sous la main pendant le défi',
+      detail: `Pendant que la main couvrait le visage, celui-ci est resté détecté sur ${Math.round(metrics.faceUnderHandRatio * 100)} % des images. Une vraie main cache le visage ; un visage superposé à l'image, lui, reste visible. À vérifier avec un second défi.`,
+    });
+  }
   upsertSignals(session, [
+    ...extra,
     {
       id: `challenge.${challengeId}.${session.challenges.length}`,
       source: 'challenge',

@@ -42,10 +42,11 @@ export function interpreter(demande: string, e: Etat): Reponse {
     const relance = x.preVerification.statut !== "non_envoyee";
     return { comprise: true, message: relance ? `Je relance ${nomComplet(x)} par e-mail.` : `J'envoie le lien de pré-vérification à ${nomComplet(x)}.`, executer: () => { void envoyerPreVerif(x.id, relance); } };
   }
-  // Rejoindre l'entretien de Y (page de visio Oval)
+  // Rejoindre l'entretien de Y : on ouvre sa réunion (Google Meet, Zoom…) dans un nouvel onglet
   if (/rejoin|visio|appel|lance l.entretien/.test(t)) {
     const x = trouver(e, t);
-    if (x) return { comprise: true, message: `On rejoint l'entretien de ${nomComplet(x)}.`, executer: aller(`#/visio/${x.id}`) };
+    if (x && x.visio) { const url = x.visio.url; return { comprise: true, message: `J'ouvre la visio de ${nomComplet(x)}.`, executer: () => { window.open(url, "_blank", "noopener"); } }; }
+    if (x) return { comprise: true, message: `${nomComplet(x)} n'a pas encore de lien de visio : choisissez-le sur sa fiche.`, executer: aller(`#/rapport/${x.id}`) };
   }
   // Ouvrir le rapport de Y
   if (/rapport|resultat|deroule/.test(t)) {

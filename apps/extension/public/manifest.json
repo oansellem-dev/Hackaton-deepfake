@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Oval — panneau recruteur",
-  "description": "Vérifie qu'une présence humaine est bien là en visio. Analyse dans le navigateur, aucune vidéo enregistrée.",
-  "version": "0.1.0",
+  "name": "Oval — vérification en visio",
+  "description": "Un widget flottant sur Meet, Zoom et Teams : vérifie qu'une présence humaine est bien là. Analyse dans le navigateur, aucune vidéo enregistrée.",
+  "version": "0.2.2",
   "action": {
-    "default_title": "Ouvrir le panneau Oval"
+    "default_title": "Oval"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
@@ -13,12 +13,32 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*"
+      ],
+      "js": [
+        "widget.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
   "permissions": [
     "sidePanel",
-    "storage"
+    "storage",
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "http://localhost:8787/*",
-    "http://localhost:5173/*"
+    "http://localhost:5173/*",
+    "https://meet.google.com/*",
+    "https://*.zoom.us/*",
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*"
   ]
 }

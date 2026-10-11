@@ -30,6 +30,8 @@
 .kyc-why { background: none; padding: 0; justify-self: start; font-size: 12.5px; font-weight: 600; opacity: .8; text-decoration: underline; text-underline-offset: 3px; color: inherit; }
 .kyc-green { background: var(--g-green); color: var(--green-ink); box-shadow: var(--reflect), var(--sh-green); }
 .kyc-orange, .kyc-red { background: var(--g-gold); color: var(--gold-text); box-shadow: var(--reflect), var(--sh-gold); }
+.kyc-none { background: var(--card); color: var(--ink-2); box-shadow: var(--hi-soft), var(--sh-card); }
+.kyc-none .kyc-ring-val { stroke: transparent; }
 .kyc-explanation { margin: -4px 0 0; padding: 10px 14px 10px 30px; border-radius: 14px; background: var(--card); box-shadow: var(--hi-soft), var(--sh-tile); font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
 
 /* Manta et sa bulle */

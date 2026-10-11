@@ -58,10 +58,10 @@ function App() {
   if (!sessionId) {
     return (
       <div className="ext">
-        <header className="ext-head"><span className="ext-logo"><i />oval</span></header>
+        <header className="ext-head"><span className="ext-logo"><svg viewBox="0 0 240 480" aria-hidden><path d="M120 4A116 116 0 0 1 208.9 194.6C192.8 213.8 154 218 154 240C154 262 192.8 266.2 208.9 285.4A116 116 0 0 1 120 476A116 116 0 0 1 31.1 285.4C47.2 266.2 86 262 86 240C86 218 47.2 213.8 31.1 194.6A116 116 0 0 1 120 4Z" /></svg>Oval</span></header>
         <section className="ext-card ext-pop">
           <h1>Quel entretien ?</h1>
-          <p>Collez le code de l’extension donné par Oval (rapport de l’entretien → « Code extension »).</p>
+          <p>Collez le code donné par Oval (fiche de l’entretien → « Code extension »). Sur une page de visio, cliquez sur l’icône Oval : le widget flottant s’affiche directement sur l’appel.</p>
           <form onSubmit={(e) => { e.preventDefault(); selectSession(draft); }}>
             <input placeholder="identifiant:clé" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
             <button className="ext-primary" disabled={!draft.includes(':')}>Ouvrir le panneau</button>
@@ -78,7 +78,7 @@ function App() {
   return (
     <div className="ext ext--panel">
       <header className="ext-head">
-        <span className="ext-logo"><i />oval</span>
+        <span className="ext-logo"><svg viewBox="0 0 240 480" aria-hidden><path d="M120 4A116 116 0 0 1 208.9 194.6C192.8 213.8 154 218 154 240C154 262 192.8 266.2 208.9 285.4A116 116 0 0 1 120 476A116 116 0 0 1 31.1 285.4C47.2 266.2 86 262 86 240C86 218 47.2 213.8 31.1 194.6A116 116 0 0 1 120 4Z" /></svg>Oval</span>
         <span className="ext-session"><code>{sessionId}</code></span>
         <button className="ext-ghost" title="Ouvrir dans une fenêtre flottante" onClick={detach}>⧉</button>
         <button className="ext-ghost" onClick={reset}>Changer</button>

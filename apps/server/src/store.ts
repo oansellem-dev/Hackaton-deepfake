@@ -9,6 +9,7 @@ import {
   type Session,
   type SessionView,
   type Signal,
+  type Schedule,
 } from '@kyc/shared';
 import { audit } from './audit.ts';
 import { DATA_DIR, unseal } from './biometric.ts';
@@ -113,7 +114,7 @@ setInterval(sweepExpiredBiometrics, retention.sweepMs).unref();
 
 // --- Entretiens et liens ---
 
-export function createSession(candidateLabel: string, controller?: Controller): Session {
+export function createSession(candidateLabel: string, controller?: Controller, schedule?: Schedule): Session {
   const session: Session = {
     id: randomUUID().slice(0, 8),
     createdAt: Date.now(),
@@ -125,6 +126,7 @@ export function createSession(candidateLabel: string, controller?: Controller): 
     // Lien de pré-vérification : jeton de 32 caractères, valable peu de temps, utilisable une seule fois.
     candidateLink: { token: newToken(24), expiresAt: Date.now() + retention.candidateLinkTtlMs },
     ...(controller ? { controller } : {}),
+    ...(schedule ? { schedule } : {}),
   };
   sessions.set(session.id, session);
   index(session);

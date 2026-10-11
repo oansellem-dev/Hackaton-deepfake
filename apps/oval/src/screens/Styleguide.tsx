@@ -3,6 +3,7 @@ import { Avatar, Avatars, Bar, Btn, Field, ICirc, Input, Modal, Pill, Select, Ta
 import { toast } from "../ui/toast";
 import { IcArrowUR, IcBell, IcCal, IcCheck, IcClock, IcDot, IcFilter, IcGear, IcHand, IcHome, IcList, IcMail, IcPlus, IcSearch, IcSpark, IcSun, IcFlag, IcPlay, IcDots } from "../ui/icons";
 import { Manta, type MantaState } from "../manta/Manta";
+import { BouncyAccordion } from "../ui/BouncyAccordion";
 import "./styleguide.css";
 
 const ETATS: { s: MantaState; t: string; halo?: string }[] = [
@@ -213,7 +214,19 @@ export function Styleguide() {
 
         {/* 11. Vocabulaire */}
         <section className="panel sg-section rise" style={{ "--i": 11 } as React.CSSProperties}>
-          <h2 className="t-h2">11 · Règles de contenu</h2>
+          <h2 className="t-h2">11 · Accordéon « bouncy » <span className="t-small muted">(cliquez une ligne : elle se détache sur un ressort)</span></h2>
+          <BouncyAccordion ouvertParDefaut="planning" items={[
+            { id: "preverif", icone: <IcCheck />, titre: "Pré-vérification", contenu: "Le candidat passe trois défis courts depuis son téléphone, avant l'entretien." },
+            { id: "signaux", icone: <IcFlag />, titre: "Signaux", contenu: "Jamais de verdict : des signaux à vérifier, expliqués un par un, à votre appréciation." },
+            { id: "planning", icone: <IcCal />, titre: "Planning", contenu: "Entretiens de la semaine, rappels et détection des chevauchements." },
+            { id: "visio", icone: <IcPlay />, titre: "Rejoindre avec Google Meet", contenu: "La réunion s'ouvre dans Meet ou Zoom ; l'extension Oval observe la présence humaine à côté." },
+            { id: "alertes", icone: <IcBell />, titre: "Alertes", contenu: "Un signal à vérifier pendant l'entretien remonte ici, sans interrompre l'échange." },
+            { id: "reglages", icone: <IcGear />, titre: "Réglages", contenu: "Équipe, envoi des e-mails, source des données." },
+          ]} />
+        </section>
+
+        <section className="panel sg-section rise" style={{ "--i": 12 } as React.CSSProperties}>
+          <h2 className="t-h2">12 · Règles de contenu</h2>
           <div className="row wrap" style={{ gap: 10 }}>
             <Pill ton="soft-green" icon={<IcCheck />}>« Présence humaine vérifiée »</Pill>
             <Pill ton="soft-green" icon={<IcCheck />}>« Signal à vérifier »</Pill>

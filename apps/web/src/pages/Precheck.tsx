@@ -1,53 +1,61 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { startRegistration } from '@simplewebauthn/browser';
-import { SUPPORTED_COUNTRIES, type CandidateLinkInfo, type FaceIdStep, type IdentityPayload } from '@kyc/shared';
+import { SUPPORTED_COUNTRIES, type CandidateLinkInfo, type FaceIdStep, type IdentityPayload, type Schedule } from '@kyc/shared';
 import { FaceId, type FaceIdOutcome } from '../components/FaceId.tsx';
 import { ScreenFlash, type ScreenFlashOutcome } from '../components/ScreenFlash.tsx';
+import { LogoIntro, LogoMark } from '../components/Logo.tsx';
 import { api } from '../config.ts';
+import '../precheck.css';
 
-type Step = 'loading' | 'identity' | 'consent' | 'face' | 'flash' | 'device' | 'done' | 'expired';
-
-const STEPS: { id: Step; label: string }[] = [
-  { id: 'identity', label: '1. Vos informations' },
-  { id: 'consent', label: '2. Vérification du visage' },
-  { id: 'flash', label: '3. Reflet de l’écran' },
+/**
+ * Lien de pré-vérification envoyé au candidat (/check/<jeton>, usage unique, valable peu de temps).
+ * Un écran à la fois : intro animée, créneau de l'entretien (confirmer ou proposer), informations en courts
+ * blocs, accord biométrique, vérification du visage, reflet de l'écran, appareil, puis le récapitulatif avec le
+ * lien de la visio. Aucune image ne quitte le navigateur.
+ */
+type Step = 'loading' | 'intro' | 'slot' | 'identity' | 'consent' | 'face' | 'flash' | 'device' | 'done' | 'expired';
+type Bloc = 'nom' | 'contact' | 'lieu' | 'profil' | 'accord';
+const BLOCS: Bloc[] = ['nom', 'contact', 'lieu', 'profil', 'accord'];
+const ETAPES: { id: Step; label: string }[] = [
+  { id: 'slot', label: 'Créneau' },
+  { id: 'identity', label: 'Infos' },
+  { id: 'consent', label: 'Accord' },
+  { id: 'face', label: 'Visage' },
+  { id: 'flash', label: 'Reflet' },
+  { id: 'done', label: 'Fin' },
 ];
 
-const FLASH_TEXT: Record<ScreenFlashOutcome['result'], string> = {
-  passed: 'réalisé',
-  failed: 'non concluant',
-  inconclusive: 'non concluant',
-  skipped: 'passé',
-};
-
-const STEP_NAME: Record<FaceIdStep, string> = {
-  center: 'Visage de face',
-  turn_a: 'Tête tournée à droite',
-  turn_b: 'Tête tournée à gauche',
-  hand: 'Main devant le visage',
-};
-
+const FLASH_TEXT: Record<ScreenFlashOutcome['result'], string> = { passed: 'réalisé', failed: 'non concluant', inconclusive: 'non concluant', skipped: 'passé' };
+const STEP_NAME: Record<FaceIdStep, string> = { center: 'Visage de face', turn_a: 'Tête tournée à droite', turn_b: 'Tête tournée à gauche', hand: 'Main devant le visage' };
 const COUNTRY_NAMES: Record<string, string> = {
-  FR: 'France', BE: 'Belgique', CH: 'Suisse', LU: 'Luxembourg', DE: 'Allemagne', ES: 'Espagne', IT: 'Italie',
-  PT: 'Portugal', GB: 'Royaume-Uni', NL: 'Pays-Bas', PL: 'Pologne', RO: 'Roumanie', MA: 'Maroc', TN: 'Tunisie',
-  DZ: 'Algérie', SN: 'Sénégal', CA: 'Canada',
+  FR: 'France', BE: 'Belgique', CH: 'Suisse', LU: 'Luxembourg', DE: 'Allemagne', ES: 'Espagne', IT: 'Italie', PT: 'Portugal', GB: 'Royaume-Uni',
+  NL: 'Pays-Bas', PL: 'Pologne', RO: 'Roumanie', MA: 'Maroc', TN: 'Tunisie', DZ: 'Algérie', SN: 'Sénégal', CA: 'Canada',
 };
 
 type Form = Omit<IdentityPayload, 'consent'>;
+const EMPTY: Form = { firstName: '', lastName: '', email: '', phone: '', country: 'FR', city: '', jobTitle: '', company: '', githubUrl: '', linkedinUrl: '' };
 
-const EMPTY: Form = {
-  firstName: '', lastName: '', email: '', phone: '', country: 'FR', city: '', jobTitle: '', company: '', githubUrl: '',
-  linkedinUrl: '',
-};
+const fmtJour = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+const fmtHeure = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const fmtCourt = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const fournisseur = (url?: string) => (!url ? 'visio' : /meet\.google\./.test(url) ? 'Google Meet' : /zoom\./.test(url) ? 'Zoom' : /teams\./.test(url) ? 'Teams' : 'visio');
+const localDateTime = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-// Lien de pré-vérification envoyé au candidat (/check/<jeton>, à usage unique, valable peu de temps).
-// Page 1 : identité et informations écrites. Page 2 : consentement biométrique explicite, puis vérification du visage,
-// ou vérification sans biométrie. Le candidat peut ensuite associer son appareil et retirer son consentement.
+/** Fichier d'agenda (.ics) avec le créneau et le lien de la visio, généré dans le navigateur. */
+function icsHref(s: Schedule, titre: string): string {
+  const stamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const lignes = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Oval//FR', 'BEGIN:VEVENT', `UID:oval-${s.at}@oval`, `DTSTAMP:${stamp(Date.now())}`, `DTSTART:${stamp(s.at)}`, `DTEND:${stamp(s.at + s.durationMin * 60000)}`, `SUMMARY:${titre}`, ...(s.visioUrl ? [`LOCATION:${s.visioUrl}`, `DESCRIPTION:Rejoindre la visio : ${s.visioUrl}`] : []), 'END:VEVENT', 'END:VCALENDAR'];
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lignes.join('\r\n'))}`;
+}
+
 export function Precheck() {
   const { token = '' } = useParams();
   const [info, setInfo] = useState<CandidateLinkInfo | null>(null);
   const [step, setStep] = useState<Step>('loading');
+  const [apres, setApres] = useState<Step>('identity'); // étape qui suit l'intro
+  const [bloc, setBloc] = useState<Bloc>('nom');
   const [form, setForm] = useState<Form>(EMPTY);
   const [infoConsent, setInfoConsent] = useState(false);
   const [bioConsent, setBioConsent] = useState(false);
@@ -56,12 +64,19 @@ export function Precheck() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [withdrawn, setWithdrawn] = useState(false);
+  // Créneau
+  const [contre, setContre] = useState(false);
+  const [slot, setSlot] = useState<number | null>(null);
+  const [custom, setCustom] = useState('');
+  const [message, setMessage] = useState('');
+  const [reponse, setReponse] = useState<Schedule['response'] | null>(null);
 
   async function refresh() {
     try {
       const i = await api.getLink(token);
       setInfo(i);
       setWithdrawn(i.withdrawn);
+      if (i.schedule?.response) setReponse(i.schedule.response);
       return i;
     } catch {
       setStep('expired');
@@ -72,372 +87,297 @@ export function Precheck() {
   useEffect(() => {
     refresh().then((i) => {
       if (!i) return;
-      if (i.status === 'open') setStep(i.identityDone ? 'consent' : 'identity');
-      // Face ID fait, reflet pas encore : on reprend au test du reflet (fenêtre courte après le Face ID).
-      else if (i.faceDone && !i.flashDone && !i.optedOut && !i.withdrawn && i.status === 'used') setStep('flash');
-      else if (i.faceDone || i.optedOut || i.status === 'used') setStep('done');
-      else setStep('expired');
+      if (i.candidateFirstName) setForm((f) => ({ ...f, firstName: i.candidateFirstName! }));
+      let suite: Step;
+      if (i.status === 'open') suite = i.schedule && !i.schedule.response ? 'slot' : i.identityDone ? 'consent' : 'identity';
+      else if (i.faceDone && !i.flashDone && !i.optedOut && !i.withdrawn && i.status === 'used') suite = 'flash';
+      else if (i.faceDone || i.optedOut || i.status === 'used') suite = 'done';
+      else suite = 'expired';
+      setApres(suite);
+      setStep(suite === 'expired' ? 'expired' : 'intro');
     });
   }, [token]);
 
-  const set = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  // Intro : 2,4 s, ou un clic
+  useEffect(() => {
+    if (step !== 'intro') return;
+    const t = setTimeout(() => setStep(apres), 2400);
+    return () => clearTimeout(t);
+  }, [step, apres]);
 
-  async function submitIdentity(e: React.FormEvent) {
-    e.preventDefault();
-    setRunning(true);
-    setError(null);
+  const set = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const schedule = info?.schedule;
+  const alternatives = useMemo(() => (schedule?.alternatives ?? []).filter((a) => a > Date.now()).slice(0, 6), [schedule]);
+
+  async function repondreCreneau(body: { confirm?: boolean; proposeAt?: number; message?: string }) {
+    setRunning(true); setError(null);
     try {
-      await api.sendIdentity(token, { ...form, consent: infoConsent });
-      setStep('consent');
-    } catch (err) {
-      setError(String(err).includes('410') ? 'Ce lien a expiré ou a déjà été utilisé.' : String(err));
-    } finally {
-      setRunning(false);
-    }
+      const r = await api.sendSchedule(token, body);
+      setReponse(r.schedule.response ?? null);
+      setInfo((i) => (i ? { ...i, schedule: r.schedule } : i));
+      setTimeout(() => setStep(info?.identityDone ? 'consent' : 'identity'), 1400);
+    } catch (err) { setError(String(err)); }
+    finally { setRunning(false); }
   }
 
+  async function submitIdentity() {
+    setRunning(true); setError(null);
+    try { await api.sendIdentity(token, { ...form, consent: infoConsent }); setStep('consent'); }
+    catch (err) { setError(String(err).includes('410') ? 'Ce lien a expiré ou a déjà été utilisé.' : String(err)); }
+    finally { setRunning(false); }
+  }
   async function optOut() {
     setRunning(true);
-    try {
-      await api.optOut(token);
-      await refresh();
-      setStep('done');
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setRunning(false);
-    }
+    try { await api.optOut(token); await refresh(); setStep('done'); } catch (err) { setError(String(err)); } finally { setRunning(false); }
   }
-
   async function bindDevice() {
-    setRunning(true);
-    setError(null);
+    setRunning(true); setError(null);
     try {
       const optionsJSON = await api.deviceOptions(token);
       const response = await startRegistration({ optionsJSON: optionsJSON as never });
       await api.registerDevice(token, response);
-      await refresh();
-      setStep('done');
-    } catch (err) {
-      setError(
-        `L’appareil n’a pas pu être associé (${err instanceof Error ? err.message : String(err)}). Vous pouvez passer cette étape.`,
-      );
-    } finally {
-      setRunning(false);
-    }
+      await refresh(); setStep('done');
+    } catch (err) { setError(`L’appareil n’a pas pu être associé (${err instanceof Error ? err.message : String(err)}). Vous pouvez passer cette étape.`); }
+    finally { setRunning(false); }
   }
-
   async function withdraw() {
     setRunning(true);
-    try {
-      await api.withdraw(token);
-      setWithdrawn(true);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setRunning(false);
-    }
+    try { await api.withdraw(token); setWithdrawn(true); } catch (err) { setError(String(err)); } finally { setRunning(false); }
   }
 
   const controller = info?.controller;
+  const entreprise = controller?.name ?? 'Le recruteur';
   const retentionHours = info?.biometricRetentionHours ?? 24;
-  const activeIndex = step === 'identity' ? 0 : step === 'flash' || step === 'device' ? 2 : 1;
+  const iEtape = ETAPES.findIndex((e) => e.id === (step === 'device' ? 'flash' : step));
+  const prenom = form.firstName || info?.candidateFirstName || '';
 
-  if (step === 'loading') return <div className="page">Chargement…</div>;
+  if (step === 'loading') return <div className="pc"><div className="pc-intro pc-intro--calme"><LogoIntro /></div></div>;
   if (step === 'expired') {
     return (
-      <div className="page">
-        <h1>Lien expiré</h1>
-        <p>Ce lien de pré-vérification n’est plus valable. Demandez un nouveau lien au recruteur.</p>
+      <div className="pc"><Tete /><main className="pc-main"><section className="pc-card pc-screen"><h2>Ce lien n’est plus valable</h2><p className="muted">Il a expiré ou a déjà été utilisé. Demandez un nouveau lien au recruteur.</p></section></main></div>
+    );
+  }
+  if (step === 'intro') {
+    return (
+      <div className="pc" onClick={() => setStep(apres)}>
+        <div className="pc-intro">
+          <i className="pc-blob pc-blob--1" /><i className="pc-blob pc-blob--2" /><i className="pc-blob pc-blob--3" />
+          <LogoIntro />
+          <span className="pc-intro__mot">Oval</span>
+          <span className="pc-intro__sous">{prenom ? `Bonjour ${prenom}` : 'Vérification avant votre entretien'}</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page">
-      <h1>Pré-vérification de votre entretien</h1>
-      {step !== 'done' && (
-        <ol className="stepper">
-          {STEPS.map((s, i) => (
-            <li key={s.id} className={i < activeIndex ? 'finished' : i === activeIndex ? 'active' : ''}>
-              {s.label}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {step === 'identity' && (
-        <form className="card" onSubmit={submitIdentity}>
-          <p>
-            {controller ? `${controller.name} vous` : 'Le recruteur vous'} propose cette vérification avant votre entretien
-            en visio, pour s’assurer que la personne présente sera bien vous. Cela prend environ deux minutes.
-          </p>
-          <div className="form-grid">
-            <label>
-              Prénom *
-              <input value={form.firstName} onChange={set('firstName')} autoComplete="given-name" required />
-            </label>
-            <label>
-              Nom *
-              <input value={form.lastName} onChange={set('lastName')} autoComplete="family-name" required />
-            </label>
-            <label>
-              E-mail
-              <input type="email" value={form.email} onChange={set('email')} autoComplete="email" />
-            </label>
-            <label>
-              Téléphone
-              <input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" placeholder="+33 6 12 34 56 78" />
-            </label>
-            <label>
-              Pays depuis lequel vous passerez l’entretien
-              <select value={form.country} onChange={set('country')}>
-                {SUPPORTED_COUNTRIES.map((c) => (
-                  <option key={c} value={c}>
-                    {COUNTRY_NAMES[c] ?? c}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Ville
-              <input value={form.city} onChange={set('city')} autoComplete="address-level2" />
-            </label>
-            <label>
-              Poste actuel ou dernier poste
-              <input value={form.jobTitle} onChange={set('jobTitle')} autoComplete="organization-title" />
-            </label>
-            <label>
-              Entreprise
-              <input value={form.company} onChange={set('company')} autoComplete="organization" />
-            </label>
-            <label>
-              Profil GitHub (facultatif)
-              <input value={form.githubUrl} onChange={set('githubUrl')} placeholder="https://github.com/…" />
-            </label>
-            <label>
-              Profil LinkedIn (facultatif)
-              <input value={form.linkedinUrl} onChange={set('linkedinUrl')} placeholder="https://www.linkedin.com/in/…" />
-            </label>
-          </div>
-
-          <div className="what-we-check">
-            <strong>Ce que nous vérifions à cette étape</strong>
-            <ul>
-              <li>votre nom dans des sources publiques (Wikipédia, GitHub, ORCID, moteur de recherche) ;</li>
-              <li>la cohérence de ce que vous déclarez (pays, téléphone, e-mail, profils) ;</li>
-              <li>à l’étape suivante : votre caméra, votre fuseau horaire, votre adresse IP et votre visage ;</li>
-              <li>
-                enfin, le reflet des couleurs de votre écran sur votre visage (analysé dans votre navigateur, test
-                facultatif).
-              </li>
-            </ul>
-            <p className="muted">
-              Les champs facultatifs vides ne vous pénalisent pas, et ne rien trouver sur vous en ligne non plus.
-            </p>
-          </div>
-
-          <label className="consent">
-            <input type="checkbox" checked={infoConsent} onChange={(e) => setInfoConsent(e.target.checked)} />
-            <span>
-              J’accepte que les informations ci-dessus soient vérifiées dans des sources publiques et transmises au
-              recruteur.{' '}
-              <Link to={`/confidentialite/${token}`} target="_blank">
-                Mentions d’information
-              </Link>
-            </span>
-          </label>
-          <button
-            className="primary"
-            type="submit"
-            disabled={running || !infoConsent || !form.firstName.trim() || !form.lastName.trim()}
-          >
-            {running ? 'Vérification…' : 'Continuer'}
-          </button>
-          {error && <p className="faceid-error">{error}</p>}
-        </form>
-      )}
-
-      {step === 'consent' && (
-        <div className="card">
-          <h2>Vérification du visage : votre accord</h2>
-          <table className="facts">
-            <tbody>
-              <tr>
-                <th>Responsable du traitement</th>
-                <td>
-                  {controller
-                    ? `${controller.name}${controller.contact ? ` (${controller.contact})` : ''}`
-                    : 'L’entreprise qui vous a envoyé ce lien'}
-                </td>
-              </tr>
-              <tr>
-                <th>Pourquoi</th>
-                <td>
-                  Vérifier que la personne présente à l’entretien est bien celle qui fait cette vérification (comparaison
-                  avec vous-même uniquement), et détecter une vidéo truquée. Jamais d’identification dans une base de
-                  visages, jamais d’analyse de vos émotions.
-                </td>
-              </tr>
-              <tr>
-                <th>Ce qui est traité</th>
-                <td>
-                  Votre visage, analysé uniquement dans votre navigateur : aucune image n’est envoyée ni enregistrée.
-                  Seule une empreinte numérique (des mesures) est conservée, chiffrée.
-                </td>
-              </tr>
-              <tr>
-                <th>Combien de temps</th>
-                <td>Jusqu’à la décision du recruteur, et au plus {retentionHours} heures.</td>
-              </tr>
-              <tr>
-                <th>Vos droits</th>
-                <td>
-                  Vous pouvez retirer votre accord à tout moment depuis cette page, ou en écrivant
-                  {controller?.contact ? ` à ${controller.contact}` : ' au recruteur'} : l’empreinte est alors supprimée.
-                  Accès, effacement, réclamation auprès de la CNIL :{' '}
-                  <Link to={`/confidentialite/${token}`} target="_blank">
-                    mentions d’information
-                  </Link>
-                  .
-                </td>
-              </tr>
-              <tr>
-                <th>Si vous refusez</th>
-                <td>Aucune pénalité : le recruteur vérifiera lui-même pendant l’entretien, sans biométrie.</td>
-              </tr>
-            </tbody>
-          </table>
-          <label className="consent">
-            <input type="checkbox" checked={bioConsent} onChange={(e) => setBioConsent(e.target.checked)} />
-            <span>
-              J’accepte le traitement de mon visage décrit ci-dessus (donnée biométrique, article 9 du RGPD), pour cet
-              entretien uniquement.
-            </span>
-          </label>
-          <div className="row-buttons">
-            <button className="primary" disabled={!bioConsent} onClick={() => setStep('face')}>
-              Continuer vers la caméra
-            </button>
-            <button className="secondary" disabled={running} onClick={optOut}>
-              Je préfère une vérification sans biométrie
-            </button>
-          </div>
-          {error && <p className="faceid-error">{error}</p>}
-        </div>
-      )}
-
-      {step === 'face' && (
-        <FaceId
-          token={token}
-          declaredCountry={form.country ?? 'FR'}
-          onDone={(o) => {
-            setOutcome(o);
-            setStep('flash');
-          }}
-        />
-      )}
-
-      {step === 'flash' && (
-        <ScreenFlash
-          token={token}
-          deviceId={outcome?.deviceId}
-          onDone={(f) => {
-            setFlash(f);
-            // Association de l'appareil proposée seulement si le navigateur sait créer une clé d'accès.
-            setStep(window.PublicKeyCredential ? 'device' : 'done');
-          }}
-        />
-      )}
-
-      {step === 'device' && (
-        <div className="card">
-          <h2>Dernière étape, facultative : associer cet appareil</h2>
-          <p>
-            Pendant l’entretien, le recruteur pourra vous demander de confirmer en un clic que vous utilisez le même
-            appareil. Votre appareil vous demandera peut-être votre code, votre empreinte digitale ou votre visage : ils
-            restent dans l’appareil, rien n’est envoyé.
-          </p>
-          <div className="row-buttons">
-            <button className="primary" disabled={running} onClick={bindDevice}>
-              Associer cet appareil
-            </button>
-            <button className="secondary" disabled={running} onClick={() => setStep('done')}>
-              Passer
-            </button>
-          </div>
-          {error && <p className="faceid-error">{error}</p>}
-        </div>
-      )}
-
-      {step === 'done' && (
-        <div className="card">
-          <div className="done-hero">
-            <span className="done-check" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-            </span>
-            <h2>{info?.optedOut ? 'C’est noté, merci' : 'Pré-vérification terminée'}</h2>
-            <p className="muted">
-              {info?.optedOut
-                ? 'Vous avez choisi la vérification sans biométrie : le recruteur fera les vérifications en direct, sans aucune pénalité.'
-                : `${controller ? controller.name : 'Votre recruteur'} est prévenu. Vous n’avez rien d’autre à faire avant l’entretien.`}
-            </p>
-          </div>
-
-          {(outcome || flash) && (
-            <ul className="done-list">
-              {outcome?.environment.map((r) => (
-                <li key={r.label} className={r.status === 'ok' ? '' : 'is-unknown'}>
-                  <i>{r.status === 'ok' ? '✓' : '·'}</i><span>{r.label}</span><small>{r.status === 'ok' ? 'vérifié' : 'relevé'}</small>
-                </li>
-              ))}
-              {outcome?.steps.map((s, i) => (
-                <li key={i} className={s.result === 'passed' ? '' : 'is-unknown'}>
-                  <i>{s.result === 'passed' ? '✓' : '·'}</i><span>{STEP_NAME[s.step]}</span><small>{s.result === 'passed' ? 'réalisé' : 'non concluant, sans effet'}</small>
-                </li>
-              ))}
-              {flash && (
-                <li className={flash.result === 'passed' ? '' : 'is-unknown'}>
-                  <i>{flash.result === 'passed' ? '✓' : '·'}</i><span>Reflet de l’écran</span><small>{FLASH_TEXT[flash.result]}</small>
-                </li>
-              )}
-              {info?.deviceBound && <li><i>✓</i><span>Appareil associé</span><small>clé d’accès créée</small></li>}
-            </ul>
-          )}
-
-          <div className="done-next">
-            <h3>Et maintenant ?</h3>
-            <ol>
-              <li><b>1</b>Le jour J, connectez-vous à la visio depuis cet ordinateur, avec la même caméra.</li>
-              <li><b>2</b>Pendant l’entretien, le recruteur pourra vous demander un geste simple (tourner la tête, passer la main devant le visage). C’est normal.</li>
-              <li><b>3</b>Aucune vidéo n’est enregistrée, à aucun moment. Le recruteur décide : cette vérification ne remplace pas son jugement.</li>
-            </ol>
-          </div>
-
-          <div className="done-privacy">
-            {withdrawn ? (
-              <strong>Votre accord est retiré : l’empreinte de votre visage est supprimée.</strong>
-            ) : info?.optedOut ? (
-              <span>Aucune donnée biométrique n’a été collectée.</span>
-            ) : (
+    <div className="pc">
+      <Tete etape={iEtape} />
+      <main className="pc-main" key={step}>
+        {step === 'slot' && schedule && (
+          <section className="pc-card pc-screen">
+            {!reponse ? (
               <>
-                <span>
-                  Une empreinte numérique de votre visage (des mesures, aucune image) est conservée, chiffrée, jusqu’à la décision
-                  du recruteur et au plus {retentionHours} heures.
-                </span>
-                <button className="secondary" disabled={running} onClick={withdraw}>
-                  Retirer mon accord et supprimer mon empreinte
-                </button>
+                <span className="pc-kicker">Votre entretien avec {entreprise}</span>
+                <h2 className="pc-titre">{cap(fmtJour.format(schedule.at))}<br /><span className="pc-heure">{fmtHeure.format(schedule.at)}</span></h2>
+                <p className="pc-meta">{schedule.durationMin} min · {fournisseur(schedule.visioUrl)}{schedule.recruiterName ? ` · avec ${schedule.recruiterName}` : ''}</p>
+                {!contre ? (
+                  <div className="pc-actions">
+                    <button className="pc-btn pc-btn--primaire" disabled={running} onClick={() => void repondreCreneau({ confirm: true })}>Ça me va</button>
+                    <button className="pc-btn" disabled={running} onClick={() => setContre(true)}>Proposer un autre créneau</button>
+                  </div>
+                ) : (
+                  <div className="pc-contre">
+                    {alternatives.length > 0 && (
+                      <>
+                        <p className="pc-label">Créneaux où {schedule.recruiterName ? schedule.recruiterName.split(' ')[0] : 'le recruteur'} est disponible</p>
+                        <div className="pc-chips">
+                          {alternatives.map((a) => <button key={a} type="button" className={`pc-chip${slot === a ? ' is-on' : ''}`} onClick={() => { setSlot(a); setCustom(''); }}>{cap(fmtCourt.format(a))}</button>)}
+                        </div>
+                      </>
+                    )}
+                    <label className="pc-field"><span>Ou un autre moment</span><input type="datetime-local" value={custom} min={localDateTime(new Date())} onChange={(e) => { setCustom(e.target.value); setSlot(null); }} /></label>
+                    <label className="pc-field"><span>Un mot pour le recruteur (facultatif)</span><input value={message} maxLength={300} placeholder="Ex. je termine à 13 h ce jour-là" onChange={(e) => setMessage(e.target.value)} /></label>
+                    <div className="pc-actions">
+                      <button className="pc-btn pc-btn--primaire" disabled={running || (!slot && !custom)} onClick={() => void repondreCreneau({ proposeAt: slot ?? new Date(custom).getTime(), message: message || undefined })}>Envoyer ma proposition</button>
+                      <button className="pc-btn pc-btn--discret" disabled={running} onClick={() => setContre(false)}>Retour</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="pc-ok">
+                <span className="pc-ok__coche" aria-hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>
+                <h2>{reponse.kind === 'confirmed' ? 'Créneau confirmé' : 'Proposition envoyée'}</h2>
+                <p className="muted">{reponse.kind === 'confirmed' ? `${cap(fmtJour.format(schedule.at))} à ${fmtHeure.format(schedule.at)}. On continue avec la vérification.` : `${entreprise} reçoit votre proposition et vous confirmera le créneau. On continue avec la vérification.`}</p>
+              </div>
+            )}
+            {error && <p className="pc-erreur">{error}</p>}
+          </section>
+        )}
+
+        {step === 'identity' && (
+          <section className="pc-card pc-screen" key={bloc}>
+            <span className="pc-kicker">Vos informations · {BLOCS.indexOf(bloc) + 1}/{BLOCS.length}</span>
+            {bloc === 'nom' && (
+              <>
+                <h2>Qui êtes-vous ?</h2>
+                <p className="muted">{entreprise} vous propose une vérification de deux minutes avant l’entretien, pour s’assurer que la personne en visio sera bien vous.</p>
+                <div className="pc-grille">
+                  <label className="pc-field"><span>Prénom</span><input value={form.firstName} onChange={set('firstName')} autoComplete="given-name" autoFocus /></label>
+                  <label className="pc-field"><span>Nom</span><input value={form.lastName} onChange={set('lastName')} autoComplete="family-name" /></label>
+                </div>
               </>
             )}
-            <span>
-              <Link to={`/confidentialite/${token}`}>Mentions d’information</Link> · Vous pouvez fermer cette page.
-            </span>
-          </div>
-          {error && <p className="faceid-error">{error}</p>}
-        </div>
-      )}
+            {bloc === 'contact' && (
+              <>
+                <h2>Comment vous joindre</h2>
+                <div className="pc-grille">
+                  <label className="pc-field"><span>E-mail</span><input type="email" value={form.email} onChange={set('email')} autoComplete="email" autoFocus /></label>
+                  <label className="pc-field"><span>Téléphone</span><input type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" placeholder="+33 6 12 34 56 78" /></label>
+                </div>
+              </>
+            )}
+            {bloc === 'lieu' && (
+              <>
+                <h2>D’où passerez-vous l’entretien ?</h2>
+                <div className="pc-grille">
+                  <label className="pc-field"><span>Pays</span><select value={form.country} onChange={set('country')}>{SUPPORTED_COUNTRIES.map((c) => <option key={c} value={c}>{COUNTRY_NAMES[c] ?? c}</option>)}</select></label>
+                  <label className="pc-field"><span>Ville</span><input value={form.city} onChange={set('city')} autoComplete="address-level2" autoFocus /></label>
+                </div>
+              </>
+            )}
+            {bloc === 'profil' && (
+              <>
+                <h2>Votre parcours <span className="pc-facultatif">facultatif</span></h2>
+                <div className="pc-grille">
+                  <label className="pc-field"><span>Poste actuel ou dernier poste</span><input value={form.jobTitle} onChange={set('jobTitle')} autoComplete="organization-title" autoFocus /></label>
+                  <label className="pc-field"><span>Entreprise</span><input value={form.company} onChange={set('company')} autoComplete="organization" /></label>
+                  <label className="pc-field"><span>GitHub</span><input value={form.githubUrl} onChange={set('githubUrl')} placeholder="https://github.com/…" /></label>
+                  <label className="pc-field"><span>LinkedIn</span><input value={form.linkedinUrl} onChange={set('linkedinUrl')} placeholder="https://www.linkedin.com/in/…" /></label>
+                </div>
+                <p className="muted">Les champs vides ne vous pénalisent pas, et ne rien trouver sur vous en ligne non plus.</p>
+              </>
+            )}
+            {bloc === 'accord' && (
+              <>
+                <h2>Ce que nous vérifions</h2>
+                <ul className="pc-liste">
+                  <li><i>1</i><span>votre nom dans des sources publiques (Wikipédia, GitHub, ORCID, moteur de recherche)</span></li>
+                  <li><i>2</i><span>la cohérence de ce que vous déclarez : pays, téléphone, e-mail, profils</span></li>
+                  <li><i>3</i><span>à l’étape suivante, votre caméra, votre fuseau horaire, votre adresse IP et votre visage</span></li>
+                  <li><i>4</i><span>enfin, le reflet des couleurs de votre écran sur votre visage, analysé dans votre navigateur, facultatif</span></li>
+                </ul>
+                <label className="pc-consent"><input type="checkbox" checked={infoConsent} onChange={(e) => setInfoConsent(e.target.checked)} /><span>J’accepte que ces informations soient vérifiées dans des sources publiques et transmises au recruteur. <Link to={`/confidentialite/${token}`} target="_blank">Mentions d’information</Link></span></label>
+              </>
+            )}
+            <div className="pc-actions">
+              {bloc !== 'accord' ? (
+                <button className="pc-btn pc-btn--primaire" disabled={bloc === 'nom' && (!form.firstName.trim() || !form.lastName.trim())} onClick={() => setBloc(BLOCS[BLOCS.indexOf(bloc) + 1])}>Continuer</button>
+              ) : (
+                <button className="pc-btn pc-btn--primaire" disabled={running || !infoConsent} onClick={() => void submitIdentity()}>{running ? 'Vérification…' : 'Valider mes informations'}</button>
+              )}
+              {bloc !== 'nom' && <button className="pc-btn pc-btn--discret" onClick={() => setBloc(BLOCS[BLOCS.indexOf(bloc) - 1])}>Retour</button>}
+            </div>
+            {error && <p className="pc-erreur">{error}</p>}
+          </section>
+        )}
+
+        {step === 'consent' && (
+          <section className="pc-card pc-screen">
+            <span className="pc-kicker">Vérification du visage</span>
+            <h2>Votre accord</h2>
+            <div className="pc-faits">
+              <div><b>Pourquoi</b><span>Vérifier que la personne en entretien est bien celle qui fait cette vérification, et détecter une vidéo truquée. Jamais d’identification dans une base de visages, jamais d’analyse de vos émotions.</span></div>
+              <div><b>Ce qui est traité</b><span>Votre visage, analysé uniquement dans votre navigateur : aucune image n’est envoyée ni enregistrée. Seule une empreinte numérique (des mesures) est conservée, chiffrée.</span></div>
+              <div><b>Combien de temps</b><span>Jusqu’à la décision du recruteur, et au plus {retentionHours} heures.</span></div>
+              <div><b>Responsable</b><span>{controller ? `${controller.name}${controller.contact ? ` (${controller.contact})` : ''}` : 'L’entreprise qui vous a envoyé ce lien'}. Retrait possible à tout moment depuis cette page. <Link to={`/confidentialite/${token}`} target="_blank">Mentions d’information</Link></span></div>
+              <div><b>Si vous refusez</b><span>Aucune pénalité : le recruteur vérifiera lui-même pendant l’entretien, sans biométrie.</span></div>
+            </div>
+            <label className="pc-consent"><input type="checkbox" checked={bioConsent} onChange={(e) => setBioConsent(e.target.checked)} /><span>J’accepte le traitement de mon visage décrit ci-dessus (donnée biométrique, article 9 du RGPD), pour cet entretien uniquement.</span></label>
+            <div className="pc-actions">
+              <button className="pc-btn pc-btn--primaire" disabled={!bioConsent} onClick={() => setStep('face')}>Continuer vers la caméra</button>
+              <button className="pc-btn pc-btn--discret" disabled={running} onClick={() => void optOut()}>Je préfère une vérification sans biométrie</button>
+            </div>
+            {error && <p className="pc-erreur">{error}</p>}
+          </section>
+        )}
+
+        {step === 'face' && <div className="pc-screen"><FaceId token={token} declaredCountry={form.country ?? 'FR'} onDone={(o) => { setOutcome(o); setStep('flash'); }} /></div>}
+        {step === 'flash' && <div className="pc-screen"><ScreenFlash token={token} deviceId={outcome?.deviceId} onDone={(f) => { setFlash(f); setStep(window.PublicKeyCredential ? 'device' : 'done'); }} /></div>}
+
+        {step === 'device' && (
+          <section className="pc-card pc-screen">
+            <span className="pc-kicker">Dernière étape, facultative</span>
+            <h2>Associer cet appareil</h2>
+            <p className="muted">Pendant l’entretien, le recruteur pourra vous demander de confirmer en un clic que vous utilisez le même appareil. Votre code, votre empreinte ou votre visage restent dans l’appareil, rien n’est envoyé.</p>
+            <div className="pc-actions">
+              <button className="pc-btn pc-btn--primaire" disabled={running} onClick={() => void bindDevice()}>Associer cet appareil</button>
+              <button className="pc-btn pc-btn--discret" disabled={running} onClick={() => setStep('done')}>Passer</button>
+            </div>
+            {error && <p className="pc-erreur">{error}</p>}
+          </section>
+        )}
+
+        {step === 'done' && (
+          <section className="pc-card pc-screen">
+            <div className="pc-ok">
+              <span className="pc-ok__coche" aria-hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>
+              <h2>{info?.optedOut ? 'C’est noté, merci' : 'Pré-vérification terminée'}</h2>
+              <p className="muted">{info?.optedOut ? 'Vous avez choisi la vérification sans biométrie : le recruteur fera les vérifications en direct, sans aucune pénalité.' : `${entreprise} est prévenu. Vous n’avez rien d’autre à faire avant l’entretien.`}</p>
+            </div>
+
+            {schedule && (
+              <div className="pc-rdv">
+                <div className="pc-rdv__txt">
+                  <b>{reponse?.kind === 'proposed' && reponse.slot ? `Vous avez proposé ${fmtJour.format(reponse.slot)} à ${fmtHeure.format(reponse.slot)}` : `${cap(fmtJour.format(schedule.at))} à ${fmtHeure.format(schedule.at)}`}</b>
+                  <span>{reponse?.kind === 'proposed' ? `En attente de confirmation par ${entreprise}` : `${schedule.durationMin} min · ${fournisseur(schedule.visioUrl)}${schedule.recruiterName ? ` · avec ${schedule.recruiterName}` : ''}`}</span>
+                </div>
+                <div className="pc-rdv__btns">
+                  {schedule.visioUrl && <a className="pc-btn pc-btn--primaire" href={schedule.visioUrl} target="_blank" rel="noreferrer">Rejoindre sur {fournisseur(schedule.visioUrl)}</a>}
+                  {reponse?.kind !== 'proposed' && <a className="pc-btn" href={icsHref(schedule, `Entretien avec ${entreprise}`)} download="entretien-oval.ics">Ajouter à mon agenda</a>}
+                </div>
+              </div>
+            )}
+
+            {(outcome || flash) && (
+              <ul className="pc-bilan">
+                {outcome?.environment.map((r) => <li key={r.label} className={r.status === 'ok' ? '' : 'is-unknown'}><i>{r.status === 'ok' ? '✓' : '·'}</i><span>{r.label}</span><small>{r.status === 'ok' ? 'vérifié' : 'relevé'}</small></li>)}
+                {outcome?.steps.map((s, i) => <li key={i} className={s.result === 'passed' ? '' : 'is-unknown'}><i>{s.result === 'passed' ? '✓' : '·'}</i><span>{STEP_NAME[s.step]}</span><small>{s.result === 'passed' ? 'réalisé' : 'non concluant, sans effet'}</small></li>)}
+                {flash && <li className={flash.result === 'passed' ? '' : 'is-unknown'}><i>{flash.result === 'passed' ? '✓' : '·'}</i><span>Reflet de l’écran</span><small>{FLASH_TEXT[flash.result]}</small></li>}
+                {info?.deviceBound && <li><i>✓</i><span>Appareil associé</span><small>clé d’accès créée</small></li>}
+              </ul>
+            )}
+
+            <ol className="pc-liste pc-liste--suite">
+              <li><i>1</i><span>Le jour J, connectez-vous à la visio depuis cet ordinateur, avec la même caméra.</span></li>
+              <li><i>2</i><span>Le recruteur pourra vous demander un geste simple (tourner la tête, passer la main devant le visage). C’est normal.</span></li>
+              <li><i>3</i><span>Aucune vidéo n’est enregistrée. Le recruteur décide : cette vérification ne remplace pas son jugement.</span></li>
+            </ol>
+
+            <div className="pc-pied">
+              {withdrawn ? <strong>Votre accord est retiré : l’empreinte de votre visage est supprimée.</strong>
+                : info?.optedOut ? <span>Aucune donnée biométrique n’a été collectée.</span>
+                : <><span>Une empreinte numérique de votre visage (des mesures, aucune image) est conservée, chiffrée, jusqu’à la décision du recruteur et au plus {retentionHours} heures.</span><button className="pc-btn pc-btn--discret" disabled={running} onClick={() => void withdraw()}>Retirer mon accord et supprimer mon empreinte</button></>}
+              <span><Link to={`/confidentialite/${token}`}>Mentions d’information</Link> · Vous pouvez fermer cette page.</span>
+            </div>
+            {error && <p className="pc-erreur">{error}</p>}
+          </section>
+        )}
+      </main>
     </div>
+  );
+}
+
+function Tete({ etape = -1 }: { etape?: number }) {
+  return (
+    <header className="pc-tete">
+      <span className="pc-marque"><LogoMark size={26} />Oval</span>
+      {etape >= 0 && (
+        <ol className="pc-prog" aria-label="Progression">
+          {ETAPES.map((e, i) => <li key={e.id} className={i < etape ? 'is-fait' : i === etape ? 'is-actif' : ''}><i /><span>{e.label}</span></li>)}
+        </ol>
+      )}
+    </header>
   );
 }

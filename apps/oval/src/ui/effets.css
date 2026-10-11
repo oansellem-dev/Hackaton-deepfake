@@ -1,0 +1,37 @@
+/* ═══ Micro-interactions ═══ */
+
+/* Hôtes : un contexte de position pour l'ondulation et la lueur */
+.btn, .icirc, .rail__item, .tabs__tab, .bar, .bcard, .plan__who, .tbl__row, .menu__item, .bacc__tete, .auj__card, .switch, .depli__btn,
+.card.lift, .defi-card, .bacc__item { position: relative; }
+
+/* Ondulation : un disque doux qui s'étend depuis le point pressé, découpé à la forme de l'hôte */
+.fx-ripple { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 3; }
+.fx-ripple i { position: absolute; border-radius: 50%; background: radial-gradient(circle, currentColor 0%, transparent 70%); opacity: .14; transform: scale(.15); animation: fx-ripple .7s cubic-bezier(.2,.8,.2,1) forwards; will-change: transform, opacity; }
+@keyframes fx-ripple { 60% { opacity: .08; } to { transform: scale(1); opacity: 0; } }
+
+/* Aimantation : aucune transition pendant le suivi (rAF), un ressort uniquement au retour */
+.rail__item, .icirc, .btn--primary, .btn--now { will-change: translate; }
+.fx-retour { transition: translate .6s cubic-bezier(.22,1.4,.36,1) !important; }
+
+/* Lueur : un disque flou déplacé par transform (compositeur), visible uniquement au survol */
+.fx-glow { position: absolute; left: 0; top: 0; width: 240px; height: 240px; border-radius: 50%; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle, rgba(52,99,234,.13) 0%, rgba(52,99,234,.05) 40%, transparent 70%);
+  opacity: 0; transition: opacity .35s ease; will-change: transform, opacity; }
+.fx-lit > .fx-glow { opacity: 1; }
+.auj__card--now > .fx-glow { background: radial-gradient(circle, rgba(255,255,255,.28) 0%, rgba(255,255,255,.1) 40%, transparent 70%); }
+.card.lift, .auj__card, .bcard, .tbl__row, .defi-card, .bacc__item { overflow: hidden; }
+.card.lift > :not(.fx-glow), .auj__card > :not(.fx-glow), .bcard > :not(.fx-glow), .tbl__row > :not(.fx-glow), .defi-card > :not(.fx-glow) { position: relative; z-index: 1; }
+
+/* Balayage lumineux sur les boutons principaux (shimmer), une fois par survol */
+.btn--primary, .btn--now { overflow: hidden; isolation: isolate; }
+.btn--primary::before, .btn--now::before { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; z-index: 1; pointer-events: none;
+  background: linear-gradient(100deg, transparent 0%, rgba(255,255,255,.28) 50%, transparent 100%); transform: skewX(-18deg) translateZ(0); }
+.btn--primary:hover::before, .btn--now:hover::before { animation: fx-shine 1.1s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes fx-shine { to { left: 130%; } }
+.btn--primary > *, .btn--now > * { position: relative; z-index: 2; }
+
+/* Survol et pression : courbes plus naturelles */
+.btn, .icirc, .rail__item { transition: transform .35s cubic-bezier(.22,1,.36,1), background-color var(--t) var(--ease), color var(--t) var(--ease), box-shadow .35s var(--ease); }
+.btn:active, .icirc:active, .rail__item:active, .tabs__tab:active { transition-duration: 90ms; }
+
+@media (prefers-reduced-motion: reduce) { .fx-ripple, .fx-glow, .btn--primary::before, .btn--now::before { display: none; } }

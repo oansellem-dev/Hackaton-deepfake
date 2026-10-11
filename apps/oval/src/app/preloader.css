@@ -1,0 +1,7 @@
+/* Rideau d'ouverture : voile blanc plein écran qui remonte avec un bord inférieur courbe */
+.preloader { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; will-change: transform; }
+.preloader__svg { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% + 300px); fill: #fff; }
+/* Remontée : 0,8 s, départ décalé de 0,2 s, même courbe d'accélération que l'original */
+.preloader--sortie { animation: preloader-monte .8s cubic-bezier(.76, 0, .24, 1) .2s forwards; }
+@keyframes preloader-monte { to { transform: translateY(-100vh); } }
+@media (prefers-reduced-motion: reduce) { .preloader { display: none; } }

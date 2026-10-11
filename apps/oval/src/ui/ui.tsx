@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { flushSync } from "react-dom";
 import type { Couleur } from "../store/types";
-import { IcCheck, IcInfo, IcX } from "./icons";
+import { IcCheck, IcChevron, IcInfo, IcX } from "./icons";
 import { useToasts } from "./toast";
 import "./ui.css";
 
@@ -98,8 +98,12 @@ export const Select = ({ className = "", ...p }: SelectHTMLAttributes<HTMLSelect
 export const Textarea = ({ className = "", ...p }: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea className={`field__ctl ${className}`} {...p} />;
 
 /* ── Avatars ─────────────────────────────────────────────────── */
-export function Avatar({ initiales, couleur, size, title }: { initiales: string; couleur: Couleur; size?: "sm" | "lg" | "xl"; title?: string }) {
-  return <span className={`avatar avatar--${couleur}${size ? ` avatar--${size}` : ""}`} title={title} aria-label={title}>{initiales}</span>;
+export function Avatar({ initiales, couleur, photo, size, title }: { initiales: string; couleur: Couleur; photo?: string; size?: "sm" | "lg" | "xl"; title?: string }) {
+  return (
+    <span className={`avatar avatar--${couleur}${size ? ` avatar--${size}` : ""}${photo ? " avatar--photo" : ""}`} title={title} aria-label={title}>
+      {photo ? <img src={photo} alt="" loading="lazy" /> : initiales}
+    </span>
+  );
 }
 export function Avatars({ children }: { children: ReactNode }) { return <span className="avatars">{children}</span>; }
 
@@ -143,4 +147,15 @@ export function transition(fn: () => void) {
 /* ── Interrupteur ────────────────────────────────────────────── */
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return <button type="button" role="switch" aria-checked={on} aria-label={label} title={label} disabled={disabled} className={`switch${on ? " is-on" : ""}`} onClick={() => onChange(!on)}><i /></button>;
+}
+
+/* ── Dépliant : un titre, un contenu qui se déploie en douceur ── */
+export function Depliant({ titre, ouvert = false, children, className = "" }: { titre: ReactNode; ouvert?: boolean; children: ReactNode; className?: string }) {
+  const [on, setOn] = useState(ouvert);
+  return (
+    <div className={`depli${on ? " is-on" : ""} ${className}`}>
+      <button type="button" className="depli__btn" aria-expanded={on} onClick={() => setOn(!on)}>{titre}<IcChevron /></button>
+      <div className="depli__zone"><div className="depli__in">{children}</div></div>
+    </div>
+  );
 }

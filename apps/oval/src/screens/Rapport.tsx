@@ -5,7 +5,8 @@ import { debutJour, heure, jourCourt, quand, relatif } from "../store/format";
 import { DECISIONS, DEFI_NOMS, DEFI_PHRASES } from "../store/texts";
 import { doux, etapesFaites, etiquetteDefi, etiquetteEtape, etiquetteSignal, point, statutEntretien, statutPreVerif } from "../store/statuts";
 import { envoyerPreVerif } from "../store/envoi";
-import { envoyerDecision, lienPanneau, lienVisio } from "../store/moteur";
+import { envoyerDecision } from "../store/moteur";
+import { BtnRejoindre } from "../ui/visio";
 import { Manta } from "../manta/Manta";
 import { Avatar, Btn, Pill, Vide } from "../ui/ui";
 import { toast } from "../ui/toast";
@@ -36,7 +37,7 @@ export function Rapport({ id }: { id: string }) {
       <header className="rp__top rise" style={v({ "--i": 1 })}>
         <a className="rp__back" href="#/entretiens"><IcArrowL /> Entretiens</a>
         <div className="rp__who">
-          <Avatar initiales={initiales(x)} couleur={x.candidat.couleur} size="lg" />
+          <Avatar initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} size="lg" />
           <div>
             <h1>{nomComplet(x)}</h1>
             <span>{x.candidat.poste} · {jourCourt(x.date)}, {heure(x.date)}{termine ? ` · ${x.dureeMin} min` : ""} · mené par {recruteur(etat, x.recruteurId).nom}</span>
@@ -44,7 +45,7 @@ export function Rapport({ id }: { id: string }) {
         </div>
         <div className="rp__actions">
           <Pill ton={doux(st.ton)} dot>{st.texte}</Pill>
-          {!termine && <Btn variant="now" icon={<IcPlay />} href={lienVisio(x)} newTab={!!x.moteur}>Rejoindre avec Oval</Btn>}
+          {!termine && <BtnRejoindre x={x} />}
           <Btn icon={<IcDownload />} href={`#/rapport/${x.id}/imprimer`}>Exporter</Btn>
         </div>
       </header>
@@ -267,11 +268,14 @@ function AvantEntretien({ x }: { x: Entretien }) {
   return (
     <section className="panel rp__dec rise" style={v({ "--i": 4 })}>
       <header className="rp__h"><h2 className="t-h2">Avant l'entretien</h2></header>
-      <Btn variant="now" block size="lg" icon={<IcPlay />} href={lienVisio(x)} newTab={!!x.moteur}>Rejoindre avec Oval</Btn>
+      <BtnRejoindre x={x} block size="lg" />
       {p.statut === "non_envoyee" && <Btn block icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>Envoyer le lien de pré-vérification</Btn>}
       {p.statut !== "non_envoyee" && p.statut !== "faite" && <Btn block icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer le lien{p.envoyeeLe ? ` · envoyé ${relatif(p.envoyeeLe).toLowerCase()}` : ""}</Btn>}
-      <Btn block variant="ghost" icon={<IcArrowUR />} href={lienPanneau(x)} newTab>Ouvrir le panneau seul (360 px)</Btn>
-      {x.moteur && <Btn block variant="ghost" onClick={() => navigator.clipboard.writeText(`${x.moteur!.sessionId}:${x.moteur!.recruiterKey}`).then(() => toast("Code extension copié : collez-le dans le panneau Oval de Chrome"), () => toast("Copie impossible"))}>Copier le code extension</Btn>}
+      {x.moteur ? (
+        <Btn block variant="ghost" onClick={() => navigator.clipboard.writeText(`${x.moteur!.sessionId}:${x.moteur!.recruiterKey}`).then(() => toast("Code extension copié : collez-le dans le widget Oval pendant la visio"), () => toast("Copie impossible"))}>Copier le code extension</Btn>
+      ) : (
+        <p className="t-small muted">Pendant la visio, cliquez sur l'icône Oval dans Chrome : le widget flottant analyse l'appel. Cet entretien de démo n'est pas relié au moteur, il n'a pas de code extension.</p>
+      )}
       <p className="t-small faint">La décision se prend après l'entretien. Le recruteur décide, l'outil éclaire.</p>
     </section>
   );

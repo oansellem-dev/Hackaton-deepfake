@@ -14,7 +14,7 @@ export type ResultatEnvoi = { mode: "envoye" } | { mode: "test" } | { mode: "man
 export const baseUrl = () => (import.meta.env.VITE_PUBLIC_URL ?? "").replace(/\/+$/, "") || location.origin;
 export const lienCandidat = (token: string) => `${baseUrl()}/#/candidat/${token}`;
 /** Adresse du site du moteur (pages candidat, visio, panneau) : VITE_MOTEUR_URL, sinon http://localhost:5173. */
-export const moteurUrl = () => (import.meta.env.VITE_MOTEUR_URL ?? "http://localhost:5173").replace(/\/+$/, "");
+export const moteurUrl = () => (import.meta.env.VITE_MOTEUR_URL ?? "http://localhost:5173").trim().replace(/\/+$/, "");
 /** Lien candidat du moteur : /check/<jeton>, pré-vérification réelle (identité, Face ID, reflet de l'écran). */
 export const lienCandidatMoteur = (token: string) => `${moteurUrl()}/check/${token}`;
 

@@ -1,6 +1,8 @@
-const fmtHeure = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
-const fmtJourCourt = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" });
-const fmtJourLong = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+import { locale, t } from "../i18n";
+
+const fmtHeure = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+const fmtJourCourt = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short" });
+const fmtJourLong = new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" });
 
 export const heure = (iso: string) => fmtHeure.format(new Date(iso)).replace(":", ":");
 export const jourCourt = (iso: string | Date) => fmtJourCourt.format(typeof iso === "string" ? new Date(iso) : iso).replace(".", "");
@@ -14,9 +16,9 @@ export function quand(iso: string, ref: Date = new Date()): string {
   const demain = new Date(ref); demain.setDate(ref.getDate() + 1);
   const hier = new Date(ref); hier.setDate(ref.getDate() - 1);
   const h = heure(iso);
-  if (memeJour(d, ref)) return `Auj. · ${h}`;
-  if (memeJour(d, demain)) return `Demain · ${h}`;
-  if (memeJour(d, hier)) return `Hier · ${h}`;
+  if (memeJour(d, ref)) return t("Auj. · {h}", { h });
+  if (memeJour(d, demain)) return t("Demain · {h}", { h });
+  if (memeJour(d, hier)) return t("Hier · {h}", { h });
   return `${jourCourt(d)} · ${h}`;
 }
 
@@ -26,8 +28,8 @@ export function relatif(iso: string, ref: Date = new Date()): string {
   const min = Math.round(ms / 60000);
   const abs = Math.abs(min);
   const futur = min >= 0;
-  const txt = abs < 60 ? `${abs} min` : abs < 60 * 36 ? `${Math.round(abs / 60)} h` : `${Math.round(abs / 1440)} j`;
-  return futur ? `Dans ${txt}` : `Il y a ${txt}`;
+  const txt = abs < 60 ? t("{n} min", { n: abs }) : abs < 60 * 36 ? t("{n} h", { n: Math.round(abs / 60) }) : t("{n} j", { n: Math.round(abs / 1440) });
+  return futur ? t("Dans {txt}", { txt }) : t("Il y a {txt}", { txt });
 }
 
 export const plage = (iso: string, dureeMin: number) => { const d = new Date(iso); const f = new Date(d.getTime() + dureeMin * 60000); return `${fmtHeure.format(d)} – ${fmtHeure.format(f)}`; };
@@ -36,8 +38,8 @@ export const plage = (iso: string, dureeMin: number) => { const d = new Date(iso
 export function lundi(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); const j = (x.getDay() + 6) % 7; x.setDate(x.getDate() - j); return x; }
 export const plusJours = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
-const fmtMois = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" });
-const fmtNomJour = new Intl.DateTimeFormat("fr-FR", { weekday: "short" });
+const fmtMois = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long" });
+const fmtNomJour = new Intl.DateTimeFormat(locale, { weekday: "short" });
 /** « 5 octobre » */
 export const semaineDu = (d: Date) => fmtMois.format(d);
 /** « Lun », « Mar »… */

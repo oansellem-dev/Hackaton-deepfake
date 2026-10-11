@@ -22,22 +22,23 @@ import {
   type SignalStatus,
 } from '@kyc/shared';
 import { api } from '../config.ts';
+import { t } from '../i18n.ts';
 import { analyzeSnapshot, loadFaceModels, snapshotFace } from '../lib/faceModels.ts';
 import { detect, loadTracker } from '../lib/tracker.ts';
 import { clearFaceMesh, drawFaceMesh } from './FaceMesh.ts';
 
 const STEP_TEXT: Record<FaceIdStep, string> = {
-  center: 'Placez votre visage dans l’ovale, de face, bien éclairé.',
-  turn_a: 'Tournez doucement la tête vers votre droite.',
-  turn_b: 'Tournez doucement la tête vers votre gauche.',
-  hand: 'Passez la main devant votre visage, puis retirez-la.',
+  center: t('Placez votre visage dans l’ovale, de face, bien éclairé.'),
+  turn_a: t('Tournez doucement la tête vers votre droite.'),
+  turn_b: t('Tournez doucement la tête vers votre gauche.'),
+  hand: t('Passez la main devant votre visage, puis retirez-la.'),
 };
 
 const STEP_LABEL: Record<FaceIdStep, string> = {
-  center: 'Visage de face',
-  turn_a: 'Tête à droite',
-  turn_b: 'Tête à gauche',
-  hand: 'Main devant le visage',
+  center: t('Visage de face'),
+  turn_a: t('Tête à droite'),
+  turn_b: t('Tête à gauche'),
+  hand: t('Main devant le visage'),
 };
 
 const FRAME_MS = 80; // ~12 analyses par seconde
@@ -143,15 +144,14 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         if (errorText(e).includes('déjà terminée')) {
           stopCamera();
           setPhase('blocked');
-          setMessage('Votre vérification du visage est déjà enregistrée. Vous pouvez fermer cette page.');
+          setMessage(t('Votre vérification du visage est déjà enregistrée. Vous pouvez fermer cette page.'));
           return;
         }
         if (errorText(e).includes('camera-virtuelle')) {
           stopCamera();
           setPhase('blocked');
           setMessage(
-            `La caméra « ${label} » est une caméra virtuelle. Merci d’utiliser la caméra de votre ordinateur ou de votre ` +
-              'téléphone (désactivez OBS, ManyCam ou tout logiciel de ce type), puis réessayez.',
+            t('La caméra « {label} » est une caméra virtuelle. Merci d’utiliser la caméra de votre ordinateur ou de votre téléphone (désactivez OBS, ManyCam ou tout logiciel de ce type), puis réessayez.', { label }),
           );
           return;
         }
@@ -165,7 +165,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
     } catch (e) {
       stopCamera();
       setPhase('error');
-      setMessage(`Impossible de démarrer : ${errorText(e)}`);
+      setMessage(t('Impossible de démarrer : {err}', { err: errorText(e) }));
     }
   }
 
@@ -266,18 +266,18 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
           centeredRef.current = ok;
           setMessage(
             !face
-              ? 'Je ne vois pas de visage.'
+              ? t('Je ne vois pas de visage.')
               : luma <= 50
-                ? 'Il fait trop sombre : éclairez votre visage.'
+                ? t('Il fait trop sombre : éclairez votre visage.')
                 : w <= 0.25
-                  ? 'Rapprochez-vous un peu.'
+                  ? t('Rapprochez-vous un peu.')
                   : w >= 0.65
-                    ? 'Reculez un peu.'
+                    ? t('Reculez un peu.')
                     : !framed
-                      ? 'Centrez votre visage dans l’ovale.'
+                      ? t('Centrez votre visage dans l’ovale.')
                       : !ok
-                        ? 'Regardez la caméra, de face.'
-                        : 'Parfait, ne bougez plus…',
+                        ? t('Regardez la caméra, de face.')
+                        : t('Parfait, ne bougez plus…'),
           );
           goodStreak = ok ? goodStreak + 1 : 0;
           if (ok && goodStreak >= CENTER_HOLD) {
@@ -307,9 +307,9 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
           if (turnedEnough) turnedAny = true;
           setMessage(
             wrongWay
-              ? 'Dans l’autre sens, s’il vous plaît.'
+              ? t('Dans l’autre sens, s’il vous plaît.')
               : !armed && turnedEnough
-                ? 'Revenez de face, puis tournez la tête.'
+                ? t('Revenez de face, puis tournez la tête.')
                 : '',
           );
           actionStreak = armed && turnedEnough && !wrongWay ? actionStreak + 1 : 0;
@@ -336,7 +336,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         clearInterval(timer);
         stopCamera();
         setPhase('error');
-        setMessage(`Analyse interrompue : ${errorText(e)}`);
+        setMessage(t('Analyse interrompue : {err}', { err: errorText(e) }));
       } finally {
         busy = false;
       }
@@ -376,7 +376,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
       } catch (e) {
         stopCamera();
         setPhase('error');
-        setMessage(`Envoi impossible : ${errorText(e)}`);
+        setMessage(t('Envoi impossible : {err}', { err: errorText(e) }));
       }
     }
 
@@ -390,12 +390,9 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
   const currentStep = plan?.steps[index];
   return (
     <div className="card">
-      <h2>Vérification du visage</h2>
+      <h2>{t('Vérification du visage')}</h2>
       <p className="muted">
-        Votre visage est analysé uniquement dans votre navigateur : aucune image n’est envoyée ni enregistrée. Seule
-        une empreinte numérique de votre visage (des mesures) est conservée, chiffrée, jusqu’à la fin de l’entretien.
-        Utilisez la caméra de votre ordinateur ou de votre téléphone, rien d’autre. Cette étape vérifie aussi votre fuseau
-        horaire et votre adresse IP.
+        {t('Votre visage est analysé uniquement dans votre navigateur : aucune image n’est envoyée ni enregistrée. Seule une empreinte numérique de votre visage (des mesures) est conservée, chiffrée, jusqu’à la fin de l’entretien. Utilisez la caméra de votre ordinateur ou de votre téléphone, rien d’autre. Cette étape vérifie aussi votre fuseau horaire et votre adresse IP.')}
       </p>
 
       <div className={`faceid-stage ${centered && currentStep === 'center' ? 'faceid-ok' : ''}`}>
@@ -404,7 +401,7 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
         <div className="faceid-oval" />
         <i className="faceid-corner faceid-corner--tl" aria-hidden /><i className="faceid-corner faceid-corner--tr" aria-hidden /><i className="faceid-corner faceid-corner--bl" aria-hidden /><i className="faceid-corner faceid-corner--br" aria-hidden />
         {phase === 'running' && <i className="faceid-scan" aria-hidden />}
-        {phase === 'running' && <span className="faceid-live"><i />{centered && currentStep === 'center' ? 'Visage bien placé' : 'Analyse dans votre navigateur'}</span>}
+        {phase === 'running' && <span className="faceid-live"><i />{centered && currentStep === 'center' ? t('Visage bien placé') : t('Analyse dans votre navigateur')}</span>}
       </div>
 
       {phase === 'running' && currentStep && (
@@ -418,22 +415,22 @@ export function FaceId({ token, declaredCountry, onDone }: Props) {
               </li>
             ))}
           </ol>
-          {plan!.hardened && <p className="muted">Quelques étapes de plus que d’habitude, merci de votre patience.</p>}
+          {plan!.hardened && <p className="muted">{t('Quelques étapes de plus que d’habitude, merci de votre patience.')}</p>}
         </>
       )}
 
       {phase === 'ready' && (
         <button className="primary" onClick={start}>
-          Activer la caméra et commencer
+          {t('Activer la caméra et commencer')}
         </button>
       )}
-      {phase === 'loading' && <p className="muted">Préparation de la caméra et de l’analyse…</p>}
-      {phase === 'sending' && <p className="muted">Enregistrement du résultat…</p>}
+      {phase === 'loading' && <p className="muted">{t('Préparation de la caméra et de l’analyse…')}</p>}
+      {phase === 'sending' && <p className="muted">{t('Enregistrement du résultat…')}</p>}
       {(phase === 'error' || phase === 'blocked') && (
         <>
           <p className="faceid-error">{message}</p>
           <button className="primary" onClick={start}>
-            Réessayer
+            {t('Réessayer')}
           </button>
         </>
       )}

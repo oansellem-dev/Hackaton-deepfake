@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import type { Couleur } from "../store/types";
 import { IcCheck, IcChevron, IcInfo, IcX } from "./icons";
 import { useToasts } from "./toast";
+import { t } from "../i18n";
 import "./ui.css";
 
 /* ── Boutons ─────────────────────────────────────────────────── */
@@ -116,7 +117,7 @@ export function Modal({ open, onClose, title, children, width }: { open: boolean
   return (
     <div className="modal-backdrop backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={ref} className="panel modal pop" role="dialog" aria-modal="true" aria-label={title} style={width ? { width: `min(${width}px, 100%)` } : undefined}>
-        <div className="modal__head"><h2 className="t-h2">{title}</h2><ICirc size="sm" label="Fermer" onClick={onClose}><IcX /></ICirc></div>
+        <div className="modal__head"><h2 className="t-h2">{title}</h2><ICirc size="sm" label={t("Fermer")} onClick={onClose}><IcX /></ICirc></div>
         {children}
       </div>
     </div>

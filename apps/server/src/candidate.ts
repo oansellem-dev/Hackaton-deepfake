@@ -90,6 +90,7 @@ candidateRouter.get('/api/check/:token', link('any'), (_req, res) => {
       email: session.candidateEmail,
       ...Object.fromEntries(Object.entries(session.cv?.prefill ?? {}).filter(([, v]) => !!v)),
     },
+    prefillFromCv: !!session.cv,
     status: linkStatus(session),
     expiresAt: session.candidateLink!.expiresAt,
     controller: session.controller,

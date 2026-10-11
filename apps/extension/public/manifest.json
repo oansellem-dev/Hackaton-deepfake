@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Oval — vérification en visio",
   "description": "Un widget flottant sur Meet, Zoom et Teams : vérifie qu'une présence humaine est bien là. Analyse dans le navigateur, aucune vidéo enregistrée.",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "action": {
     "default_title": "Oval"
   },
@@ -34,11 +34,13 @@
     "scripting"
   ],
   "host_permissions": [
+    "https://oval-moteur.onrender.com/*",
     "http://localhost:8787/*",
     "http://localhost:5173/*",
     "https://meet.google.com/*",
     "https://*.zoom.us/*",
     "https://teams.microsoft.com/*",
     "https://teams.live.com/*"
-  ]
+  ],
+  "minimum_chrome_version": "116"
 }

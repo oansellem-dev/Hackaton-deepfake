@@ -8,6 +8,7 @@ import { actions, getEtat, parId, recruteur } from "./store";
 import { composerEmail, envoyerEmail, type Email } from "./email";
 import { toast } from "../ui/toast";
 import { creerSession, cvEnAttente, envoyerCv, modeMoteur } from "./moteur";
+import { t } from "../i18n";
 
 export type DetailEmail = { mode: "apercu" } | { mode: "manuel"; raison: string; entretienId: string; prev: PreVerification };
 export interface EvenementEmail { email: Email; detail: DetailEmail }
@@ -23,11 +24,11 @@ export async function envoyerPreVerif(id: string, relance = false): Promise<void
   // Mode moteur : la session est créée côté serveur, qui fournit le jeton du lien (/check/<jeton> sur le site du moteur).
   let moteur = x.moteur;
   if (!moteur && modeMoteur()) {
-    try { moteur = await creerSession(x); } catch (e) { toast(`Moteur injoignable, lien de démo utilisé (${e instanceof Error ? e.message : e})`); }
+    try { moteur = await creerSession(x); } catch (e) { toast(t("Moteur injoignable, lien de démo utilisé ({e})", { e: e instanceof Error ? e.message : String(e) })); }
   }
   const cv = cvEnAttente.get(id);
   if (cv && moteur) {
-    try { await envoyerCv(id, cv); cvEnAttente.delete(id); } catch (e) { toast(`CV non analysé (${e instanceof Error ? e.message : e})`); }
+    try { await envoyerCv(id, cv); cvEnAttente.delete(id); } catch (e) { toast(t("CV non analysé ({e})", { e: e instanceof Error ? e.message : String(e) })); }
   }
   const lienMoteur = moteur?.lienToken ? parId(getEtat(), id)?.preVerification.lien : undefined;
   const encoreValide = prev.lien && new Date(prev.lien.expireLe).getTime() > Date.now() ? prev.lien : undefined;
@@ -41,8 +42,8 @@ export async function envoyerPreVerif(id: string, relance = false): Promise<void
     objet: etat.reglages.textesLien.objet, intro: etat.reglages.textesLien.intro,
   });
   const r = await envoyerEmail(email);
-  if (r.mode === "envoye") toast(`E-mail ${estRelance ? "de rappel " : ""}envoyé à ${x.candidat.prenom} (${x.candidat.email})`);
-  else if (r.mode === "test") toast("Mode test : e-mail enregistré dans outbox/, rien n'est parti");
+  if (r.mode === "envoye") toast(estRelance ? t("E-mail de rappel envoyé à {prenom} ({email})", { prenom: x.candidat.prenom, email: x.candidat.email }) : t("E-mail envoyé à {prenom} ({email})", { prenom: x.candidat.prenom, email: x.candidat.email }));
+  else if (r.mode === "test") toast(t("Mode test : e-mail enregistré dans outbox/, rien n'est parti"));
   else signaler({ email, detail: { mode: "manuel", raison: r.raison, entretienId: id, prev } });
 }
 

@@ -44,9 +44,14 @@ export function Panel() {
 
   const [session, setSession] = useState<SessionView | null>(null);
   const onSession = useCallback((s: SessionView) => setSession(s), []);
+  // Score vers le widget flottant, à chaque changement et en battement de cœur (3 s) : sans nouvelle, la bulle
+  // signale une analyse interrompue au lieu d'afficher un score figé.
   useEffect(() => {
     if (!widget || !session) return;
-    window.parent.postMessage({ type: 'oval:score', value: session.score.value, level: session.score.level, evidence: session.score.evidence, live: !!stream }, '*');
+    const envoyer = () => window.parent.postMessage({ type: 'oval:score', value: session.score.value, level: session.score.level, evidence: session.score.evidence, live: !!stream }, '*');
+    envoyer();
+    const timer = setInterval(envoyer, 3000);
+    return () => clearInterval(timer);
   }, [widget, session, stream]);
 
   async function share() {

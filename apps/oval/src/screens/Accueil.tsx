@@ -11,6 +11,7 @@ import { ouvrirNouvelEntretien } from "../app/events";
 import { MantaAsk } from "./MantaAsk";
 import { Calendrier, CalendrierApercu } from "./Calendrier";
 import { envoyerPreVerif } from "../store/envoi";
+import { t } from "../i18n";
 import "./accueil.css";
 
 const v = (o: Record<string, string | number>) => o as CSSProperties;
@@ -44,13 +45,13 @@ function Aujourdhui({ ref_ }: { ref_: Date }) {
   const enAvant = duJour.find((x) => x.statut !== "termine" && new Date(x.date).getTime() + x.dureeMin * 60000 > ref_.getTime());
   return (
     <section className="panel bloc rise" style={v({ "--i": 2 })}>
-      <div className="bloc__head"><h2 className="t-h2">Aujourd'hui</h2><Btn size="sm" variant="ghost" icon={<IcArrowUR />} href="#/entretiens?filtre=aujourdhui">Tout voir</Btn></div>
+      <div className="bloc__head"><h2 className="t-h2">{t("Aujourd'hui")}</h2><Btn size="sm" variant="ghost" icon={<IcArrowUR />} href="#/entretiens?filtre=aujourdhui">{t("Tout voir")}</Btn></div>
       <div className="auj">
-        {!duJour.length && <Vide titre="Aucun entretien aujourd'hui." texte="Les prochains sont listés ci-dessous." />}
+        {!duJour.length && <Vide titre={t("Aucun entretien aujourd'hui.")} texte={t("Les prochains sont listés ci-dessous.")} />}
         {duJour.map((x) => <CarteJour key={x.id} x={x} ref_={ref_} enAvant={x.id === enAvant?.id} />)}
-        {suite.length > 0 && <div className="auj__sep">Prochainement</div>}
+        {suite.length > 0 && <div className="auj__sep">{t("Prochainement")}</div>}
         {suite.map((x) => <CarteJour key={x.id} x={x} ref_={ref_} enAvant={false} />)}
-        {!duJour.length && !suite.length && <Btn variant="primary" icon={<IcPlus />} onClick={ouvrirNouvelEntretien}>Nouvel entretien</Btn>}
+        {!duJour.length && !suite.length && <Btn variant="primary" icon={<IcPlus />} onClick={ouvrirNouvelEntretien}>{t("Nouvel entretien")}</Btn>}
       </div>
     </section>
   );
@@ -60,20 +61,20 @@ function CarteJour({ x, ref_, enAvant }: { x: Entretien; ref_: Date; enAvant: bo
   const p = x.preVerification;
   const auj = memeJour(new Date(x.date), ref_);
   const termine = x.statut === "termine";
-  const pv = p.statut === "faite" ? "pré-vérification faite"
-    : p.refuseeLe ? "pré-vérification refusée, défis en direct"
-    : termine || auj ? "pré-vérification non faite, défis en direct"
-    : p.statut === "non_envoyee" ? "lien pas encore envoyé"
-    : `lien envoyé ${relatif(p.relanceeLe ?? p.envoyeeLe ?? x.creeLe, ref_).toLowerCase()}`;
+  const pv = p.statut === "faite" ? t("pré-vérification faite")
+    : p.refuseeLe ? t("pré-vérification refusée, défis en direct")
+    : termine || auj ? t("pré-vérification non faite, défis en direct")
+    : p.statut === "non_envoyee" ? t("lien pas encore envoyé")
+    : t("lien envoyé {quand}", { quand: relatif(p.relanceeLe ?? p.envoyeeLe ?? x.creeLe, ref_).toLowerCase() });
   const st = statutEntretien(x, ref_);
   const coin = termine ? st.texte : auj ? relatif(x.date, ref_) : jourCourt(x.date);
   const coinTon: Ton = enAvant ? "white" : termine ? (st.ton === "gold" ? "soft-gold" : st.ton === "green" ? "soft-green" : "neutral") : auj ? "soft-blue" : "neutral";
   let action: ReactNode;
-  if (termine) action = <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Ouvrir le rapport</Btn>;
+  if (termine) action = <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>{t("Ouvrir le rapport")}</Btn>;
   else if (enAvant) action = <BtnRejoindre x={x} size="sm" variant="glass" />;
-  else if (p.statut === "non_envoyee") action = <Btn size="sm" icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>Envoyer le lien</Btn>;
-  else if (p.statut !== "faite") action = <Btn size="sm" icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer le lien</Btn>;
-  else action = auj ? <BtnRejoindre x={x} size="sm" variant="secondary" /> : <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>Voir la fiche</Btn>;
+  else if (p.statut === "non_envoyee") action = <Btn size="sm" icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>{t("Envoyer le lien")}</Btn>;
+  else if (p.statut !== "faite") action = <Btn size="sm" icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>{t("Relancer le lien")}</Btn>;
+  else action = auj ? <BtnRejoindre x={x} size="sm" variant="secondary" /> : <Btn size="sm" icon={<IcArrowUR />} onClick={() => rapport(x)}>{t("Voir la fiche")}</Btn>;
   return (
     <article className={`card auj__card${enAvant ? " auj__card--now" : " lift"}`}>
       <div className="auj__top">

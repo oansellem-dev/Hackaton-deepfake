@@ -8,8 +8,10 @@ import './sidepanel.css';
  * ici dans un cadre : c'est là que tournent MediaPipe et les modèles ONNX (même origine que les modèles), donc la
  * même détection que dans la visio. Aucune image ne quitte le navigateur.
  */
-const API_BASE: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8787';
-const WEB_BASE: string = import.meta.env.VITE_WEB_URL ?? 'http://localhost:5173';
+// Par défaut, le moteur déployé (même cible que le dashboard) ; VITE_API_URL / VITE_WEB_URL pour un moteur local.
+const MOTEUR = 'https://oval-moteur.onrender.com';
+const API_BASE: string = (import.meta.env.VITE_API_URL ?? MOTEUR).replace(/\/+$/, '');
+const WEB_BASE: string = (import.meta.env.VITE_WEB_URL ?? MOTEUR).replace(/\/+$/, '');
 const OVAL_BASE: string = import.meta.env.VITE_OVAL_URL ?? 'http://localhost:5174';
 const api = createApi(API_BASE);
 
@@ -41,7 +43,7 @@ function App() {
       const created = await api.createSession('Candidat');
       selectSession(`${created.id}:${created.recruiterKey}`);
     } catch (e) {
-      setError(`Serveur injoignable (${API_BASE}). Lancez npm run dev.`);
+      setError('Moteur Oval injoignable pour le moment. Réessayez dans un instant.');
     }
   }
 

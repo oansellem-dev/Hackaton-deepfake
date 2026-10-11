@@ -17,6 +17,7 @@ import { liveRouter } from './live.ts';
 import { attachSignaling } from './signaling.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
 import { presenceRouter } from './webauthn.ts';
+import { rateLimit } from './ratelimit.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -48,7 +49,14 @@ app.use((req, res, next) => {
   next();
 });
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
+// Débit : une limite générale, puis des limites serrées sur ce qui coûte (création d'entretien, lecture de PDF)
+// et sur les jetons des candidats (pas d'énumération).
+app.use('/api', rateLimit(600, 60_000));
+app.post('/api/sessions', rateLimit(20, 60_000, 'création'));
+app.use('/api/cv', rateLimit(10, 60_000, 'cv'));
+app.use('/api/check', rateLimit(120, 60_000, 'candidat'));
+app.use('/api/presence', rateLimit(60, 60_000, 'présence'));
 // Les entretiens sont sauvegardés après chaque requête qui les modifie.
 app.use((req, res, next) => {
   if (req.method !== 'GET') res.on('finish', schedulePersist);

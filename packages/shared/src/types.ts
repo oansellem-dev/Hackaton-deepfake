@@ -207,4 +207,5 @@ export interface CandidateLinkInfo {
   candidateFirstName?: string; // prénom donné par le recruteur, pour l'accueil
   schedule?: Schedule;
   prefill?: Partial<Omit<IdentityPayload, 'consent'>>; // depuis le CV chargé par le recruteur, à vérifier par le candidat
+  prefillFromCv?: boolean; // vrai si un CV a servi au pré-remplissage (sinon : nom et e-mail saisis par le recruteur)
 }

@@ -9,6 +9,7 @@ import { IcCheck, IcDownload, IcMail, IcX } from "../ui/icons";
 import { cvEnAttente, extraireCv, modeMoteur } from "../store/moteur";
 import { CREER, Logo, NOMS, fournisseurDe, lienValide } from "../ui/visio";
 import { Manta } from "../manta/Manta";
+import { t } from "../i18n";
 
 export const POSTES = ["Développeuse front-end", "Développeur back-end", "Développeur full-stack", "Développeur mobile", "Designer UI/UX", "Architecte cloud", "Data analyst", "Cheffe de produit", "Ingénieure QA", "Rédactrice"];
 
@@ -26,7 +27,7 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
   /** CV déposé : le moteur le lit, et ce qu'il trouve pré-remplit les champs encore vides. */
   const prendreCv = async (file: File | undefined) => {
     if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { toast("Le CV doit être un PDF"); return; }
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { toast(t("Le CV doit être un PDF")); return; }
     setCv(file); setCvEtat("lecture"); setCvTrouve([]);
     if (!modeMoteur()) { setCvEtat("lu"); return; }
     try {
@@ -38,22 +39,22 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
         email: cur.email.trim() || p.email || "",
         poste: POSTES.includes(p.jobTitle ?? "") ? (p.jobTitle as string) : cur.poste,
       }));
-      setCvTrouve([p.firstName || p.lastName ? "nom" : "", p.email ? "e-mail" : "", p.phone ? "téléphone" : "", p.githubUrl ? "GitHub" : "", p.linkedinUrl ? "LinkedIn" : "", r.found.schools.length ? `${r.found.schools.length} formation${r.found.schools.length > 1 ? "s" : ""}` : ""].filter(Boolean));
+      setCvTrouve([p.firstName || p.lastName ? t("nom") : "", p.email ? t("e-mail") : "", p.phone ? t("téléphone") : "", p.githubUrl ? "GitHub" : "", p.linkedinUrl ? "LinkedIn" : "", r.found.schools.length ? (r.found.schools.length > 1 ? t("{n} formations", { n: r.found.schools.length }) : t("1 formation")) : ""].filter(Boolean));
       setCvEtat("lu");
-    } catch (e) { setCvEtat("erreur"); toast(`CV illisible (${e instanceof Error ? e.message : e})`); }
+    } catch (e) { setCvEtat("erreur"); toast(t("CV illisible ({e})", { e: e instanceof Error ? e.message : String(e) })); }
   };
   const deposer = (e: DragEvent) => { e.preventDefault(); void prendreCv(e.dataTransfer.files?.[0]); };
   const set = (k: keyof F) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setF({ ...f, [k]: e.target.value }); if (err[k]) setErr({ ...err, [k]: undefined }); };
 
   const valider = (): Date | null => {
     const e: Partial<Record<keyof F, string>> = {};
-    if (f.nom.trim().split(/\s+/).filter(Boolean).length < 2) e.nom = "Indiquez le prénom et le nom.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = "Cet e-mail ne semble pas valide.";
-    if (!f.date) e.date = "Choisissez une date.";
-    if (!f.heure) e.heure = "Choisissez une heure.";
+    if (f.nom.trim().split(/\s+/).filter(Boolean).length < 2) e.nom = t("Indiquez le prénom et le nom.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = t("Cet e-mail ne semble pas valide.");
+    if (!f.date) e.date = t("Choisissez une date.");
+    if (!f.heure) e.heure = t("Choisissez une heure.");
     const quand = new Date(`${f.date}T${f.heure || "00:00"}`);
-    if (!e.date && !e.heure && quand.getTime() < Date.now()) e.date = "Cette date est déjà passée.";
-    if (f.visio.trim() && !lienValide(f.visio)) e.visio = "Collez un lien complet (https://…).";
+    if (!e.date && !e.heure && quand.getTime() < Date.now()) e.date = t("Cette date est déjà passée.");
+    if (f.visio.trim() && !lienValide(f.visio)) e.visio = t("Collez un lien complet (https://…).");
     setErr(e);
     return Object.keys(e).length ? null : quand;
   };
@@ -63,7 +64,7 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
     const [prenom, ...reste] = f.nom.trim().split(/\s+/);
     const x = actions.creerEntretien({ prenom, nom: reste.join(" "), email: f.email.trim(), poste: f.poste, date: quand.toISOString(), visio: f.visio.trim() || undefined }, false);
     if (cv) cvEnAttente.set(x.id, cv);
-    toast(lien ? `Entretien créé pour ${prenom}` : `Entretien créé pour ${prenom}, sans pré-vérification`);
+    toast(lien ? t("Entretien créé pour {prenom}", { prenom }) : t("Entretien créé pour {prenom}, sans pré-vérification", { prenom }));
     if (lien) void envoyerPreVerif(x.id);
     setF({ ...f, nom: "", email: "", visio: "" });
     setCv(null); setCvEtat(""); setCvTrouve([]);
@@ -80,32 +81,32 @@ export function NouvelEntretienForm({ onDone, initial }: { onDone?: (id: string)
       <div className={`cvzone${cv ? " cvzone--plein" : ""}${cvEtat === "lecture" ? " cvzone--lecture" : ""}`} onDragOver={(e) => e.preventDefault()} onDrop={deposer} onClick={() => !cv && fichier.current?.click()} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") fichier.current?.click(); }}>
         <input ref={fichier} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => void prendreCv(e.target.files?.[0])} />
         {!cv ? (
-          <><span className="cvzone__ic"><IcDownload /></span><span className="cvzone__txt"><strong>Déposer le CV du candidat (PDF)</strong><small>Ses informations seront pré-remplies sur son lien, puis comparées à ce qu'il déclare et aux sources publiques.</small></span></>
+          <><span className="cvzone__ic"><IcDownload /></span><span className="cvzone__txt"><strong>{t("Déposer le CV du candidat (PDF)")}</strong><small>{t("Ses informations seront pré-remplies sur son lien, puis comparées à ce qu'il déclare et aux sources publiques.")}</small></span></>
         ) : (
           <><span className={`cvzone__ic${cvEtat === "lu" ? " is-ok" : ""}`}>{cvEtat === "lecture" ? <span className="progress" style={{ width: 18, marginTop: 0 }}><i /></span> : <IcCheck />}</span>
-            <span className="cvzone__txt"><strong>{cv.name}</strong><small>{cvEtat === "lecture" ? "Lecture du CV…" : cvEtat === "erreur" ? "Illisible : il sera tout de même joint." : cvTrouve.length ? `Trouvé : ${cvTrouve.join(", ")}` : modeMoteur() ? "Rien d'exploitable trouvé, le CV sera joint." : "Joint à l'entretien (mode moteur requis pour l'analyse)."}</small></span>
-            <button type="button" className="icirc icirc--sm" aria-label="Retirer le CV" onClick={(e) => { e.stopPropagation(); setCv(null); setCvEtat(""); setCvTrouve([]); }}><IcX /></button></>
+            <span className="cvzone__txt"><strong>{cv.name}</strong><small>{cvEtat === "lecture" ? t("Lecture du CV…") : cvEtat === "erreur" ? t("Illisible : il sera tout de même joint.") : cvTrouve.length ? t("Trouvé : {liste}", { liste: cvTrouve.join(", ") }) : modeMoteur() ? t("Rien d'exploitable trouvé, le CV sera joint.") : t("Joint à l'entretien (mode moteur requis pour l'analyse).")}</small></span>
+            <button type="button" className="icirc icirc--sm" aria-label={t("Retirer le CV")} onClick={(e) => { e.stopPropagation(); setCv(null); setCvEtat(""); setCvTrouve([]); }}><IcX /></button></>
         )}
       </div>
-      <Field label="Candidat" error={err.nom}><Input value={f.nom} onChange={set("nom")} placeholder="Prénom Nom" autoFocus error={!!err.nom} /></Field>
-      <Field label="E-mail" error={err.email}><Input type="email" value={f.email} onChange={set("email")} placeholder="prenom.nom@exemple.fr" error={!!err.email} /></Field>
-      <Field label="Poste"><Select value={f.poste} onChange={set("poste")}>{POSTES.map((p) => <option key={p}>{p}</option>)}</Select></Field>
+      <Field label={t("Candidat")} error={err.nom}><Input value={f.nom} onChange={set("nom")} placeholder={t("Prénom Nom")} autoFocus error={!!err.nom} /></Field>
+      <Field label={t("E-mail")} error={err.email}><Input type="email" value={f.email} onChange={set("email")} placeholder={t("prenom.nom@exemple.fr")} error={!!err.email} /></Field>
+      <Field label={t("Poste")}><Select value={f.poste} onChange={set("poste")}>{POSTES.map((p) => <option key={p}>{p}</option>)}</Select></Field>
       <div className="nouvel__2">
-        <Field label="Date" error={err.date}><Input type="date" value={f.date} onChange={set("date")} error={!!err.date} /></Field>
-        <Field label="Heure" error={err.heure}><Input type="time" value={f.heure} onChange={set("heure")} error={!!err.heure} /></Field>
+        <Field label={t("Date")} error={err.date}><Input type="date" value={f.date} onChange={set("date")} error={!!err.date} /></Field>
+        <Field label={t("Heure")} error={err.heure}><Input type="time" value={f.heure} onChange={set("heure")} error={!!err.heure} /></Field>
       </div>
-      <Field label="Visio (Google Meet, Zoom, Teams)" error={err.visio} hint={f.visio.trim() ? `Le bouton « Rejoindre » ouvrira ${NOMS[fournisseurDe(f.visio)]}.` : "Facultatif : créez la réunion puis collez son lien. Oval ne fait aucun appel lui-même."}>
+      <Field label={t("Visio (Google Meet, Zoom, Teams)")} error={err.visio} hint={f.visio.trim() ? t("Le bouton « Rejoindre » ouvrira {visio}.", { visio: NOMS[fournisseurDe(f.visio)] }) : t("Facultatif : créez la réunion puis collez son lien. Oval ne fait aucun appel lui-même.")}>
         <Input value={f.visio} onChange={set("visio")} placeholder="https://meet.google.com/abc-defg-hij" error={!!err.visio} />
       </Field>
       <div className="row wrap nouvel__visios" style={{ gap: 8 }}>
-        {CREER.map((c) => <Btn key={c.id} size="sm" variant="ghost" icon={<Logo f={c.id} />} href={c.url} newTab>Créer sur {NOMS[c.id]}</Btn>)}
+        {CREER.map((c) => <Btn key={c.id} size="sm" variant="ghost" icon={<Logo f={c.id} />} href={c.url} newTab>{t("Créer sur {visio}", { visio: NOMS[c.id] })}</Btn>)}
       </div>
       <div className="card nouvel__info">
         <Manta size={48} />
-        <div><strong>Ce que recevra {prenom || "le candidat"}</strong><p className="t-small muted">Un lien de 2 minutes : accord, test de lumière, un geste. Aucune vidéo enregistrée. Il peut refuser sans que ça compte contre lui.</p><button type="button" className="btn btn--ghost btn--sm nouvel__voir" onClick={voirEmail}>Voir l'e-mail</button></div>
+        <div><strong>{t("Ce que recevra {qui}", { qui: prenom || t("le candidat") })}</strong><p className="t-small muted">{t("Un lien de 2 minutes : accord, test de lumière, un geste. Aucune vidéo enregistrée. Il peut refuser sans que ça compte contre lui.")}</p><button type="button" className="btn btn--ghost btn--sm nouvel__voir" onClick={voirEmail}>{t("Voir l'e-mail")}</button></div>
       </div>
-      <Btn type="submit" variant="primary" size="lg" block icon={<IcMail />}>Envoyer le lien de pré-vérification</Btn>
-      <Btn block onClick={() => creer(false)}>Créer sans pré-vérification</Btn>
+      <Btn type="submit" variant="primary" size="lg" block icon={<IcMail />}>{t("Envoyer le lien de pré-vérification")}</Btn>
+      <Btn block onClick={() => creer(false)}>{t("Créer sans pré-vérification")}</Btn>
     </form>
   );
 }

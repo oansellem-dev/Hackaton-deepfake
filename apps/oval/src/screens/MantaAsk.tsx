@@ -7,6 +7,7 @@ import { Btn, ICirc, Pop } from "../ui/ui";
 import { toast } from "../ui/toast";
 import { IcArrowR, IcFlag, IcList, IcMail, IcPlus, IcX } from "../ui/icons";
 import { ouvrirNouvelEntretien } from "../app/events";
+import { t } from "../i18n";
 
 const MAX = 300;
 
@@ -23,7 +24,7 @@ export function MantaAsk() {
   const inserer = (s: string) => { setTexte((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${s} `.slice(0, MAX)); requestAnimationFrame(() => zone.current?.focus()); };
   const envoyer = () => {
     const demande = texte.trim();
-    if (!demande) { setRep({ comprise: false, message: "Écris ce que tu veux vérifier, ou choisis une action :", suggestions: ACTIONS_RAPIDES(etat) }); return; }
+    if (!demande) { setRep({ comprise: false, message: t("Écris ce que tu veux vérifier, ou choisis une action :"), suggestions: ACTIONS_RAPIDES(etat) }); return; }
     setMstate("analyse");
     const r = interpreter(demande, etat);
     window.setTimeout(() => {
@@ -41,30 +42,30 @@ export function MantaAsk() {
   return (
     <section className="panel bloc manta-bloc rise" style={{ "--i": 4 } as CSSProperties}>
       <Manta state={mstate} size={124} title="Manta" />
-      <h2 className="manta-bloc__hello">Bonjour {prenom},<br />que veux-tu vérifier aujourd'hui ?</h2>
+      <h2 className="manta-bloc__hello">{t("Bonjour {prenom},", { prenom })}<br />{t("que veux-tu vérifier aujourd'hui ?")}</h2>
       <div className="manta-bloc__chips">
-        <Btn size="sm" icon={<IcMail />} onClick={ouvrirNouvelEntretien}>Envoyer un lien</Btn>
-        <Btn size="sm" icon={<IcList />} href="#/entretiens?filtre=termines">Voir les rapports</Btn>
-        <Btn size="sm" icon={<IcFlag />} href="#/entretiens?filtre=signal">Signaux à vérifier</Btn>
+        <Btn size="sm" icon={<IcMail />} onClick={ouvrirNouvelEntretien}>{t("Envoyer un lien")}</Btn>
+        <Btn size="sm" icon={<IcList />} href="#/entretiens?filtre=termines">{t("Voir les rapports")}</Btn>
+        <Btn size="sm" icon={<IcFlag />} href="#/entretiens?filtre=signal">{t("Signaux à vérifier")}</Btn>
       </div>
       {rep && (
         <div className="card reponse pop" role="status">
-          <div className="reponse__top"><span>{rep.message}</span><button type="button" className="icirc icirc--sm" aria-label="Fermer la réponse" onClick={() => setRep(null)}><IcX /></button></div>
+          <div className="reponse__top"><span>{rep.message}</span><button type="button" className="icirc icirc--sm" aria-label={t("Fermer la réponse")} onClick={() => setRep(null)}><IcX /></button></div>
           {rep.suggestions && <div className="row wrap" style={{ gap: 8 }}>{rep.suggestions.map((s) => <Btn key={s.libelle} size="sm" onClick={() => { setRep(null); s.executer(); }}>{s.libelle}</Btn>)}</div>}
         </div>
       )}
       <BorderBeam>
       <form className="card ask" onSubmit={(e) => { e.preventDefault(); envoyer(); }}>
-        <label className="sr-only" htmlFor="demande-manta">Demande à Manta</label>
-        <textarea id="demande-manta" ref={zone} rows={2} maxLength={MAX} value={texte} placeholder="Demande à Manta… ex. « Envoie un lien à Camille Royer »"
+        <label className="sr-only" htmlFor="demande-manta">{t("Demande à Manta")}</label>
+        <textarea id="demande-manta" ref={zone} rows={2} maxLength={MAX} value={texte} placeholder={t("Demande à Manta… ex. « Envoie un lien à Camille Royer »")}
           onChange={(e) => setTexte(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); envoyer(); } }} />
         <div className="ask__bar">
-          <Pop up width={250} button={({ open, toggle }) => <Btn size="sm" variant="inset" icon={<IcPlus />} onClick={toggle} aria-expanded={open}>Candidat</Btn>}>
-            {(close) => <><div className="menu__title">Insérer un candidat</div><div className="menu__scroll">{noms.map((n) => <button key={n} type="button" className="menu__item" onClick={() => { inserer(n); close(); }}>{n}</button>)}</div></>}
+          <Pop up width={250} button={({ open, toggle }) => <Btn size="sm" variant="inset" icon={<IcPlus />} onClick={toggle} aria-expanded={open}>{t("Candidat")}</Btn>}>
+            {(close) => <><div className="menu__title">{t("Insérer un candidat")}</div><div className="menu__scroll">{noms.map((n) => <button key={n} type="button" className="menu__item" onClick={() => { inserer(n); close(); }}>{n}</button>)}</div></>}
           </Pop>
-          <Btn size="sm" variant="inset" icon={<IcList />} onClick={() => inserer("Ouvre le rapport de")}>Rapport</Btn>
+          <Btn size="sm" variant="inset" icon={<IcList />} onClick={() => inserer("Ouvre le rapport de")}>{t("Rapport")}</Btn>
           <span className="ask__count" aria-live="polite">{texte.length}/{MAX}</span>
-          <ICirc size="sm" label="Envoyer à Manta" type="submit"><IcArrowR /></ICirc>
+          <ICirc size="sm" label={t("Envoyer à Manta")} type="submit"><IcArrowR /></ICirc>
         </div>
       </form>
       </BorderBeam>

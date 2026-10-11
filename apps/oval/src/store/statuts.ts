@@ -3,6 +3,7 @@ import type { Ton } from "../ui/ui";
 import { nbSignauxAVerifier } from "./store";
 import { relatif } from "./format";
 import { DEFI_NOMS } from "./texts";
+import { t } from "../i18n";
 
 /** Étiquettes de statut partagées par tous les écrans. Toujours un mot, jamais la couleur seule. */
 export interface Etiquette { texte: string; ton: Ton }
@@ -15,39 +16,39 @@ export function etapesFaites(x: Entretien): number {
 
 export function statutEntretien(x: Entretien, ref: Date): Etiquette {
   if (x.statut === "termine") {
-    if (nbSignauxAVerifier(x) > 0) return { texte: "Signal à vérifier", ton: "gold" };
-    if (x.defis.length && x.defis.every((d) => d.resultat !== "reussi")) return { texte: "Non concluant", ton: "neutral" };
-    return { texte: "Présence vérifiée", ton: "green" };
+    if (nbSignauxAVerifier(x) > 0) return { texte: t("Signal à vérifier"), ton: "gold" };
+    if (x.defis.length && x.defis.every((d) => d.resultat !== "reussi")) return { texte: t("Non concluant"), ton: "neutral" };
+    return { texte: t("Présence vérifiée"), ton: "green" };
   }
-  if (x.statut === "en_cours") return { texte: "En cours", ton: "today" };
+  if (x.statut === "en_cours") return { texte: t("En cours"), ton: "today" };
   const min = (new Date(x.date).getTime() - ref.getTime()) / 60000;
-  if (min <= 60 && min > -x.dureeMin) return { texte: min > 0 ? relatif(x.date, ref) : "Maintenant", ton: "today" };
-  return { texte: "À venir", ton: "blue" };
+  if (min <= 60 && min > -x.dureeMin) return { texte: min > 0 ? relatif(x.date, ref) : t("Maintenant"), ton: "today" };
+  return { texte: t("À venir"), ton: "blue" };
 }
 
 export function statutPreVerif(x: Entretien, ref: Date): Etiquette {
   const p = x.preVerification;
   const n = etapesFaites(x);
   if (p.statut === "faite") {
-    if (p.signaux.some((s) => s.resultat === "a_verifier")) return { texte: `${n}/4 · Signal à vérifier`, ton: "soft-gold" };
-    if (p.etapes.lumiere === "passe") return { texte: `${n}/4 · Lumière passée`, ton: "soft-green" };
-    if (p.etapes.lumiere === "non_concluant" || p.etapes.geste === "non_concluant") return { texte: `${n}/4 · Non concluant`, ton: "neutral" };
-    return { texte: `${n}/4 · Cohérent`, ton: "soft-green" };
+    if (p.signaux.some((s) => s.resultat === "a_verifier")) return { texte: t("{n}/4 · Signal à vérifier", { n }), ton: "soft-gold" };
+    if (p.etapes.lumiere === "passe") return { texte: t("{n}/4 · Lumière passée", { n }), ton: "soft-green" };
+    if (p.etapes.lumiere === "non_concluant" || p.etapes.geste === "non_concluant") return { texte: t("{n}/4 · Non concluant", { n }), ton: "neutral" };
+    return { texte: t("{n}/4 · Cohérent", { n }), ton: "soft-green" };
   }
-  if (p.refuseeLe && p.statut === "non_faite") return { texte: "Refusée · autre solution", ton: "neutral" };
-  if (p.statut === "non_envoyee") return { texte: "Lien non envoyé", ton: "neutral" };
+  if (p.refuseeLe && p.statut === "non_faite") return { texte: t("Refusée · autre solution"), ton: "neutral" };
+  if (p.statut === "non_envoyee") return { texte: t("Lien non envoyé"), ton: "neutral" };
   const passe = x.statut === "termine" || new Date(x.date).getTime() < ref.getTime();
-  if (p.statut === "non_faite" || passe) return { texte: "Non faite", ton: "neutral" };
-  if (p.statut === "ouverte") return { texte: "Lien ouvert", ton: "soft-violet" };
-  return { texte: p.relanceeLe ? "Relancé · en attente" : "Lien envoyé · en attente", ton: "soft-violet" };
+  if (p.statut === "non_faite" || passe) return { texte: t("Non faite"), ton: "neutral" };
+  if (p.statut === "ouverte") return { texte: t("Lien ouvert"), ton: "soft-violet" };
+  return { texte: p.relanceeLe ? t("Relancé · en attente") : t("Lien envoyé · en attente"), ton: "soft-violet" };
 }
 
 /** Phrase courte qui résume le premier point à vérifier. */
 export function premierSignal(x: Entretien): string {
   const d = x.defis.find((y) => y.resultat === "a_verifier");
-  if (d) return `${DEFI_NOMS[d.type]} : ${d.detail?.toLowerCase() ?? "à vérifier"}`;
+  if (d) return t("{defi} : {detail}", { defi: DEFI_NOMS[d.type], detail: d.detail?.toLowerCase() ?? t("à vérifier") });
   const s = [...x.signaux, ...x.preVerification.signaux].find((y) => y.resultat === "a_verifier");
-  return s ? s.libelle : "Signal à vérifier";
+  return s ? s.libelle : t("Signal à vérifier");
 }
 
 /** Version douce d'une teinte (pour les en-têtes et les listes). */
@@ -57,31 +58,31 @@ export const point = (t: Ton) => (t.includes("green") ? "green" : t.includes("go
 
 export function etiquetteDefi(r: DefiResultat): Etiquette {
   switch (r) {
-    case "reussi": return { texte: "Réussi", ton: "soft-green" };
-    case "a_verifier": return { texte: "À vérifier", ton: "soft-gold" };
-    case "non_concluant": return { texte: "Non concluant", ton: "neutral" };
-    case "passe": return { texte: "Passé", ton: "neutral" };
-    case "en_cours": return { texte: "En cours", ton: "soft-blue" };
-    default: return { texte: "Proposé", ton: "soft-blue" };
+    case "reussi": return { texte: t("Réussi"), ton: "soft-green" };
+    case "a_verifier": return { texte: t("À vérifier"), ton: "soft-gold" };
+    case "non_concluant": return { texte: t("Non concluant"), ton: "neutral" };
+    case "passe": return { texte: t("Passé"), ton: "neutral" };
+    case "en_cours": return { texte: t("En cours"), ton: "soft-blue" };
+    default: return { texte: t("Proposé"), ton: "soft-blue" };
   }
 }
 
 export function etiquetteSignal(s: Signal): Etiquette {
-  if (s.resultat === "a_verifier") return s.poids === "fort" ? { texte: "Poids fort", ton: "soft-gold" } : { texte: "À vérifier", ton: "soft-gold" };
-  if (s.type === "vpn") return { texte: "Courant, expliqué", ton: "neutral" };
-  if (s.resultat === "coherent") return { texte: "Cohérent", ton: "soft-green" };
-  if (s.resultat === "rien_a_signaler") return { texte: "Rien à signaler", ton: "soft-green" };
-  if (s.resultat === "passe") return { texte: "Étape passée", ton: "neutral" };
-  return { texte: "Non concluant", ton: "neutral" };
+  if (s.resultat === "a_verifier") return s.poids === "fort" ? { texte: t("Poids fort"), ton: "soft-gold" } : { texte: t("À vérifier"), ton: "soft-gold" };
+  if (s.type === "vpn") return { texte: t("Courant, expliqué"), ton: "neutral" };
+  if (s.resultat === "coherent") return { texte: t("Cohérent"), ton: "soft-green" };
+  if (s.resultat === "rien_a_signaler") return { texte: t("Rien à signaler"), ton: "soft-green" };
+  if (s.resultat === "passe") return { texte: t("Étape passée"), ton: "neutral" };
+  return { texte: t("Non concluant"), ton: "neutral" };
 }
 
 /** Étiquette d'une étape de pré-vérification (absence = jamais négative). */
 export function etiquetteEtape(v: boolean | Resultat | undefined): Etiquette {
-  if (v === undefined) return { texte: "Pas encore", ton: "neutral" };
-  if (v === true) return { texte: "Fait", ton: "soft-green" };
-  if (v === false) return { texte: "Sans caméra", ton: "neutral" };
-  if (v === "coherent" || v === "rien_a_signaler") return { texte: "Cohérent", ton: "soft-green" };
-  if (v === "a_verifier") return { texte: "À vérifier", ton: "soft-gold" };
-  if (v === "passe") return { texte: "Passée", ton: "neutral" };
-  return { texte: "Non concluant", ton: "neutral" };
+  if (v === undefined) return { texte: t("Pas encore"), ton: "neutral" };
+  if (v === true) return { texte: t("Fait"), ton: "soft-green" };
+  if (v === false) return { texte: t("Sans caméra"), ton: "neutral" };
+  if (v === "coherent" || v === "rien_a_signaler") return { texte: t("Cohérent"), ton: "soft-green" };
+  if (v === "a_verifier") return { texte: t("À vérifier"), ton: "soft-gold" };
+  if (v === "passe") return { texte: t("Passée"), ton: "neutral" };
+  return { texte: t("Non concluant"), ton: "neutral" };
 }

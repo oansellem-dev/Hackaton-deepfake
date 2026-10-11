@@ -10,6 +10,7 @@ import type { Defi, DefiResultat, DefiType, Entretien, Poids, Resultat, Signal, 
 import { actions, getEtat } from "./store";
 import { DEFI_PHRASES } from "./texts";
 import { moteurUrl } from "./email";
+import { t } from "../i18n";
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -101,7 +102,7 @@ export async function envoyerCreneau(id: string): Promise<void> {
 }
 
 export async function lireSession(x: Entretien): Promise<SessionView> {
-  if (!x.moteur) throw new Error("entretien non relié au moteur");
+  if (!x.moteur) throw new Error(t("entretien non relié au moteur"));
   return appel<SessionView>(`/api/sessions/${x.moteur.sessionId}`, {}, x.moteur.recruiterKey);
 }
 

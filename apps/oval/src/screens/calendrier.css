@@ -16,12 +16,12 @@
 .cal__axe span:first-child { transform: none; }
 /* Colonnes : lignes d'heures en fond, en creux */
 .cal__col { position: relative; grid-row: 2; border-radius: 16px; cursor: copy; }
+.cal__col--passe { cursor: default; }
 .cal__cell { position: absolute; left: 0; right: 0; height: calc(var(--h) - 6px); border-radius: 14px; background: var(--card); box-shadow: var(--hi-soft), var(--sh-tile); transition: background-color var(--t), box-shadow var(--t); }
 .cal__cell::after { content: "+"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 600; color: var(--blue-text); opacity: 0; transition: opacity var(--t); }
 .cal__col:not(.cal__col--passe) .cal__cell:hover { background: var(--blue-soft); box-shadow: var(--sh-inset-blue); }
 .cal__col:not(.cal__col--passe) .cal__cell:hover::after { opacity: .9; }
-.cal__col--today { border-radius: 16px; background: var(--blue-soft); box-shadow: var(--sh-inset-blue); padding: 0; }
-.cal__col--today .cal__cell { background: rgba(255,255,255,.72); box-shadow: inset 0 1px 0 #fff; }
+.cal__col--today .cal__cell { background: var(--blue-soft); box-shadow: var(--hi-soft), var(--sh-tile); }
 .cal__col--we:not(.cal__col--today) .cal__cell { background-color: var(--we); background-image: repeating-linear-gradient(135deg, var(--hatch) 0 5px, transparent 5px 12px); box-shadow: var(--sh-inset); }
 .cal__col { container-type: inline-size; }
 @container (max-width: 132px) { .cal__evIc, .cal__evChip { display: none; } .cal__ev { padding-right: 6px; } }

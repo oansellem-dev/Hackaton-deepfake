@@ -1,86 +1,87 @@
 import type { DecisionValeur, DefiResultat, DefiType, Resultat, SignalType, StatutPreVerif } from "./types";
+import { t } from "../i18n";
 
 /** Tous les libellés en français, au même endroit. Ton simple et humain. Jamais de verdict. */
 
 export const SIGNAL_LIBELLES: Record<SignalType, string> = {
-  camera_virtuelle: "Caméra virtuelle déclarée par le navigateur",
-  camera_physique: "Caméra physique détectée",
-  fuseau_horaire: "Fuseau horaire et lieu déclaré",
-  adresse_connexion: "Adresse de connexion et lieu déclaré",
-  vpn: "Connexion via VPN",
-  test_lumiere: "Test de lumière",
-  image_deformee: "Image déformée pendant un geste",
-  defi_non_execute: "Défi non exécuté dans le temps attendu",
-  delai_reponse: "Délai de réponse inhabituel",
-  levres_son: "Lèvres et son",
-  contradiction_cv: "Information déclarée différente du CV",
+  camera_virtuelle: t("Caméra virtuelle déclarée par le navigateur"),
+  camera_physique: t("Caméra physique détectée"),
+  fuseau_horaire: t("Fuseau horaire et lieu déclaré"),
+  adresse_connexion: t("Adresse de connexion et lieu déclaré"),
+  vpn: t("Connexion via VPN"),
+  test_lumiere: t("Test de lumière"),
+  image_deformee: t("Image déformée pendant un geste"),
+  defi_non_execute: t("Défi non exécuté dans le temps attendu"),
+  delai_reponse: t("Délai de réponse inhabituel"),
+  levres_son: t("Lèvres et son"),
+  contradiction_cv: t("Information déclarée différente du CV"),
 };
 
 export const DEFI_PHRASES: Record<DefiType, string> = {
-  main_devant_visage: "Pouvez-vous passer la main devant votre visage ?",
-  rotation_tete: "Pouvez-vous tourner la tête à gauche, puis à droite ?",
-  phrase_aleatoire: "Pouvez-vous répéter : « Le train de midi part du quai sept » ?",
+  main_devant_visage: t("Pouvez-vous passer la main devant votre visage ?"),
+  rotation_tete: t("Pouvez-vous tourner la tête à gauche, puis à droite ?"),
+  phrase_aleatoire: t("Pouvez-vous répéter : « Le train de midi part du quai sept » ?"),
 };
 export const DEFI_NOMS: Record<DefiType, string> = {
-  main_devant_visage: "Main devant le visage",
-  rotation_tete: "Tourner la tête",
-  phrase_aleatoire: "Phrase aléatoire",
+  main_devant_visage: t("Main devant le visage"),
+  rotation_tete: t("Tourner la tête"),
+  phrase_aleatoire: t("Phrase aléatoire"),
 };
 export const DEFI_DESCRIPTIONS: Record<DefiType, string> = {
-  main_devant_visage: "La main passe devant le visage : un flux substitué se déforme au passage.",
-  rotation_tete: "Le visage tourne de profil : les modèles de substitution décrochent sur les angles.",
-  phrase_aleatoire: "Une phrase imprévisible : on vérifie que les lèvres et le son restent alignés.",
+  main_devant_visage: t("La main passe devant le visage : un flux substitué se déforme au passage."),
+  rotation_tete: t("Le visage tourne de profil : les modèles de substitution décrochent sur les angles."),
+  phrase_aleatoire: t("Une phrase imprévisible : on vérifie que les lèvres et le son restent alignés."),
 };
 
 export const DEFI_RESULTATS: Record<DefiResultat, string> = {
-  propose: "Proposé",
-  en_cours: "En cours",
-  reussi: "Réussi",
-  a_verifier: "À vérifier",
-  non_concluant: "Non concluant",
-  passe: "Passé",
+  propose: t("Proposé"),
+  en_cours: t("En cours"),
+  reussi: t("Réussi"),
+  a_verifier: t("À vérifier"),
+  non_concluant: t("Non concluant"),
+  passe: t("Passé"),
 };
 
 export const RESULTATS: Record<Resultat, string> = {
-  coherent: "Cohérent",
-  a_verifier: "À vérifier",
-  non_concluant: "Non concluant",
-  passe: "Étape passée",
-  rien_a_signaler: "Rien à signaler",
+  coherent: t("Cohérent"),
+  a_verifier: t("À vérifier"),
+  non_concluant: t("Non concluant"),
+  passe: t("Étape passée"),
+  rien_a_signaler: t("Rien à signaler"),
 };
 
 export const PREVERIF_STATUTS: Record<StatutPreVerif, string> = {
-  non_envoyee: "Lien non envoyé",
-  envoyee: "Lien envoyé",
-  ouverte: "Lien ouvert",
-  faite: "Faite",
-  non_faite: "Non faite",
+  non_envoyee: t("Lien non envoyé"),
+  envoyee: t("Lien envoyé"),
+  ouverte: t("Lien ouvert"),
+  faite: t("Faite"),
+  non_faite: t("Non faite"),
 };
 
 export const DECISIONS: Record<DecisionValeur, string> = {
-  non_prise: "En attente",
-  poursuivre: "Poursuivre le recrutement",
-  refaire_defi: "Refaire un défi au prochain échange",
-  presentiel: "Proposer un entretien en présentiel",
+  non_prise: t("En attente"),
+  poursuivre: t("Poursuivre le recrutement"),
+  refaire_defi: t("Refaire un défi au prochain échange"),
+  presentiel: t("Proposer un entretien en présentiel"),
 };
 
 /** Étiquette de statut d'un entretien : toujours un mot à côté de la couleur. */
 export const STATUTS_ENTRETIEN = {
-  presence_verifiee: "Présence vérifiée",
-  signal: "Signal à vérifier",
-  a_venir: "À venir",
-  en_cours: "En cours",
-  non_concluant: "Non concluant",
+  presence_verifiee: t("Présence vérifiée"),
+  signal: t("Signal à vérifier"),
+  a_venir: t("À venir"),
+  en_cours: t("En cours"),
+  non_concluant: t("Non concluant"),
 } as const;
 
 export const MANTA = {
-  neutre: "Tout va bien. Je regarde avec vous.",
-  defi: "Demandez-lui, naturellement :",
-  analyse: "Je vérifie le geste…",
-  signal: "Signal à vérifier.",
-  verifie: "Présence humaine vérifiée.",
-  lumiere: "J'éclaire ton visage avec quelques couleurs.",
-  rappel: "Oval vérifie une présence humaine, pas une identité. Vous décidez.",
+  neutre: t("Tout va bien. Je regarde avec vous."),
+  defi: t("Demandez-lui, naturellement :"),
+  analyse: t("Je vérifie le geste…"),
+  signal: t("Signal à vérifier."),
+  verifie: t("Présence humaine vérifiée."),
+  lumiere: t("J'éclaire ton visage avec quelques couleurs."),
+  rappel: t("Oval vérifie une présence humaine, pas une identité. Vous décidez."),
 };
 
-export const DECISIONS_COURT: Record<DecisionValeur, string> = { non_prise: "en attente", poursuivre: "poursuivre", refaire_defi: "refaire un défi", presentiel: "présentiel proposé" };
+export const DECISIONS_COURT: Record<DecisionValeur, string> = { non_prise: t("en attente"), poursuivre: t("poursuivre"), refaire_defi: t("refaire un défi"), presentiel: t("présentiel proposé") };

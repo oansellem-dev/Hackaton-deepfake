@@ -10,6 +10,7 @@ import {
   type FlashResult,
 } from '@kyc/shared';
 import { api } from '../config.ts';
+import { t } from '../i18n.ts';
 import { FlashAborted, enterFullscreen, exitFullscreen, runFlash, secureRandom, waitForFace } from '../lib/flash.ts';
 
 export interface ScreenFlashOutcome {
@@ -95,21 +96,21 @@ export function ScreenFlash({ token, deviceId, onDone }: Props) {
     setMessage('');
     setProgress(0);
     setPhase('starting');
-    setHud('Préparation de la caméra…');
+    setHud(t('Préparation de la caméra…'));
     try {
       const stream = await openCamera(deviceId);
       streamRef.current = stream;
       video.srcObject = stream;
       await video.play();
 
-      setHud('Regardez l’écran, visage bien en face');
+      setHud(t('Regardez l’écran, visage bien en face'));
       if (!(await waitForFace(video, 6000, controller.signal))) {
-        backToStart('Je ne vois pas votre visage. Placez-vous face à l’écran, bien éclairé, puis recommencez.');
+        backToStart(t('Je ne vois pas votre visage. Placez-vous face à l’écran, bien éclairé, puis recommencez.'));
         return;
       }
 
       setPhase('running');
-      setHud('Ne bougez pas et gardez les yeux sur l’écran');
+      setHud(t('Ne bougez pas et gardez les yeux sur l’écran'));
       const segments = makeFlashSequence(FLASH_DEFAULTS.segments, secureRandom);
       const run = await runFlash({ video, stage, segments, signal: controller.signal, onProgress: setProgress });
       stopAll();
@@ -123,21 +124,20 @@ export function ScreenFlash({ token, deviceId, onDone }: Props) {
       if (final) onDone({ result: combineFlashAttempts(attempts).result, attempts: attempts.length });
       else {
         setMessage(
-          'Le reflet n’était pas assez net. Montez la luminosité de votre écran au maximum, rapprochez-vous ' +
-            '(environ 40 cm) et évitez d’avoir une lampe ou une fenêtre face à vous, puis réessayez.',
+          t('Le reflet n’était pas assez net. Montez la luminosité de votre écran au maximum, rapprochez-vous (environ 40 cm) et évitez d’avoir une lampe ou une fenêtre face à vous, puis réessayez.'),
         );
         setPhase('retry');
       }
     } catch (e) {
-      if (e instanceof FlashAborted) return backToStart(`${e.message}. Vous pouvez recommencer.`);
+      if (e instanceof FlashAborted) return backToStart(t('{message}. Vous pouvez recommencer.', { message: e.message }));
       stopAll();
       if (errorText(e).includes('déjà terminé')) {
         setPhase('blocked');
-        setMessage('Ce test est déjà enregistré. Vous pouvez fermer cette page.');
+        setMessage(t('Ce test est déjà enregistré. Vous pouvez fermer cette page.'));
         return;
       }
       setPhase('error');
-      setMessage(`Impossible de lancer le test : ${errorText(e)}`);
+      setMessage(t('Impossible de lancer le test : {err}', { err: errorText(e) }));
     }
   }
 
@@ -148,32 +148,29 @@ export function ScreenFlash({ token, deviceId, onDone }: Props) {
       onDone({ result: 'skipped', attempts: 0 });
     } catch (e) {
       setPhase('error');
-      setMessage(`Envoi impossible : ${errorText(e)}`);
+      setMessage(t('Envoi impossible : {err}', { err: errorText(e) }));
     }
   }
 
   const active = phase === 'starting' || phase === 'running';
   return (
     <div className="card">
-      <h2>Test du reflet de l’écran</h2>
+      <h2>{t('Test du reflet de l’écran')}</h2>
       <p>
-        Votre écran va afficher des couleurs pendant environ {SECONDS} secondes. Votre caméra doit voir leur reflet sur
-        votre visage : c’est ce qui distingue une vraie caméra d’une vidéo truquée. L’analyse se fait dans votre
-        navigateur ; seul le résultat est envoyé, aucune image.
+        {t('Votre écran va afficher des couleurs pendant environ {secondes} secondes. Votre caméra doit voir leur reflet sur votre visage : c’est ce qui distingue une vraie caméra d’une vidéo truquée. L’analyse se fait dans votre navigateur ; seul le résultat est envoyé, aucune image.', { secondes: SECONDS })}
       </p>
       <ul className="flash-tips">
-        <li>montez la luminosité de votre écran au maximum ;</li>
-        <li>placez-vous à 40–60 cm de l’écran, visage bien en face ;</li>
-        <li>évitez d’avoir une fenêtre ou une lampe forte face à vous.</li>
+        <li>{t('montez la luminosité de votre écran au maximum ;')}</li>
+        <li>{t('placez-vous à 40–60 cm de l’écran, visage bien en face ;')}</li>
+        <li>{t('évitez d’avoir une fenêtre ou une lampe forte face à vous.')}</li>
       </ul>
       <p className="flash-warning">
-        L’écran va changer de couleur environ deux fois par seconde. Si vous êtes sensible aux lumières clignotantes
-        (épilepsie photosensible), passez ce test : cela ne vous pénalise pas.
+        {t('L’écran va changer de couleur environ deux fois par seconde. Si vous êtes sensible aux lumières clignotantes (épilepsie photosensible), passez ce test : cela ne vous pénalise pas.')}
       </p>
 
       <div ref={stageRef} className={`flash-stage ${active ? 'flash-active' : ''}`}>
         <video ref={videoRef} playsInline muted />
-        {!active && <p className="flash-placeholder">L’écran passera en plein écran pendant le test.</p>}
+        {!active && <p className="flash-placeholder">{t('L’écran passera en plein écran pendant le test.')}</p>}
         {active && (
           <div className="flash-hud">
             {hud}
@@ -190,24 +187,24 @@ export function ScreenFlash({ token, deviceId, onDone }: Props) {
       {phase === 'intro' && (
         <div className="flash-actions">
           <button className="primary" onClick={start}>
-            Commencer le test du reflet
+            {t('Commencer le test du reflet')}
           </button>
           <button className="link-button" onClick={skip}>
-            Passer ce test
+            {t('Passer ce test')}
           </button>
         </div>
       )}
       {phase === 'retry' && (
         <button className="primary" onClick={start}>
-          Réessayer le test ({attemptsRef.current.length + 1}/{FLASH_MAX_ATTEMPTS})
+          {t('Réessayer le test ({n}/{total})', { n: attemptsRef.current.length + 1, total: FLASH_MAX_ATTEMPTS })}
         </button>
       )}
       {phase === 'error' && (
         <button className="primary" onClick={() => setPhase(attemptsRef.current.length ? 'retry' : 'intro')}>
-          Revenir au test
+          {t('Revenir au test')}
         </button>
       )}
-      {phase === 'sending' && <p className="muted">Enregistrement du résultat…</p>}
+      {phase === 'sending' && <p className="muted">{t('Enregistrement du résultat…')}</p>}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { aller } from "../app/router";
 import { ouvrirNouvelEntretien } from "../app/events";
 import { LigneVisio } from "../ui/visio";
 import { envoyerCreneau } from "../store/moteur";
+import { t } from "../i18n";
 import "./calendrier.css";
 
 /**
@@ -27,10 +28,10 @@ const arrondi = (m: number) => Math.round(m / PAS) * PAS;
 
 type Filtre = "signal" | "attente" | "avenir" | "termines";
 const FILTRES: { id: Filtre; label: string; test: (x: Entretien) => boolean }[] = [
-  { id: "signal", label: "Signal à vérifier", test: (x) => nbSignauxAVerifier(x) > 0 },
-  { id: "attente", label: "Pré-vérification en attente", test: (x) => x.statut !== "termine" && (x.preVerification.statut === "envoyee" || x.preVerification.statut === "ouverte") },
-  { id: "avenir", label: "À venir", test: (x) => x.statut !== "termine" },
-  { id: "termines", label: "Terminés", test: (x) => x.statut === "termine" },
+  { id: "signal", label: t("Signal à vérifier"), test: (x) => nbSignauxAVerifier(x) > 0 },
+  { id: "attente", label: t("Pré-vérification en attente"), test: (x) => x.statut !== "termine" && (x.preVerification.statut === "envoyee" || x.preVerification.statut === "ouverte") },
+  { id: "avenir", label: t("À venir"), test: (x) => x.statut !== "termine" },
+  { id: "termines", label: t("Terminés"), test: (x) => x.statut === "termine" },
 ];
 
 interface Place { x: Entretien; debut: number; fin: number; col: number; n: number }
@@ -122,10 +123,10 @@ export function Calendrier({ onReduire }: { onReduire?: () => void }) {
       removeEventListener("pointermove", move); removeEventListener("pointerup", up);
       setGlisse(null);
       if (!bouge) { ouvrirFiche(x.id, carte); return; }
-      if (new Date(courant.date).getTime() < ref.getTime() && mode === "deplace") { toast("Impossible de déplacer un entretien dans le passé"); return; }
+      if (new Date(courant.date).getTime() < ref.getTime() && mode === "deplace") { toast(t("Impossible de déplacer un entretien dans le passé")); return; }
       actions.deplacer(x.id, courant.date, courant.dureeMin);
-      void envoyerCreneau(x.id).catch(() => toast("Moteur injoignable : le candidat n'a pas encore le nouveau créneau"));
-      toast(mode === "deplace" ? `${x.candidat.prenom} : déplacé au ${jourLong(courant.date)} à ${heure(courant.date)}` : `${x.candidat.prenom} : durée ${courant.dureeMin} min`);
+      void envoyerCreneau(x.id).catch(() => toast(t("Moteur injoignable : le candidat n'a pas encore le nouveau créneau")));
+      toast(mode === "deplace" ? t("{prenom} : déplacé au {jour} à {heure}", { prenom: x.candidat.prenom, jour: jourLong(courant.date), heure: heure(courant.date) }) : t("{prenom} : durée {n} min", { prenom: x.candidat.prenom, n: courant.dureeMin }));
     };
     addEventListener("pointermove", move); addEventListener("pointerup", up);
   };
@@ -136,7 +137,7 @@ export function Calendrier({ onReduire }: { onReduire?: () => void }) {
     const r = e.currentTarget.getBoundingClientRect();
     const m = Math.max(h0 * 60, arrondi(h0 * 60 + ((e.clientY - r.top) / H) * 60));
     const d = new Date(j); d.setHours(Math.floor(m / 60), m % 60, 0, 0);
-    if (d.getTime() < ref.getTime()) { toast("Ce créneau est déjà passé"); return; }
+    if (d.getTime() < ref.getTime()) { toast(t("Ce créneau est déjà passé")); return; }
     setFiche(null);
     ouvrirNouvelEntretien({ date: isoDate(d), heure: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` });
   };
@@ -158,36 +159,36 @@ export function Calendrier({ onReduire }: { onReduire?: () => void }) {
     <section ref={section} className="panel cal cal--ouvert" style={v({ "--i": 1, viewTransitionName: "calendrier" })}>
       <header className="cal__head">
         <div className="cal__titre">
-          <h1 className="t-display">{offset === 0 ? "Cette semaine" : `Semaine du ${semaineDu(start)}`}</h1>
+          <h1 className="t-display">{offset === 0 ? t("Cette semaine") : t("Semaine du {date}", { date: semaineDu(start) })}</h1>
           <div className="cal__resume">
-            <Pill ton="soft-blue" icon={<IcClock />}>{semaine.filter((x) => x.statut !== "termine").length} à venir</Pill>
-            {semaine.some((x) => nbSignauxAVerifier(x) > 0) && <Pill ton="soft-gold" icon={<IcFlag />}>{semaine.filter((x) => nbSignauxAVerifier(x) > 0).length} signal{semaine.filter((x) => nbSignauxAVerifier(x) > 0).length > 1 ? "s" : ""} à vérifier</Pill>}
-            {semaine.some((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0) && <Pill ton="soft-green" icon={<IcCheck />}>{semaine.filter((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0).length} vérifié{semaine.filter((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0).length > 1 ? "s" : ""}</Pill>}
-            <span className="muted t-small cal__astuce">Glissez pour déplacer · cliquez un créneau libre pour créer</span>
+            <Pill ton="soft-blue" icon={<IcClock />}>{t("{n} à venir", { n: semaine.filter((x) => x.statut !== "termine").length })}</Pill>
+            {semaine.some((x) => nbSignauxAVerifier(x) > 0) && <Pill ton="soft-gold" icon={<IcFlag />}>{semaine.filter((x) => nbSignauxAVerifier(x) > 0).length > 1 ? t("{n} signals à vérifier", { n: semaine.filter((x) => nbSignauxAVerifier(x) > 0).length }) : t("{n} signal à vérifier", { n: semaine.filter((x) => nbSignauxAVerifier(x) > 0).length })}</Pill>}
+            {semaine.some((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0) && <Pill ton="soft-green" icon={<IcCheck />}>{semaine.filter((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0).length > 1 ? t("{n} vérifiés", { n: semaine.filter((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0).length }) : t("{n} vérifié", { n: semaine.filter((x) => x.statut === "termine" && nbSignauxAVerifier(x) === 0).length })}</Pill>}
+            <span className="muted t-small cal__astuce">{t("Glissez pour déplacer · cliquez un créneau libre pour créer")}</span>
           </div>
         </div>
         <div className="cal__tools">
-          <ICirc size="sm" label="Semaine précédente" onClick={() => aller_(offset - 1)}><IcArrowL /></ICirc>
-          <Pop align="right" width={280} button={({ open, toggle }) => <Btn icon={<IcCal />} onClick={toggle} aria-expanded={open}>Semaine du {semaineDu(start)} <IcChevron /></Btn>}>
+          <ICirc size="sm" label={t("Semaine précédente")} onClick={() => aller_(offset - 1)}><IcArrowL /></ICirc>
+          <Pop align="right" width={280} button={({ open, toggle }) => <Btn icon={<IcCal />} onClick={toggle} aria-expanded={open}>{t("Semaine du {date}", { date: semaineDu(start) })} <IcChevron /></Btn>}>
             {(close) => (
               <>
-                <div className="menu__title">Aller à</div>
+                <div className="menu__title">{t("Aller à")}</div>
                 {[-2, -1, 0, 1, 2, 3].map((o) => (
                   <button key={o} type="button" className="menu__item" aria-current={o === offset} onClick={() => { aller_(o); close(); }}>
-                    Semaine du {semaineDu(plusJours(lundi(ref), o * 7))}{o === 0 && <span className="menu__sub">· cette semaine</span>}
+                    {t("Semaine du {date}", { date: semaineDu(plusJours(lundi(ref), o * 7)) })}{o === 0 && <span className="menu__sub">{t("· cette semaine")}</span>}
                   </button>
                 ))}
               </>
             )}
           </Pop>
-          <ICirc size="sm" label="Semaine suivante" onClick={() => aller_(offset + 1)}><IcArrowR /></ICirc>
-          {onReduire && <ICirc size="sm" label="Réduire le calendrier" onClick={onReduire}><IcChevron style={{ transform: "rotate(180deg)" }} /></ICirc>}
-          <Pop align="right" width={290} button={({ open, toggle }) => <Btn icon={<IcFilter />} onClick={toggle} aria-expanded={open}>Filtrer{filtres.length > 0 && <span className="btn__count">{filtres.length}</span>}</Btn>}>
+          <ICirc size="sm" label={t("Semaine suivante")} onClick={() => aller_(offset + 1)}><IcArrowR /></ICirc>
+          {onReduire && <ICirc size="sm" label={t("Réduire le calendrier")} onClick={onReduire}><IcChevron style={{ transform: "rotate(180deg)" }} /></ICirc>}
+          <Pop align="right" width={290} button={({ open, toggle }) => <Btn icon={<IcFilter />} onClick={toggle} aria-expanded={open}>{t("Filtrer")}{filtres.length > 0 && <span className="btn__count">{filtres.length}</span>}</Btn>}>
             {() => (
               <>
-                <div className="menu__title">Montrer seulement</div>
+                <div className="menu__title">{t("Montrer seulement")}</div>
                 {FILTRES.map((f) => { const on = filtres.includes(f.id); return <button key={f.id} type="button" className="menu__item" aria-pressed={on} onClick={() => basculer(f.id)}><span className={`check${on ? " check--on" : ""}`}>{on && <IcCheck />}</span>{f.label}</button>; })}
-                {filtres.length > 0 && <button type="button" className="menu__item" onClick={() => transition(() => setFiltres([]))}><IcX width={16} height={16} />Tout montrer</button>}
+                {filtres.length > 0 && <button type="button" className="menu__item" onClick={() => transition(() => setFiltres([]))}><IcX width={16} height={16} />{t("Tout montrer")}</button>}
               </>
             )}
           </Pop>
@@ -206,8 +207,9 @@ export function Calendrier({ onReduire }: { onReduire?: () => void }) {
               .map((x) => (glisse?.id === x.id ? { ...x, date: glisse.mode === "deplace" ? glisse.date : x.date, dureeMin: glisse.dureeMin } : x));
             const places = placer(duJour);
             const auj = memeJour(j, ref);
+            const passe = new Date(j).setHours(23, 59, 59, 999) < ref.getTime(); // journée entière passée : pas d'invitation à créer
             return (
-              <div key={+j} className={`cal__col${auj ? " cal__col--today" : ""}${estWE(j) ? " cal__col--we" : ""}`} style={v({ gridColumn: ij + 2 })} onClick={(e) => creneau(e, j)}>
+              <div key={+j} className={`cal__col${auj ? " cal__col--today" : ""}${estWE(j) ? " cal__col--we" : ""}${passe ? " cal__col--passe" : ""}`} style={v({ gridColumn: ij + 2 })} onClick={(e) => creneau(e, j)}>
                 {heures.slice(0, -1).map((h) => <div key={h} className="cal__cell" style={{ top: (h - h0) * H }} aria-hidden />)}
                 {auj && nowMin >= h0 * 60 && nowMin <= h1 * 60 && <i className="cal__now" style={{ top: ((nowMin - h0 * 60) / 60) * H }} aria-hidden />}
                 {places.map(({ x, debut, col, n }) => {
@@ -236,8 +238,8 @@ export function Calendrier({ onReduire }: { onReduire?: () => void }) {
       </div>
 
       <footer className="cal__legende">
-        <span><i className="dot dot--blue" /> Aujourd'hui</span><span><i className="dot dot--neutral" /> À venir</span>
-        <span><i className="dot dot--green" /> Présence vérifiée</span><span><i className="dot dot--gold" /> Signal à vérifier</span>
+        <span><i className="dot dot--blue" /> {t("Aujourd'hui")}</span><span><i className="dot dot--neutral" /> {t("À venir")}</span>
+        <span><i className="dot dot--green" /> {t("Présence vérifiée")}</span><span><i className="dot dot--gold" /> {t("Signal à vérifier")}</span>
       </footer>
 
       {ouvert && <Fiche x={ouvert} ref_={ref} ancre={ancre} largeur={section.current?.clientWidth ?? 0} onClose={() => setFiche(null)} />}
@@ -259,7 +261,7 @@ function Fiche({ x, ref_, ancre, largeur, onClose }: { x: Entretien; ref_: Date;
   const changer = (date: string, heureTxt: string, duree: number) => {
     const n = new Date(`${date}T${heureTxt}`);
     if (isNaN(+n)) return;
-    if (n.getTime() < ref_.getTime()) { toast("Cette date est déjà passée"); return; }
+    if (n.getTime() < ref_.getTime()) { toast(t("Cette date est déjà passée")); return; }
     actions.deplacer(x.id, n.toISOString(), duree);
     void envoyerCreneau(x.id).catch(() => undefined);
   };
@@ -267,38 +269,38 @@ function Fiche({ x, ref_, ancre, largeur, onClose }: { x: Entretien; ref_: Date;
   return (
     <>
       <div className="cal__fond" onPointerDown={onClose} />
-      <aside className={`panel cal__fiche pop${ancre ? " cal__fiche--ancree" : ""}`} style={style} role="dialog" aria-label={`Entretien de ${nomComplet(x)}`}>
+      <aside className={`panel cal__fiche pop${ancre ? " cal__fiche--ancree" : ""}`} style={style} role="dialog" aria-label={t("Entretien de {nom}", { nom: nomComplet(x) })}>
         <div className="cal__ficheHead">
           <Avatar initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} size="lg" />
           <div className="grow"><strong>{nomComplet(x)}</strong><div className="t-small muted">{x.candidat.poste}</div></div>
-          <ICirc size="sm" label="Fermer" onClick={onClose}><IcX /></ICirc>
+          <ICirc size="sm" label={t("Fermer")} onClick={onClose}><IcX /></ICirc>
         </div>
         <div className="row wrap" style={{ gap: 6 }}>
           <Pill ton={st.ton} dot>{st.texte}</Pill>
-          {x.creneau?.statut === "confirme" && <Pill ton="soft-green" dot>Créneau confirmé par le candidat</Pill>}
-          {x.creneau?.statut === "propose" && x.creneau.propose && <Pill ton="soft-gold" dot>Propose {jourLong(x.creneau.propose)} à {heure(x.creneau.propose)}</Pill>}
-          {x.creneau?.statut === "attente" && !termine && <Pill dot>Créneau en attente de réponse</Pill>}
+          {x.creneau?.statut === "confirme" && <Pill ton="soft-green" dot>{t("Créneau confirmé par le candidat")}</Pill>}
+          {x.creneau?.statut === "propose" && x.creneau.propose && <Pill ton="soft-gold" dot>{t("Propose {jour} à {heure}", { jour: jourLong(x.creneau.propose), heure: heure(x.creneau.propose) })}</Pill>}
+          {x.creneau?.statut === "attente" && !termine && <Pill dot>{t("Créneau en attente de réponse")}</Pill>}
         </div>
         {termine ? (
-          <p className="t-small muted">{jourLong(x.date)} · {plage(x.date, x.dureeMin)}. Un entretien terminé ne se déplace plus.</p>
+          <p className="t-small muted">{jourLong(x.date)} · {plage(x.date, x.dureeMin)}. {t("Un entretien terminé ne se déplace plus.")}</p>
         ) : (
           <div className="cal__ficheForm">
-            <Field label="Date"><Input type="date" value={date} onChange={(e) => changer(e.target.value, heureTxt, x.dureeMin)} /></Field>
-            <Field label="Heure"><Input type="time" step={900} value={heureTxt} onChange={(e) => changer(date, e.target.value, x.dureeMin)} /></Field>
-            <Field label="Durée"><Select value={x.dureeMin} onChange={(e) => changer(date, heureTxt, Number(e.target.value))}>{[15, 30, 45, 60, 75, 90, 120].includes(x.dureeMin) ? null : <option value={x.dureeMin}>{x.dureeMin} min</option>}{[15, 30, 45, 60, 75, 90, 120].map((m) => <option key={m} value={m}>{m} min</option>)}</Select></Field>
+            <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => changer(e.target.value, heureTxt, x.dureeMin)} /></Field>
+            <Field label={t("Heure")}><Input type="time" step={900} value={heureTxt} onChange={(e) => changer(date, e.target.value, x.dureeMin)} /></Field>
+            <Field label={t("Durée")}><Select value={x.dureeMin} onChange={(e) => changer(date, heureTxt, Number(e.target.value))}>{[15, 30, 45, 60, 75, 90, 120].includes(x.dureeMin) ? null : <option value={x.dureeMin}>{t("{n} min", { n: x.dureeMin })}</option>}{[15, 30, 45, 60, 75, 90, 120].map((m) => <option key={m} value={m}>{t("{n} min", { n: m })}</option>)}</Select></Field>
           </div>
         )}
         <div className="cal__ficheActions">
-          <Btn size="sm" icon={<IcArrowUR />} onClick={() => { aller(`#/rapport/${x.id}`); onClose(); }}>{termine ? "Ouvrir le rapport" : "Voir la fiche"}</Btn>
+          <Btn size="sm" icon={<IcArrowUR />} onClick={() => { aller(`#/rapport/${x.id}`); onClose(); }}>{termine ? t("Ouvrir le rapport") : t("Voir la fiche")}</Btn>
           {!termine && <LigneVisio x={x} />}
-          <Btn size="sm" variant="ghost" icon={<IcX />} className="cal__suppr" onClick={() => setConfirmer(true)}>Supprimer</Btn>
+          <Btn size="sm" variant="ghost" icon={<IcX />} className="cal__suppr" onClick={() => setConfirmer(true)}>{t("Supprimer")}</Btn>
         </div>
       </aside>
-      <Modal open={confirmer} onClose={() => setConfirmer(false)} title={`Supprimer l'entretien de ${x.candidat.prenom} ?`}>
-        <p className="muted">{termine ? "Le rapport et les signaux relevés seront perdus." : "Le lien de pré-vérification envoyé au candidat ne mènera plus nulle part."}</p>
+      <Modal open={confirmer} onClose={() => setConfirmer(false)} title={t("Supprimer l'entretien de {prenom} ?", { prenom: x.candidat.prenom })}>
+        <p className="muted">{termine ? t("Le rapport et les signaux relevés seront perdus.") : t("Le lien de pré-vérification envoyé au candidat ne mènera plus nulle part.")}</p>
         <div className="row" style={{ justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
-          <Btn variant="ghost" onClick={() => setConfirmer(false)}>Annuler</Btn>
-          <Btn variant="primary" onClick={() => { actions.supprimer(x.id); setConfirmer(false); onClose(); toast(`Entretien de ${x.candidat.prenom} supprimé`); }}>Supprimer</Btn>
+          <Btn variant="ghost" onClick={() => setConfirmer(false)}>{t("Annuler")}</Btn>
+          <Btn variant="primary" onClick={() => { actions.supprimer(x.id); setConfirmer(false); onClose(); toast(t("Entretien de {prenom} supprimé", { prenom: x.candidat.prenom })); }}>{t("Supprimer")}</Btn>
         </div>
       </Modal>
     </>
@@ -319,16 +321,16 @@ export function CalendrierApercu({ onOuvrir }: { onOuvrir: () => void }) {
   return (
     <section className="panel cal cal--ferme" style={v({ "--i": 1, viewTransitionName: "calendrier" })}>
       <div className="calf__gauche">
-        <h1 className="t-display">Cette semaine</h1>
+        <h1 className="t-display">{t("Cette semaine")}</h1>
         <div className="cal__resume">
-          <Pill ton="soft-blue" icon={<IcClock />}>{aVenir} à venir</Pill>
-          {signaux > 0 && <Pill ton="soft-gold" icon={<IcFlag />}>{signaux} signal{signaux > 1 ? "s" : ""} à vérifier</Pill>}
-          {verifies > 0 && <Pill ton="soft-green" icon={<IcCheck />}>{verifies} vérifié{verifies > 1 ? "s" : ""}</Pill>}
+          <Pill ton="soft-blue" icon={<IcClock />}>{t("{n} à venir", { n: aVenir })}</Pill>
+          {signaux > 0 && <Pill ton="soft-gold" icon={<IcFlag />}>{signaux > 1 ? t("{n} signals à vérifier", { n: signaux }) : t("{n} signal à vérifier", { n: signaux })}</Pill>}
+          {verifies > 0 && <Pill ton="soft-green" icon={<IcCheck />}>{verifies > 1 ? t("{n} vérifiés", { n: verifies }) : t("{n} vérifié", { n: verifies })}</Pill>}
         </div>
-        {prochain && <p className="calf__prochain"><span className="muted">Prochain :</span> <strong>{nomComplet(prochain)}</strong> · {memeJour(new Date(prochain.date), ref) ? "aujourd'hui" : jourLong(prochain.date)} à {heure(prochain.date)}</p>}
-        <Btn variant="primary" size="lg" icon={<IcCal />} onClick={onOuvrir} className="calf__btn">Ouvrir le calendrier</Btn>
+        {prochain && <p className="calf__prochain"><span className="muted">{t("Prochain :")}</span> <strong>{nomComplet(prochain)}</strong> · {t("{jour} à {heure}", { jour: memeJour(new Date(prochain.date), ref) ? t("aujourd'hui") : jourLong(prochain.date), heure: heure(prochain.date) })}</p>}
+        <Btn variant="primary" size="lg" icon={<IcCal />} onClick={onOuvrir} className="calf__btn">{t("Ouvrir le calendrier")}</Btn>
       </div>
-      <button type="button" className="calf__bande" onClick={onOuvrir} aria-label="Ouvrir le calendrier de la semaine">
+      <button type="button" className="calf__bande" onClick={onOuvrir} aria-label={t("Ouvrir le calendrier de la semaine")}>
         {jours.map((j) => {
           const liste = semaine.filter((x) => memeJour(new Date(x.date), j)).sort((a, b) => +new Date(a.date) - +new Date(b.date));
           const auj = memeJour(j, ref);
@@ -338,9 +340,9 @@ export function CalendrierApercu({ onOuvrir }: { onOuvrir: () => void }) {
               <span className="calf__pile">
                 {liste.slice(0, 4).map((x) => <Avatar key={x.id} initiales={initiales(x)} couleur={x.candidat.couleur} photo={x.candidat.photo} size="sm" title={`${nomComplet(x)} · ${heure(x.date)}`} />)}
                 {liste.length > 4 && <span className="calf__plus">+{liste.length - 4}</span>}
-                {!liste.length && <span className="calf__vide">libre</span>}
+                {!liste.length && <span className="calf__vide">{t("libre")}</span>}
               </span>
-              <span className="calf__n">{liste.length ? `${liste.length} entretien${liste.length > 1 ? "s" : ""}` : ""}</span>
+              <span className="calf__n">{liste.length ? (liste.length > 1 ? t("{n} entretiens", { n: liste.length }) : t("{n} entretien", { n: liste.length })) : ""}</span>
             </span>
           );
         })}

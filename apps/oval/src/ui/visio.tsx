@@ -4,6 +4,7 @@ import { actions } from "../store/store";
 import { Btn, Pop } from "./ui";
 import { toast } from "./toast";
 import { IcArrowUR, IcPlay, IcX } from "./icons";
+import { t } from "../i18n";
 
 /**
  * Visio externe : Oval ne fait aucun appel lui-même. Chaque entretien porte le lien de sa réunion
@@ -11,7 +12,7 @@ import { IcArrowUR, IcPlay, IcX } from "./icons";
  * s'ouvre ensuite à côté de la visio.
  */
 export type Fournisseur = "meet" | "zoom" | "teams" | "autre";
-export const NOMS: Record<Fournisseur, string> = { meet: "Google Meet", zoom: "Zoom", teams: "Teams", autre: "la visio" };
+export const NOMS: Record<Fournisseur, string> = { meet: "Google Meet", zoom: "Zoom", teams: "Teams", autre: t("la visio") };
 /** Pages de création d'une réunion instantanée. */
 export const CREER: { id: Fournisseur; url: string }[] = [
   { id: "meet", url: "https://meet.google.com/new" },
@@ -38,10 +39,10 @@ export const Logo = ({ f }: { f: Fournisseur }) => (f === "meet" ? <IcMeet /> : 
 export function BtnRejoindre({ x, size, variant = "now", block, court }: { x: Entretien; size?: "sm" | "md" | "lg"; variant?: "now" | "glass" | "secondary" | "primary"; block?: boolean; court?: boolean }) {
   if (x.visio) {
     const f = x.visio.fournisseur;
-    return <Btn size={size} variant={variant} block={block} icon={<Logo f={f} />} href={x.visio.url} newTab>{court ? "Rejoindre" : `Rejoindre avec ${NOMS[f]}`}</Btn>;
+    return <Btn size={size} variant={variant} block={block} icon={<Logo f={f} />} href={x.visio.url} newTab>{court ? t("Rejoindre") : t("Rejoindre avec {visio}", { visio: NOMS[f] })}</Btn>;
   }
   return (
-    <Pop align="left" width={300} button={({ open, toggle }) => <Btn size={size} variant={variant === "now" ? "secondary" : variant} block={block} icon={<IcPlay />} onClick={toggle} aria-expanded={open}>{court ? "Visio" : "Choisir la visio"}</Btn>}>
+    <Pop align="left" width={300} button={({ open, toggle }) => <Btn size={size} variant={variant === "now" ? "secondary" : variant} block={block} icon={<IcPlay />} onClick={toggle} aria-expanded={open}>{court ? t("Visio") : t("Choisir la visio")}</Btn>}>
       {(close) => <MenuVisio x={x} close={close} />}
     </Pop>
   );
@@ -50,21 +51,21 @@ export function BtnRejoindre({ x, size, variant = "now", block, court }: { x: En
 function MenuVisio({ x, close }: { x: Entretien; close: () => void }) {
   const [url, setUrl] = useState("");
   const coller = () => {
-    if (!lienValide(url)) { toast("Collez un lien complet, par exemple https://meet.google.com/abc-defg-hij"); return; }
+    if (!lienValide(url)) { toast(t("Collez un lien complet, par exemple https://meet.google.com/abc-defg-hij")); return; }
     actions.definirVisio(x.id, url.trim());
-    toast(`Lien ${NOMS[fournisseurDe(url)]} enregistré pour ${x.candidat.prenom}`);
+    toast(t("Lien {visio} enregistré pour {prenom}", { visio: NOMS[fournisseurDe(url)], prenom: x.candidat.prenom }));
     close();
   };
   return (
     <>
-      <div className="menu__title">Créer la réunion</div>
+      <div className="menu__title">{t("Créer la réunion")}</div>
       {CREER.map((c) => (
-        <a key={c.id} className="menu__item" href={c.url} target="_blank" rel="noreferrer" onClick={() => toast(`Copiez ensuite le lien ${NOMS[c.id]} et collez-le ici`)}><Logo f={c.id} />{NOMS[c.id]}<IcArrowUR width={14} height={14} style={{ marginLeft: "auto", opacity: .6 }} /></a>
+        <a key={c.id} className="menu__item" href={c.url} target="_blank" rel="noreferrer" onClick={() => toast(t("Copiez ensuite le lien {visio} et collez-le ici", { visio: NOMS[c.id] }))}><Logo f={c.id} />{NOMS[c.id]}<IcArrowUR width={14} height={14} style={{ marginLeft: "auto", opacity: .6 }} /></a>
       ))}
-      <div className="menu__title">Ou coller un lien existant</div>
+      <div className="menu__title">{t("Ou coller un lien existant")}</div>
       <form className="visio__coller" onSubmit={(e) => { e.preventDefault(); coller(); }}>
-        <input className="field__ctl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://meet.google.com/…" aria-label="Lien de la visio" autoFocus />
-        <Btn size="sm" variant="primary" type="submit">Enregistrer</Btn>
+        <input className="field__ctl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://meet.google.com/…" aria-label={t("Lien de la visio")} autoFocus />
+        <Btn size="sm" variant="primary" type="submit">{t("Enregistrer")}</Btn>
       </form>
     </>
   );
@@ -76,8 +77,8 @@ export function LigneVisio({ x }: { x: Entretien }) {
   const f = x.visio.fournisseur;
   return (
     <span className="visio__ligne">
-      <Btn size="sm" variant="now" icon={<Logo f={f} />} href={x.visio.url} newTab>Rejoindre avec {NOMS[f]}</Btn>
-      <button type="button" className="icirc icirc--sm" title="Retirer le lien de visio" aria-label="Retirer le lien de visio" onClick={() => { actions.definirVisio(x.id, undefined); toast("Lien de visio retiré"); }}><IcX /></button>
+      <Btn size="sm" variant="now" icon={<Logo f={f} />} href={x.visio.url} newTab>{t("Rejoindre avec {visio}", { visio: NOMS[f] })}</Btn>
+      <button type="button" className="icirc icirc--sm" title={t("Retirer le lien de visio")} aria-label={t("Retirer le lien de visio")} onClick={() => { actions.definirVisio(x.id, undefined); toast(t("Lien de visio retiré")); }}><IcX /></button>
     </span>
   );
 }

@@ -3,5 +3,11 @@
   "installCommand": "npm install",
   "buildCommand": "npm -w apps/oval run build",
   "outputDirectory": "apps/oval/dist",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://oval-moteur.onrender.com/api/$1"
+    }
+  ]
 }

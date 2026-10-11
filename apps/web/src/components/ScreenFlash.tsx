@@ -18,7 +18,7 @@ export interface ScreenFlashOutcome {
 }
 
 interface Props {
-  sessionId: string;
+  token: string; // jeton du lien de pré-vérification
   deviceId?: string; // caméra de la vérification du visage
   onDone: (outcome: ScreenFlashOutcome) => void;
 }
@@ -46,7 +46,7 @@ async function openCamera(deviceId?: string): Promise<MediaStream> {
 
 // Étape 3 de la pré-vérification : l'écran affiche une suite de couleurs, la caméra doit en voir le reflet sur le
 // visage. Analyse dans le navigateur ; seul le résumé de chaque essai est envoyé. Deux essais au plus.
-export function ScreenFlash({ sessionId, deviceId, onDone }: Props) {
+export function ScreenFlash({ token, deviceId, onDone }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -119,7 +119,7 @@ export function ScreenFlash({ sessionId, deviceId, onDone }: Props) {
       attemptsRef.current = attempts;
       const final = attempt.result === 'passed' || attempts.length >= FLASH_MAX_ATTEMPTS;
       setPhase('sending');
-      await api.sendFlash(sessionId, { attempt, final });
+      await api.sendFlash(token, { attempt, final });
       if (final) onDone({ result: combineFlashAttempts(attempts).result, attempts: attempts.length });
       else {
         setMessage(
@@ -144,7 +144,7 @@ export function ScreenFlash({ sessionId, deviceId, onDone }: Props) {
   async function skip() {
     setPhase('sending');
     try {
-      await api.sendFlash(sessionId, { skipped: true, final: true });
+      await api.sendFlash(token, { skipped: true, final: true });
       onDone({ result: 'skipped', attempts: 0 });
     } catch (e) {
       setPhase('error');

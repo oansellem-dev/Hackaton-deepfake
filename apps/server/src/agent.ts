@@ -109,18 +109,6 @@ export async function viewWithAgent(session: Session): Promise<SessionView> {
   }
 }
 
-// Transmet une capture du visage au détecteur passif local. L'image n'est ni stockée ni journalisée.
-export async function forwardFrame(sessionId: string, image: Buffer, contentType: string) {
-  const form = new FormData();
-  form.append('image', new Blob([new Uint8Array(image)], { type: contentType }), 'frame.jpg');
-  const res = await fetch(`${AGENT_URL}/frame/${encodeURIComponent(sessionId)}`, {
-    method: 'POST',
-    body: form,
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  return { status: res.status, body: await res.json().catch(() => ({})) };
-}
-
 export interface CvResult {
   found: { emails: string[]; phones: string[]; github: string[]; linkedin: string[]; schools: string[] };
   inconsistencies: { field: string; label: string; detail: string }[];

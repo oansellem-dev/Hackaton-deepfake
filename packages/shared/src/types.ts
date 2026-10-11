@@ -1,6 +1,6 @@
 // Contrat partagé entre le serveur, le site web et l'extension.
 
-import type { FaceIdPlan, FaceProfile } from './face.ts';
+import type { FaceIdPlan } from './face.ts';
 import type { FlashSummary } from './flash.ts';
 
 export type Severity = 'strong' | 'medium';
@@ -9,7 +9,7 @@ export type Severity = 'strong' | 'medium';
 // « unknown » (absence de trace, signal non vérifiable) n'a aucun effet.
 export type SignalStatus = 'ok' | 'contradiction' | 'unknown';
 
-export type SignalSource = 'precheck' | 'challenge' | 'cv' | 'identity' | 'face';
+export type SignalSource = 'precheck' | 'challenge' | 'cv' | 'identity' | 'face' | 'device';
 
 export interface Signal {
   id: string;
@@ -70,15 +70,66 @@ export interface CvAnalysis {
   links: { categorie: string; label: string; url: string }[];
 }
 
+// Version du texte de consentement biométrique affiché au candidat (à changer à chaque modification du texte).
+export const CONSENT_VERSION = '2026-10-11';
+
+// Responsable du traitement : l'entreprise qui recrute, renseignée par le recruteur à la création de l'entretien.
+export interface Controller {
+  name: string;
+  contact: string; // adresse à laquelle le candidat exerce ses droits
+}
+
+// Lien de pré-vérification : jeton non devinable, expiration courte, usage unique.
+export interface CandidateLink {
+  token: string;
+  expiresAt: number;
+  usedAt?: number;
+}
+
+// Trace du consentement, horodatée, sans aucune donnée biométrique.
+export interface ConsentRecord {
+  infoAt?: number; // vérification des informations déclarées
+  biometricAt?: number; // traitement biométrique (article 9 RGPD), donné sur l'écran de la caméra
+  version?: string; // version du texte affiché
+  withdrawnAt?: number; // retrait par le candidat : gabarit supprimé, plus aucune comparaison
+}
+
+// Journal d'audit : qui a fait quoi, quand, avec quel résultat. Jamais de donnée biométrique.
+export interface AuditEntry {
+  at: number;
+  actor: 'candidat' | 'recruteur' | 'système';
+  action: string;
+  detail?: string;
+}
+
+// Clé d'accès (passkey) créée à la pré-vérification : prouve ensuite qu'on parle au même appareil.
+// Ce n'est pas une donnée biométrique : l'empreinte digitale ou le visage restent dans l'appareil.
+export interface DeviceBinding {
+  credentialId: string;
+  publicKey: string; // base64url
+  counter: number;
+  transports?: string[];
+  registeredAt: number;
+}
+
 export interface Session {
   id: string;
   createdAt: number;
   candidateLabel: string;
   precheckDone: boolean;
+  controller?: Controller;
+  candidateLink?: CandidateLink;
+  consent?: ConsentRecord;
+  biometricOptOut?: { at: number }; // vérification sans biométrie choisie par le candidat
   identity?: DeclaredIdentity;
   faceId?: FaceIdPlan & { startedAt: number; completedAt?: number };
-  // Proportions du visage (biométrie) : stockées chiffrées, jamais renvoyées au client, effacées à la décision.
-  faceProfile?: FaceProfile;
+  // Gabarit biométrique : stocké à part (templates.json), chiffré, sous un identifiant aléatoire sans lien avec
+  // l'identité ; jamais renvoyé au client, effacé à la décision, au retrait ou à expiration (serveur seulement).
+  templateId?: string;
+  device?: DeviceBinding; // serveur seulement
+  deviceChallenge?: string; // serveur seulement
+  presence?: { token: string; expiresAt: number; challenge?: string }; // serveur seulement
+  audit?: AuditEntry[];
   // Test du reflet de l'écran : résumé de chaque essai (aucune mesure image par image, aucune image).
   screenFlash?: FlashSummary;
   // Probabilités de trucage du détecteur passif sur les dernières captures (15 au plus), sans les images.
@@ -104,9 +155,11 @@ export interface AgentInfo {
   passive?: { frames: number; medianFakeProbability: number | null }; // détecteur passif local
 }
 
-export interface SessionView extends Omit<Session, 'faceProfile' | 'recruiterKey'> {
+export interface SessionView
+  extends Omit<Session, 'recruiterKey' | 'templateId' | 'device' | 'deviceChallenge' | 'presence'> {
   score: Score;
   hasFaceProfile: boolean;
+  deviceBound: boolean;
   // Ce que contient le profil, sans les valeurs (elles ne quittent jamais le serveur).
   faceProfileSummary?: { samples: number; angles: number; embedding: boolean };
   agent?: AgentInfo;
@@ -117,4 +170,19 @@ export interface PrecheckPayload {
   timezone: string;
   languages: string[];
   declaredCountry: string; // code ISO à 2 lettres, ex. « FR »
+}
+
+// Ce que la page du candidat apprend de son lien (jamais les signaux ni le score).
+export interface CandidateLinkInfo {
+  status: 'open' | 'used' | 'expired';
+  expiresAt: number;
+  controller?: Controller;
+  biometricRetentionHours: number;
+  consentVersion: string;
+  identityDone: boolean;
+  faceDone: boolean;
+  flashDone: boolean; // test du reflet terminé ou passé
+  optedOut: boolean;
+  withdrawn: boolean;
+  deviceBound: boolean;
 }

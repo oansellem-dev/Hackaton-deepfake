@@ -27,12 +27,18 @@ const ok = (cond, msg) => {
 };
 // Jeton recruteur par entretien : exigé par le serveur pour lire les signaux (le candidat n'en a pas).
 const keys = new Map();
+const links = new Map(); // jetons des liens de pré-vérification (/check/<jeton>)
+// Routes candidat : /api/check/<jeton>/… (jeton du lien) ; routes recruteur : /api/sessions/<id>/… (clé recruteur).
+const check = (id, suffix = '') => `/api/check/${links.get(id)}${suffix}`;
 const api = async (path, body) => {
   const id = path.split('/')[3];
   const headers = { 'Content-Type': 'application/json', ...(keys.has(id) ? { 'X-Recruiter-Key': keys.get(id) } : {}) };
   const r = await fetch(BASE + path, body ? { method: 'POST', headers, body: JSON.stringify(body) } : { headers });
   const json = await r.json();
-  if (path === '/api/sessions' && json.recruiterKey) keys.set(json.id, json.recruiterKey);
+  if (path === '/api/sessions' && json.recruiterKey) {
+    keys.set(json.id, json.recruiterKey);
+    links.set(json.id, json.candidateLink.token);
+  }
   return { status: r.status, body: json };
 };
 
@@ -191,9 +197,9 @@ console.log('--- Filtre d’échange de visage, caméra qui renvoie l’écran')
 // --- 2 et 3. Pré-vérification ---
 async function sessionAtFlashStep(label) {
   const { body: s } = await api('/api/sessions', { candidateLabel: label });
-  await api(`/api/sessions/${s.id}/identity`, { firstName: 'Test', lastName: 'Reflet', country: 'FR', consent: true });
-  const { body: plan } = await api(`/api/sessions/${s.id}/faceid/start`, { cameraLabel: 'FaceTime HD Camera' });
-  const submit = await api(`/api/sessions/${s.id}/faceid/submit`, {
+  await api(check(s.id, '/identity'), { firstName: 'Test', lastName: 'Reflet', country: 'FR', consent: true });
+  const { body: plan } = await api(check(s.id, '/faceid/start'), { cameraLabel: 'FaceTime HD Camera', biometricConsent: true });
+  const submit = await api(check(s.id, '/faceid/submit'), {
     nonce: plan.nonce,
     results: plan.steps.map((step) => ({ step, result: 'passed', durationMs: 1000 })),
     ratios: [],
@@ -206,9 +212,8 @@ async function sessionAtFlashStep(label) {
 
 async function openFlashStep(id, tag) {
   const page = await newPage(tag);
-  // La page reprend à l'étape enregistrée : on arrive directement au test du reflet.
-  await page.addInitScript((sid) => sessionStorage.setItem(`kyc-precheck-${sid}`, JSON.stringify({ step: 'flash', country: 'FR' })), id);
-  await page.goto(`${BASE}/check/${id}`);
+  // Face ID déjà fait côté serveur : la page reprend directement au test du reflet (fenêtre après le Face ID).
+  await page.goto(`${BASE}/check/${links.get(id)}`);
   await page.waitForSelector('text=Test du reflet de l’écran');
   return page;
 }
@@ -237,7 +242,7 @@ console.log('--- Pré-vérification, fausse caméra fixe');
   ok((await page.content()).includes('aucune réaction de l’image (2 essais)'), 'rapport : « aucune réaction de l’image (2 essais) »');
   await page.context().close();
 
-  const again = await api(`/api/sessions/${id}/flash`, { attempt: v.screenFlash.attempts[0], final: true });
+  const again = await api(check(id, '/flash'), { attempt: v.screenFlash.attempts[0], final: true });
   ok(again.status === 409, 'un test terminé ne peut pas être rejoué');
 }
 
@@ -255,11 +260,11 @@ console.log('--- Pré-vérification, « Passer ce test »');
 console.log('--- Règles du serveur');
 {
   const { body: s } = await api('/api/sessions', { candidateLabel: 'Ordre' });
-  await api(`/api/sessions/${s.id}/identity`, { firstName: 'Test', lastName: 'Ordre', consent: true });
-  ok((await api(`/api/sessions/${s.id}/flash`, { skipped: true, final: true })).status === 409, 'refusé avant la vérification du visage');
+  await api(check(s.id, '/identity'), { firstName: 'Test', lastName: 'Ordre', consent: true });
+  ok((await api(check(s.id, '/flash'), { skipped: true, final: true })).status === 410, 'refusé avant la vérification du visage (lien encore ouvert, fenêtre non commencée)');
 
   const id = await sessionAtFlashStep('Validation');
-  ok((await api(`/api/sessions/${id}/flash`, { attempt: { result: 'passed', correlation: 7 }, final: true })).status === 400, 'essai invalide refusé');
+  ok((await api(check(id, '/flash'), { attempt: { result: 'passed', correlation: 7 }, final: true })).status === 400, 'essai invalide refusé');
   const attempt = { result: 'failed', reason: 'no-response', correlation: 0.1, pValue: 0.5, lagMs: 100, amplitude: 0.01, frames: 200, fps: 30, faceCoverage: 1 };
   ok((await api(`/api/sessions/${id}/flash`, { attempt, final: false })).status === 200, '1er essai accepté');
   ok((await api(`/api/sessions/${id}/flash`, { skipped: true, final: true })).status === 409, '« passer » refusé après un essai');

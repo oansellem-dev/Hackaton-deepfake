@@ -13,13 +13,16 @@ import {
   estimateYawDeg,
   findVirtualCameras,
   handPointsOverFace,
+  meanEmbedding,
   medianRatios,
   type FaceIdPlan,
   type FaceIdStep,
   type FaceIdStepResult,
+  type Point,
   type SignalStatus,
 } from '@kyc/shared';
 import { api } from '../config.ts';
+import { analyzeSnapshot, loadFaceModels, snapshotFace } from '../lib/faceModels.ts';
 import { detect, loadTracker } from '../lib/tracker.ts';
 
 const STEP_TEXT: Record<FaceIdStep, string> = {
@@ -41,10 +44,13 @@ const CENTER_HOLD = 6; // images bien cadrées d'affilée avant de commencer à 
 const CENTER_SAMPLES = 16; // mesures de face pour le profil
 const CENTER_TIMEOUT_MS = 25000;
 const ACTION_TIMEOUT_MS = 12000;
-// Captures pour le détecteur passif : quelques-unes de face, et surtout PENDANT les défis,
-// là où un deepfake temps réel se dégrade (profil, main qui passe devant le visage).
+// Analyses faites dans le navigateur (aucune image envoyée) : l'empreinte sur des images de face, la probabilité de
+// trucage aussi PENDANT les défis, là où un deepfake temps réel se dégrade (profil, main qui passe devant le visage).
 const MAX_PASSIVE_FRAMES = 10;
 const HAND_PASSIVE_FRAMES = 2;
+const MIN_EMBEDDINGS = 3;
+const MAX_EMBEDDINGS = 6;
+const EMBEDDING_EXTRA_MS = 6000; // attente maximale de face pour obtenir assez d'empreintes
 
 export type EnvResult = { label: string; status: SignalStatus; detail: string };
 
@@ -56,7 +62,7 @@ export interface FaceIdOutcome {
 }
 
 interface Props {
-  sessionId: string;
+  token: string; // jeton du lien de pré-vérification
   declaredCountry: string;
   onDone: (outcome: FaceIdOutcome) => void;
 }
@@ -73,7 +79,8 @@ function openCamera(deviceId?: string): Promise<MediaStream> {
   });
 }
 
-export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
+// À n'afficher qu'après le consentement biométrique explicite (écran précédent).
+export function FaceId({ token, declaredCountry, onDone }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const stopRef = useRef<() => void>(() => undefined);
@@ -118,7 +125,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
       await video.play();
 
       // Vérification de l'environnement en même temps : caméras, fuseau horaire, adresse IP.
-      const env = await api.sendPrecheck(sessionId, {
+      const env = await api.sendPrecheck(token, {
         cameras: devices.map((d) => d.label),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         languages: [...navigator.languages],
@@ -128,7 +135,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
 
       let newPlan: FaceIdPlan;
       try {
-        newPlan = await api.startFaceId(sessionId, label);
+        newPlan = await api.startFaceId(token, label, true);
       } catch (e) {
         if (errorText(e).includes('déjà terminée')) {
           stopCamera();
@@ -147,10 +154,11 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
         }
         throw e;
       }
-      const tracker = await loadTracker();
+      // Si les modèles d'empreinte ne se chargent pas, la vérification continue avec les proportions seules.
+      const [tracker, models] = await Promise.all([loadTracker(), loadFaceModels().catch(() => null)]);
       setPlan(newPlan);
       setPhase('running');
-      run(newPlan, tracker);
+      run(newPlan, tracker, models !== null);
     } catch (e) {
       stopCamera();
       setPhase('error');
@@ -158,13 +166,12 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
     }
   }
 
-  function run(p: FaceIdPlan, tracker: Awaited<ReturnType<typeof loadTracker>>) {
+  function run(p: FaceIdPlan, tracker: Awaited<ReturnType<typeof loadTracker>>, modelsReady: boolean) {
     const video = videoRef.current!;
     const lumaCanvas = document.createElement('canvas');
     lumaCanvas.width = 32;
     lumaCanvas.height = 24;
     const lumaCtx = lumaCanvas.getContext('2d', { willReadFrequently: true })!;
-    const jpegCanvas = document.createElement('canvas');
 
     const results: FaceIdStepResult[] = [];
     const ratioSamples: number[][] = [];
@@ -176,8 +183,11 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
     let tracked = 0;
     let goodStreak = 0;
     let actionStreak = 0;
-    let passiveSent = 0;
-    let stepFrames = 0; // captures passives envoyées pendant l'étape en cours
+    let stepFrames = 0; // analyses lancées pendant l'étape en cours
+    let ratiosDoneAt = 0;
+    const embeddings: number[][] = [];
+    const passive: number[] = [];
+    const pending = new Set<Promise<void>>();
     // Une rotation ne compte qu'après être revenu de face (sinon l'étape suivante validerait la même rotation),
     // et la seconde doit aller dans l'autre sens que la première.
     let armed = false;
@@ -187,18 +197,20 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
     let busy = false;
     let finished = false;
 
-    const sendPassiveFrame = () => {
-      if (passiveSent >= MAX_PASSIVE_FRAMES || !video.videoWidth) return;
-      passiveSent += 1;
+    // Analyse d'une image, ici même : empreinte (si le visage est de face) et probabilité de trucage.
+    // Une analyse à la fois (~0,5 s) ; rien n'est envoyé avant la fin du parcours, et jamais d'image.
+    const measure = (face: Point[], frontal: boolean) => {
+      if (!modelsReady || pending.size > 0) return;
+      if (passive.length >= MAX_PASSIVE_FRAMES && (!frontal || embeddings.length >= MAX_EMBEDDINGS)) return;
       stepFrames += 1;
-      jpegCanvas.width = video.videoWidth;
-      jpegCanvas.height = video.videoHeight;
-      jpegCanvas.getContext('2d')!.drawImage(video, 0, 0);
-      jpegCanvas.toBlob(
-        (blob) => blob && api.sendFrame(sessionId, blob, 'precheck').catch(() => undefined),
-        'image/jpeg',
-        0.85,
-      );
+      const job: Promise<void> = analyzeSnapshot(snapshotFace(video, face))
+        .then((r) => {
+          if (passive.length < MAX_PASSIVE_FRAMES) passive.push(r.fakeProbability);
+          if (frontal && embeddings.length < MAX_EMBEDDINGS) embeddings.push(r.embedding);
+        })
+        .catch(() => undefined)
+        .finally(() => pending.delete(job));
+      pending.add(job);
     };
 
     const finishStep = (result: FaceIdStepResult['result'], yaw = 0) => {
@@ -265,11 +277,17 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
           goodStreak = ok ? goodStreak + 1 : 0;
           if (ok && goodStreak >= CENTER_HOLD) {
             const r = computeRatios(face!, video.videoWidth, video.videoHeight);
-            if (r) ratioSamples.push(r);
-            if (ratioSamples.length % 3 === 1) sendPassiveFrame();
+            if (r && ratioSamples.length < CENTER_SAMPLES) ratioSamples.push(r);
+            measure(face!, true);
           }
-          if (ratioSamples.length >= CENTER_SAMPLES) finishStep('passed');
-          else if (performance.now() - stepStart > CENTER_TIMEOUT_MS) finishStep(timeoutResult());
+          if (ratioSamples.length >= CENTER_SAMPLES && !ratiosDoneAt) ratiosDoneAt = performance.now();
+          // Fin de l'étape quand les proportions ET quelques empreintes sont prises (ou si l'empreinte tarde trop).
+          const enoughEmbeddings =
+            !modelsReady || embeddings.length >= MIN_EMBEDDINGS || performance.now() - ratiosDoneAt > EMBEDDING_EXTRA_MS;
+          if (ratiosDoneAt && enoughEmbeddings) finishStep('passed');
+          else if (performance.now() - stepStart > CENTER_TIMEOUT_MS) {
+            finishStep(ratioSamples.length >= CENTER_SAMPLES ? 'passed' : timeoutResult());
+          }
         } else if (current === 'turn_a' || current === 'turn_b') {
           // Proportions sous plusieurs angles, pour comparer la visio même quand la tête n'est pas de face.
           if (face && Math.abs(yaw) >= ANGLE_MIN_YAW_DEG && Math.abs(yaw) <= ANGLE_MAX_YAW_DEG) {
@@ -290,7 +308,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
                 : '',
           );
           actionStreak = armed && turnedEnough && !wrongWay ? actionStreak + 1 : 0;
-          if (actionStreak === 2 && stepFrames === 0) sendPassiveFrame();
+          if (actionStreak === 2 && stepFrames === 0) measure(face!, false);
           if (actionStreak >= TURN_FRAMES) {
             signFor[current] = Math.sign(yaw);
             finishStep('passed', yaw);
@@ -302,7 +320,7 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
           const box = face ? boundingBox(face) : lastFaceBox;
           const over = box ? Math.max(0, ...hands.map((h) => handPointsOverFace(h, box))) : 0;
           // Main qui commence à couvrir le visage : c'est là que le mélange d'un face-swap se trahit.
-          if (face && over > 0 && over < HAND_POINTS_OVER_FACE && stepFrames < HAND_PASSIVE_FRAMES) sendPassiveFrame();
+          if (face && over > 0 && over < HAND_POINTS_OVER_FACE && stepFrames < HAND_PASSIVE_FRAMES) measure(face, false);
           actionStreak = over >= HAND_POINTS_OVER_FACE ? actionStreak + 1 : 0;
           if (actionStreak >= HAND_FRAMES) finishStep('passed');
           else if (performance.now() - stepStart > ACTION_TIMEOUT_MS) finishStep(timeoutResult());
@@ -335,13 +353,16 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
       setPhase('sending');
       checkTurns();
       try {
+        await Promise.all([...pending]); // dernières analyses en cours
         const profileOk = ratioSamples.length >= MIN_PROFILE_SAMPLES;
-        const res = await api.submitFaceId(sessionId, {
+        const res = await api.submitFaceId(token, {
           nonce: p.nonce,
           results,
           ratios: profileOk ? medianRatios(ratioSamples) : [],
           samples: ratioSamples.length,
           angles: profileOk ? angleProfiles(angleSamples) : [],
+          embedding: profileOk && embeddings.length ? meanEmbedding(embeddings) : undefined,
+          passive,
         });
         const deviceId = streamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
         stopCamera();
@@ -365,8 +386,8 @@ export function FaceId({ sessionId, declaredCountry, onDone }: Props) {
     <div className="card">
       <h2>Vérification du visage</h2>
       <p className="muted">
-        Votre visage est analysé dans votre navigateur et par notre serveur. Aucune image n’est enregistrée : seule une
-        empreinte numérique de votre visage (des mesures) est conservée, chiffrée, jusqu’à la fin de l’entretien.
+        Votre visage est analysé uniquement dans votre navigateur : aucune image n’est envoyée ni enregistrée. Seule
+        une empreinte numérique de votre visage (des mesures) est conservée, chiffrée, jusqu’à la fin de l’entretien.
         Utilisez la caméra de votre ordinateur ou de votre téléphone, rien d’autre. Cette étape vérifie aussi votre fuseau
         horaire et votre adresse IP.
       </p>

@@ -125,9 +125,22 @@ export ANTHROPIC_API_KEY=sk-ant-...                # optionnel : explication ref
 - Doc interactive de l'agent : `http://localhost:8000/docs`. Tests : `cd agent && .venv/Scripts/python -m pytest`.
 - Licence du modèle passif : recherche / non commercial. À remplacer avant un produit commercial.
 
+## Conformité RGPD
+
+Audit, corrections et questions juridiques ouvertes : [docs/conformite-rgpd.md](docs/conformite-rgpd.md). En bref : empreinte et détecteur de trucage calculés dans le navigateur (aucune image envoyée), gabarit chiffré et stocké à part sans identité, consentement biométrique explicite avec alternative sans biométrie et retrait, suppression à la décision, manuelle ou à expiration, lien candidat à usage unique, journal d'audit, clé d'accès (passkey) pour confirmer l'appareil en visio.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `BIOMETRIC_KEY` | fichier `data/biometric.key` | clé AES-256 des gabarits (64 caractères hexadécimaux) |
+| `BIOMETRIC_TTL_HOURS` | 24 | durée maximale d'un gabarit |
+| `BIOMETRIC_SWEEP_SECONDS` | 600 | fréquence de la suppression automatique |
+| `CANDIDATE_LINK_TTL_HOURS` | 24 | validité du lien de pré-vérification |
+| `FACE_SAME_PERSON_MIN` / `FACE_DIFFERENT_PERSON_MAX` | 0,40 / 0,25 | seuils de similarité d'empreinte |
+| `FORCE_HTTPS` | — | `1` derrière un proxy TLS : redirection HTTPS et HSTS |
+
 ## Lien de pré-vérification (2 pages)
 
-Le recruteur crée un entretien sur `/` et envoie `/check/<id>` au candidat. Il suit le résultat sur `/report/<id>`, qui se met à jour tout seul : verdict de pré-vérification, informations déclarées, ce qui a été relevé, défis réussis ou non.
+Le recruteur crée un entretien sur `/` (en indiquant son entreprise, responsable du traitement) et envoie `/check/<jeton>` au candidat : jeton de 32 caractères, valable 24 h, une seule utilisation. Il suit le résultat sur `/report/<id>`, qui se met à jour tout seul : verdict de pré-vérification, informations déclarées, ce qui a été relevé, défis réussis ou non.
 
 **Page 1 — Vos informations.** Prénom et nom (obligatoires), e-mail, téléphone, pays, ville, poste, entreprise, GitHub, LinkedIn (facultatifs), et **consentement explicite** (refusé côté serveur sans la case cochée). Vérifications, uniquement par des API publiques officielles :
 
@@ -173,7 +186,7 @@ Après la vérification du visage, l’écran du candidat passe en plein écran 
   - Le test devient un signal à vérifier (gravité moyenne, 15 points) seulement si tous les essais sont des échecs.
   - Un test interrompu ou passé n’a aucun effet.
   - « Passer ce test » est proposé avant le premier essai, pour les personnes sensibles aux lumières clignotantes. Les couleurs changent au plus 2,5 fois par seconde, sous le seuil WCAG de 3 flashs par seconde.
-- **Ce qui part au serveur** (`POST /api/sessions/:id/flash`) : le résumé de chaque essai (verdict, accord, p, retard, ampleur, images par seconde). Les mesures image par image restent dans le navigateur : la couleur de la peau image par image peut trahir le pouls, qui est une donnée de santé.
+- **Ce qui part au serveur** (`POST /api/check/:token/flash`, jeton du lien, dans la fenêtre qui suit la vérification du visage) : le résumé de chaque essai (verdict, accord, p, retard, ampleur, images par seconde). Les mesures image par image restent dans le navigateur : la couleur de la peau image par image peut trahir le pouls, qui est une donnée de santé.
 - **Agent Python** : le champ `screen_flash_responsive` (`false` = aucune réaction sur un test terminé) retire 15 points.
 - **Limite connue.** Un échange de visage qui recopie l’éclairage de la vraie caméra de l’attaquant peut suivre les couleurs. Ce test vise les flux injectés. Une photo imprimée renvoie la lumière : elle passe ce test, mais pas les défis de mouvement. Les signaux sont complémentaires.
 

@@ -139,3 +139,19 @@ label.lab-check input { margin-top: 3px; }
 .cv-links { list-style: none; padding: 0; columns: 2; column-gap: 24px; font-size: 14px; }
 .cv-links li { padding: 3px 0; break-inside: avoid; }
 @media (max-width: 560px) { .cv-links { columns: 1; } }
+
+.panel-page { max-width: 420px; margin: 0 auto; padding: 16px; }
+.panel-header h1 { font-size: 20px; margin: 0 0 8px; }
+.panel-header ol { padding-left: 20px; font-size: 14px; }
+button.link { background: none; border: none; color: #6c5ce7; cursor: pointer; padding: 0; font-size: inherit; text-decoration: underline; }
+
+.row-buttons { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button.secondary { border: 1px solid #6c5ce7; border-radius: 8px; padding: 10px 16px; font-size: 15px; background: #fff; color: #6c5ce7; cursor: pointer; }
+button.secondary:disabled { opacity: 0.5; cursor: default; }
+button.danger { border: 1px solid #b03a2e; border-radius: 8px; padding: 8px 14px; background: #fff; color: #b03a2e; cursor: pointer; }
+.privacy h2 { font-size: 17px; margin: 18px 0 6px; }
+.privacy h2:first-child { margin-top: 0; }
+.audit { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+.audit li { padding: 5px 0; border-bottom: 1px solid #eee; }
+.audit time { color: #888; margin-right: 8px; }
+.presence-link { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

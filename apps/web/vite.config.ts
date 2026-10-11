@@ -1,8 +1,30 @@
+import { createReadStream, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+const publicDir = fileURLToPath(new URL('public', import.meta.url));
+
+// ONNX Runtime charge son moteur WASM par un import dynamique de /ort/*.mjs. En développement, Vite refuse
+// d'importer un fichier de public/ comme module : on sert ces fichiers tels quels, avant ses propres traitements.
+// (En production, le serveur Express les sert directement.)
+const serveOrtRaw: Plugin = {
+  name: 'serve-ort-raw',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      const path = req.url?.split('?')[0] ?? '';
+      if (!path.startsWith('/ort/')) return next();
+      const file = join(publicDir, path);
+      if (!existsSync(file)) return next();
+      res.setHeader('Content-Type', file.endsWith('.wasm') ? 'application/wasm' : 'text/javascript');
+      createReadStream(file).pipe(res);
+    });
+  },
+};
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), serveOrtRaw],
   server: {
     port: 5173,
     host: true,

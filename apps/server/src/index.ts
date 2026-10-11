@@ -4,23 +4,38 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import type { ChallengeResult, Decision, PrecheckPayload } from '@kyc/shared';
-import { precheckSignals } from './precheck.ts';
-import { attachSignaling } from './signaling.ts';
-import { analyzeCv, forwardFrame, viewWithAgent, type CvResult } from './agent.ts';
-import { hasRecruiterKey, recruiterOnly } from './auth.ts';
+import { getChallenge, type ChallengeResult, type Decision } from '@kyc/shared';
+import { analyzeCv, viewWithAgent, type CvResult } from './agent.ts';
+import { audit } from './audit.ts';
+import { recruiterOnly } from './auth.ts';
+import { candidateRouter } from './candidate.ts';
 import { cleanMetrics, recordChallenge } from './challenges.ts';
-import { faceIdRouter, onFrameEmbedding } from './faceid.ts';
 import { flashRouter } from './flash.ts';
+import { forceHttps } from './config.ts';
+import { liveRouter } from './live.ts';
+import { attachSignaling } from './signaling.ts';
 import { createSession, getSession, purgeBiometrics, schedulePersist, upsertSignals } from './store.ts';
+import { presenceRouter } from './webauthn.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 
 const app = express();
+app.set('trust proxy', true);
+
+// Sécurité : HTTPS imposé derrière un proxy TLS (FORCE_HTTPS=1), et en-têtes qui évitent les fuites de jetons.
+app.use((req, res, next) => {
+  if (forceHttps) {
+    if (!req.secure) return res.redirect(301, `https://${req.get('host')}${req.originalUrl}`);
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer'); // les liens contiennent des jetons : jamais transmis à un autre site
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self)');
+  next();
+});
 app.use(cors());
 app.use(express.json());
-app.set('trust proxy', true);
-// Les sessions (et leur profil de visage chiffré) sont sauvegardées après chaque requête qui les modifie.
+// Les entretiens sont sauvegardés après chaque requête qui les modifie.
 app.use((req, res, next) => {
   if (req.method !== 'GET') res.on('finish', schedulePersist);
   next();
@@ -30,37 +45,26 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+// Création par le recruteur : il indique le responsable du traitement (son entreprise) et un contact pour les droits.
 app.post('/api/sessions', async (req, res) => {
-  const session = createSession(String(req.body?.candidateLabel ?? 'Candidat'));
+  const body = (req.body ?? {}) as { candidateLabel?: string; controllerName?: string; controllerContact?: string };
+  const name = String(body.controllerName ?? '').trim().slice(0, 120);
+  const contact = String(body.controllerContact ?? '').trim().slice(0, 160);
+  const session = createSession(
+    String(body.candidateLabel ?? 'Candidat').slice(0, 120),
+    name ? { name, contact } : undefined,
+  );
   // Seule réponse qui contient le jeton du recruteur : à garder, il donne accès aux signaux et au rapport.
   res.status(201).json({ ...(await viewWithAgent(session)), recruiterKey: session.recruiterKey });
 });
 
 app.get('/api/sessions/:id', recruiterOnly, async (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
-  res.json(await viewWithAgent(session));
-});
-
-// Brique A : la page candidat envoie ses signaux d'environnement.
-app.post('/api/sessions/:id/precheck', (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
-
-  const payload = req.body as PrecheckPayload;
-  const signals = precheckSignals(payload, req.ip ?? 'inconnue');
-  upsertSignals(session, signals);
-  session.precheckDone = true;
-
-  // On renvoie au candidat ce qui a été vérifié, pas le score.
-  res.json({ signals: signals.map(({ label, status, detail }) => ({ label, status, detail })) });
+  res.json(await viewWithAgent(getSession(req.params.id)!));
 });
 
 // Brique B : résultat d'un défi exécuté pendant l'entretien.
 app.post('/api/sessions/:id/challenges', recruiterOnly, async (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
-
+  const session = getSession(req.params.id)!;
   const { challengeId, result, durationMs, metrics } = req.body as {
     challengeId: string;
     result: ChallengeResult;
@@ -71,37 +75,14 @@ app.post('/api/sessions/:id/challenges', recruiterOnly, async (req, res) => {
   if (!recordChallenge(session, challengeId, result, Number(durationMs) || 0, 'live', cleanMetrics(metrics))) {
     return res.status(400).json({ error: 'défi inconnu' });
   }
+  audit(session, 'recruteur', 'Défi en direct', `${getChallenge(challengeId)?.label ?? challengeId} : ${result}`);
   res.json(await viewWithAgent(session));
 });
 
-app.use(faceIdRouter);
+app.use(candidateRouter);
 app.use(flashRouter);
-
-// Détecteur passif : le panneau envoie une capture du visage (JPEG) toutes les ~2 s.
-// Elle est transmise à l'agent local, analysée en mémoire, jamais conservée.
-app.post('/api/sessions/:id/frame', express.raw({ type: 'image/*', limit: '2mb' }), async (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
-  // Le candidat n'envoie des captures que pendant sa vérification du visage ; ensuite, seul le recruteur le peut.
-  const precheck = req.query.phase === 'precheck';
-  const faceIdOpen =
-    !!session.faceId && (!session.faceId.completedAt || Date.now() - session.faceId.completedAt < 60_000);
-  if (!(precheck && faceIdOpen) && !hasRecruiterKey(req, session.recruiterKey)) {
-    return res.status(403).json({ error: 'réservé au recruteur' });
-  }
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'image manquante' });
-  try {
-    const { status, body } = await forwardFrame(session.id, req.body, req.headers['content-type'] ?? 'image/jpeg');
-    const { embedding, ...rest } = (body ?? {}) as { embedding?: unknown; frame?: { fake_probability?: unknown } };
-    onFrameEmbedding(session, embedding, precheck ? 'precheck' : 'live');
-    const p = rest.frame?.fake_probability;
-    if (typeof p === 'number' && Number.isFinite(p)) session.passiveScores = [...(session.passiveScores ?? []), p].slice(-15);
-    // L'empreinte reste sur le serveur : le navigateur ne reçoit que le résultat du détecteur passif.
-    res.status(status).json(rest);
-  } catch {
-    res.status(503).json({ error: 'agent injoignable' });
-  }
-});
+app.use(liveRouter);
+app.use(presenceRouter);
 
 // CV chargé par le recruteur (jamais par le candidat : son parcours reste léger). Comparé à ses déclarations,
 // puis oublié : on garde seulement les écarts, les éléments concordants et les liens de vérification.
@@ -142,21 +123,29 @@ app.post('/api/sessions/:id/cv', recruiterOnly, express.raw({ type: 'application
           ]
         : []),
     ]);
+    audit(session, 'recruteur', 'CV comparé aux déclarations', `${cv.inconsistencies.length} écart(s), CV non conservé`);
     res.json(await viewWithAgent(session));
   } catch {
     res.status(503).json({ error: 'agent injoignable' });
   }
 });
 
-// Règle n°2 : la décision appartient au recruteur, on la trace pour le rapport (brique E).
-app.post('/api/sessions/:id/decision', recruiterOnly, async (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) return res.status(404).json({ error: 'session inconnue' });
+// Suppression manuelle du gabarit biométrique par le recruteur, à tout moment.
+app.delete('/api/sessions/:id/biometrics', recruiterOnly, async (req, res) => {
+  const session = getSession(req.params.id)!;
+  purgeBiometrics(session, 'suppression manuelle', 'recruteur');
+  res.json(await viewWithAgent(session));
+});
 
+// Règle n°2 : la décision appartient au recruteur, on la trace pour le rapport (brique E).
+// Elle clôt l'entretien : le gabarit biométrique est supprimé.
+app.post('/api/sessions/:id/decision', recruiterOnly, async (req, res) => {
+  const session = getSession(req.params.id)!;
   const { value, note } = req.body as { value: Decision; note?: string };
+  if (!['continue', 'extra_check', 'stop'].includes(value)) return res.status(400).json({ error: 'décision inconnue' });
   session.decision = { value, note, at: Date.now() };
-  // L'entretien est tranché : les proportions du visage (biométrie) sont effacées.
-  purgeBiometrics(session);
+  audit(session, 'recruteur', 'Décision', value);
+  purgeBiometrics(session, 'décision du recruteur', 'recruteur');
   res.json(await viewWithAgent(session));
 });
 

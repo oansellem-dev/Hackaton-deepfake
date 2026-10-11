@@ -11,8 +11,10 @@ import {
   median,
   mouthOpenness,
   type ChallengeResult,
+  type Point,
 } from '@kyc/shared';
 import { API_BASE } from '../config.ts';
+import { analyzeSnapshot, snapshotFace } from './faceModels.ts';
 import { detect, loadTracker } from './tracker.ts';
 
 const FRAME_MS = 80; // ~12 analyses par seconde
@@ -20,18 +22,16 @@ const BASELINE_FRAMES = 5; // angle de départ : la caméra du candidat n'est pa
 const AFTER_HAND_MS = 1500; // après la main, on regarde encore un peu : un face-swap se trahit quand elle repart
 const SPEECH_CYCLES = 2; // une phrase lue fait plusieurs ouvertures-fermetures de la bouche
 const FRONTAL_DEG = 8; // la bouche n'est mesurée que de face : une tête tournée déforme le dessin des lèvres
-const CAPTURE_MAX_WIDTH = 640;
 
 // Défis en direct (brique B), sur le flux du candidat affiché dans le panneau, avec la même détection que la
-// pré-vérification. Rien n'est enregistré : au plus une capture par défi part vers l'agent local (détecteur passif
-// et empreinte), au moment où un trucage se trahit le plus (main qui repart, tête tournée).
+// pré-vérification. Aucune image ne quitte le navigateur : au moment où un trucage se trahit le plus (main qui repart,
+// tête tournée), on mesure ici la probabilité de trucage et l'empreinte, et seuls ces nombres partent au serveur.
 export function createLiveDetector(sessionId: string, recruiterKey?: string): ChallengeDetector {
   const api = createApi(API_BASE, recruiterKey);
   return async (video, challenge, signal) => {
     const tracker = await loadTracker();
     return new Promise<DetectorOutcome>((resolve) => {
       const start = performance.now();
-      const canvas = document.createElement('canvas');
       let frames = 0;
       let tracked = 0;
       let streak = 0;
@@ -54,13 +54,14 @@ export function createLiveDetector(sessionId: string, recruiterKey?: string): Ch
       let mouthPeak = 0;
       let mouthCycles = 0;
 
-      const capture = () => {
+      const capture = (face: Point[]) => {
         captured = true;
-        const scale = Math.min(1, CAPTURE_MAX_WIDTH / video.videoWidth);
-        canvas.width = Math.round(video.videoWidth * scale);
-        canvas.height = Math.round(video.videoHeight * scale);
-        canvas.getContext('2d')!.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => blob && api.sendFrame(sessionId, blob).catch(() => undefined), 'image/jpeg', 0.85);
+        const yawDeg = estimateYawDeg(face, video.videoWidth);
+        analyzeSnapshot(snapshotFace(video, face))
+          .then(({ embedding, fakeProbability }) =>
+            api.sendLiveSample(sessionId, { fakeProbability, ...(Math.abs(yawDeg) <= 20 ? { embedding } : {}) }),
+          )
+          .catch(() => undefined);
       };
 
       const metrics = (): Record<string, number> => {
@@ -110,7 +111,7 @@ export function createLiveDetector(sessionId: string, recruiterKey?: string): Ch
           }
           streak = over >= HAND_POINTS_OVER_FACE ? streak + 1 : 0;
           if (!passedAt && streak >= HAND_FRAMES) passedAt = now;
-          if (passedAt && !captured && face && over === 0) capture();
+          if (passedAt && !captured && face && over === 0) capture(face);
           if (passedAt && (captured || now - passedAt > AFTER_HAND_MS)) return finish('passed');
         } else if (challenge.id === 'head-turn') {
           if (!face) {
@@ -123,7 +124,7 @@ export function createLiveDetector(sessionId: string, recruiterKey?: string): Ch
               const turn = Math.abs(yaw - median(baseline));
               maxTurn = Math.max(maxTurn, turn);
               streak = turn >= TURN_YAW_DEG ? streak + 1 : 0;
-              if (streak === 2 && !captured) capture();
+              if (streak === 2 && !captured) capture(face);
               if (streak >= TURN_FRAMES) return finish('passed');
             }
           }

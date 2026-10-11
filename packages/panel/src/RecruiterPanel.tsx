@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getChallenge, pickChallenge, type Challenge, type Decision, type SessionView } from '@kyc/shared';
+import {
+  getChallenge,
+  pickChallenge,
+  type Challenge,
+  type Decision,
+  type LiveSample,
+  type SessionView,
+} from '@kyc/shared';
 import { createApi } from './api.ts';
 import { stubDetector, type ChallengeDetector } from './detector.ts';
 import { Mascot } from './Mascot.tsx';
 import './panel.css';
 
-export type FaceSampler = (video: HTMLVideoElement) => Promise<{ ratios: number[]; yawDeg: number } | null>;
+// Mesure du visage affiché, faite dans le navigateur du recruteur (MediaPipe + ONNX côté site) : jamais d'image.
+export type LiveSampler = (video: HTMLVideoElement) => Promise<LiveSample | null>;
 
 interface Props {
   sessionId: string;
@@ -13,8 +21,8 @@ interface Props {
   apiBase?: string;
   detector?: ChallengeDetector;
   reportUrl?: string;
-  // Mesure du visage affiché (MediaPipe côté site). Absent : pas de comparaison avec la pré-vérification.
-  faceSampler?: FaceSampler;
+  // Absent : pas de comparaison avec la pré-vérification ni de détecteur passif.
+  liveSampler?: LiveSampler;
   recruiterKey?: string; // jeton donné à la création de l'entretien
 }
 
@@ -30,14 +38,16 @@ const DECISIONS: { value: Decision; label: string }[] = [
   { value: 'stop', label: "Mettre fin à l'entretien" },
 ];
 
-const FRAME_INTERVAL_MS = 2000;
-const FRAME_MAX_WIDTH = 640;
+const SAMPLE_INTERVAL_MS = 2000;
 
 // Prochain défi : celui que recommande l'agent s'il est connu du panneau, sinon un tirage au hasard.
 function nextChallenge(session: SessionView): Challenge {
   // Les défis de la pré-vérification restent utiles en direct : seuls ceux de l'entretien sont écartés.
   const done = session.challenges.filter((c) => c.phase !== 'precheck').map((c) => c.challengeId);
-  const rec = session.agent?.recommendations.find((r) => getChallenge(r.challengeId));
+  // Ordre imprévisible pour le candidat : l'un des deux défis les plus utiles, tiré au hasard
+  // (une vidéo préparée ou un trucage réglé à l'avance ne peut pas anticiper le prochain geste).
+  const recs = session.agent?.recommendations.filter((r) => getChallenge(r.challengeId)) ?? [];
+  const rec = recs[Math.floor(Math.random() * Math.min(2, recs.length))];
   if (rec) return { ...getChallenge(rec.challengeId)!, mascotLine: rec.phrase };
   return pickChallenge(done);
 }
@@ -48,7 +58,7 @@ export function RecruiterPanel({
   apiBase,
   detector = stubDetector,
   reportUrl,
-  faceSampler,
+  liveSampler,
   recruiterKey,
 }: Props) {
   const api = useMemo(() => createApi(apiBase, recruiterKey), [apiBase, recruiterKey]);
@@ -65,55 +75,26 @@ export function RecruiterPanel({
     if (videoRef.current) videoRef.current.srcObject = stream;
   }, [stream]);
 
-  // Détecteur passif : une capture réduite du flux toutes les 2 s, envoyée à l'agent local.
-  // Si l'agent est arrêté, on ignore l'erreur : les défis et le score local continuent de fonctionner.
+  // Toutes les 2 s : empreinte, proportions et probabilité de trucage du visage affiché, calculées ici et comparées
+  // côté serveur au profil de la pré-vérification. Si une mesure échoue, c'est sans effet sur le score.
   useEffect(() => {
-    if (!stream) return;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    let busy = false;
-    const timer = setInterval(() => {
-      const video = videoRef.current;
-      if (busy || !ctx || !video || video.readyState < 2 || video.videoWidth === 0) return;
-      const scale = Math.min(1, FRAME_MAX_WIDTH / video.videoWidth);
-      canvas.width = Math.round(video.videoWidth * scale);
-      canvas.height = Math.round(video.videoHeight * scale);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      busy = true;
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return void (busy = false);
-          api
-            .sendFrame(sessionId, blob)
-            .catch(() => undefined)
-            .finally(() => (busy = false));
-        },
-        'image/jpeg',
-        0.8,
-      );
-    }, FRAME_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [api, sessionId, stream]);
-
-  // Continuité du visage : une mesure toutes les 2 s, comparée côté serveur au profil de la pré-vérification.
-  useEffect(() => {
-    if (!stream || !faceSampler) return;
+    if (!stream || !liveSampler) return;
     let busy = false;
     const timer = setInterval(async () => {
       const video = videoRef.current;
       if (busy || !video) return;
       busy = true;
       try {
-        const sample = await faceSampler(video);
-        if (sample) await api.sendFaceSample(sessionId, sample);
+        const sample = await liveSampler(video);
+        if (sample) await api.sendLiveSample(sessionId, sample);
       } catch {
         /* mesure impossible : sans effet sur le score */
       } finally {
         busy = false;
       }
-    }, FRAME_INTERVAL_MS);
+    }, SAMPLE_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [api, sessionId, stream, faceSampler]);
+  }, [api, sessionId, stream, liveSampler]);
 
   useEffect(() => {
     let alive = true;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import type { Couleur } from "../store/types";
 import { IcCheck, IcChevron, IcInfo, IcX } from "./icons";
 import { useToasts } from "./toast";
@@ -70,22 +70,37 @@ export function Tabs({ items, value, onChange, raised, pills }: { items: TabItem
 }
 
 /* ── Menu déroulant ─────────────────────────────────────────── */
+/** Le menu est rendu hors de son bloc (portail, position fixe) : aucun conteneur à `overflow: hidden` ne le rogne. */
 export function Pop({ button, children, align = "left", up, width }: { button: (p: { open: boolean; toggle: () => void }) => ReactNode; children: (close: () => void) => ReactNode; align?: "left" | "right"; up?: boolean; width?: number }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<CSSProperties>({});
+  const placer = useCallback(() => {
+    const r = ref.current?.getBoundingClientRect(); if (!r) return;
+    const p: CSSProperties = { position: "fixed", width };
+    if (align === "right") p.right = Math.max(8, innerWidth - r.right); else p.left = Math.max(8, r.left);
+    if (up) p.bottom = Math.max(8, innerHeight - r.top + 10); else p.top = r.bottom + 10;
+    setPos(p);
+  }, [align, up, width]);
+  useLayoutEffect(() => { if (open) placer(); }, [open, placer]);
+  const close = useCallback(() => setOpen(false), []);
   useEffect(() => {
     if (!open) return;
-    const down = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const dehors = (e: PointerEvent) => { const t = e.target as Node; if (!ref.current?.contains(t) && !menu.current?.contains(t)) setOpen(false); };
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("pointerdown", down);
+    const bouge = () => placer();
+    document.addEventListener("pointerdown", dehors);
     document.addEventListener("keydown", key);
-    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("keydown", key); };
-  }, [open]);
-  const close = useCallback(() => setOpen(false), []);
+    addEventListener("resize", bouge);
+    addEventListener("scroll", bouge, { capture: true, passive: true });
+    addEventListener("hashchange", close); // changement de page : le menu ne reste pas ouvert
+    return () => { document.removeEventListener("pointerdown", dehors); document.removeEventListener("keydown", key); removeEventListener("resize", bouge); removeEventListener("scroll", bouge, { capture: true }); removeEventListener("hashchange", close); };
+  }, [open, placer, close]);
   return (
     <div className="popw" ref={ref}>
       {button({ open, toggle: () => setOpen((o) => !o) })}
-      {open && <div className={`panel popw__menu popw__menu--${align}${up ? " popw__menu--up" : ""} pop`} style={width ? { width } : undefined}>{children(close)}</div>}
+      {open && createPortal(<div ref={menu} className={`panel popw__menu popw__menu--${align}${up ? " popw__menu--up" : ""} pop`} style={pos}>{children(close)}</div>, document.body)}
     </div>
   );
 }

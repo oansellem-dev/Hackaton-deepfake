@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => {
   const https = loadEnv(mode, process.cwd(), '').HTTPS === '1';
   return {
   plugins: [react(), serveOrtRaw, ...(https ? [basicSsl()] : [])],
+  resolve: { dedupe: ['react', 'react-dom'] },
+  optimizeDeps: { include: ['bot-avatars'] },
   server: {
     port: 5173,
     host: true,

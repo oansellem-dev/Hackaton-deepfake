@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [react(), emailPlugin(env)],
+    // Une seule copie de React pour les paquets de l'espace de travail (packages/design, bot-avatars).
+    resolve: { dedupe: ["react", "react-dom"] },
+    optimizeDeps: { include: ["bot-avatars"] },
     // Port fixe 5174 (le site du moteur est sur 5173). /api/* est relayé vers le serveur du moteur (8787),
     // sauf /api/email, servi ici par emailPlugin (même origine : pas de CORS).
     server: {

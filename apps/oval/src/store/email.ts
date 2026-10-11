@@ -51,7 +51,7 @@ export function composerEmail(d: DonneesEmail): Email {
 <span style="display:none;max-height:0;overflow:hidden;opacity:0;">Deux minutes pour vérifier votre caméra avant l'entretien du ${esc(quand)}.</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9ecf3;"><tr><td align="center" style="padding:32px 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#f9fafd;border-radius:28px;box-shadow:0 12px 32px rgba(62,74,110,.14);">
-<tr><td style="padding:30px 32px 6px;"><span style="display:inline-block;width:12px;height:18px;border:4px solid #3463ea;border-radius:50%;vertical-align:middle;"></span><span style="font-size:20px;font-weight:700;vertical-align:middle;margin-left:3px;">oval</span></td></tr>
+<tr><td style="padding:30px 32px 6px;"><img src="${moteurUrl()}/oval-logo.png" width="13" height="26" alt="" style="display:inline-block;vertical-align:middle;border:0;"><span style="font-size:20px;font-weight:800;letter-spacing:-0.02em;vertical-align:middle;margin-left:8px;color:#222;">Oval</span></td></tr>
 <tr><td style="padding:16px 32px 0;font-size:16px;line-height:1.55;">
 ${d.relance ? `<p style="margin:0 0 12px;color:#5c3a00;font-weight:700;">${rappel}</p>` : ""}
 <p style="margin:0 0 16px;">${esc(intro)}</p>

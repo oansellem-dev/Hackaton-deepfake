@@ -6,6 +6,7 @@ import { Avatar, Avatars, Btn, ICirc, Modal, Pill, Pop, Tabs } from "../ui/ui";
 import { IcBell, IcGrid, IcList, IcPlus, IcSearch, IcSpark } from "../ui/icons";
 import { NouvelEntretienForm } from "../screens/NouvelEntretien";
 import { EmailPret } from "./EmailPret";
+import { useMoteur } from "../store/useMoteur";
 import { aller, useRoute } from "./router";
 import "./shell.css";
 
@@ -19,6 +20,7 @@ const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 /** Coquille commune : rail latéral, barre du haut, fenêtre « Nouvel entretien ». */
 export function Shell({ actif, children }: { actif: string; children: ReactNode }) {
   const etat = useEtat();
+  useMoteur();
   const route = useRoute();
   const [nouveau, setNouveau] = useState(false);
   useEffect(() => { if (route.parts[0] === "entretiens" && route.parts[1] === "nouveau") setNouveau(true); }, [route.path, route.parts]);
@@ -26,6 +28,7 @@ export function Shell({ actif, children }: { actif: string; children: ReactNode 
   const fermer = () => { setNouveau(false); if (route.parts[1] === "nouveau") aller("#/entretiens"); };
   const signaux = etat.entretiens.filter((x) => nbSignauxAVerifier(x) > 0 && x.decision.valeur === "non_prise");
   const onglet = ["accueil", "entretiens", "defis"].includes(actif) ? actif : "";
+  const demo = etat.reglages.donnees !== "moteur";
 
   return (
     <div className="app">
@@ -49,6 +52,7 @@ export function Shell({ actif, children }: { actif: string; children: ReactNode 
             <div className="topbar__spacer" />
             <Avatars>{etat.recruteurs.map((r) => <Avatar key={r.id} initiales={r.initiales} couleur={r.couleur} title={`Équipe : ${r.nom}`} />)}</Avatars>
             <Btn icon={<IcPlus />} onClick={() => setNouveau(true)}>Nouvel entretien</Btn>
+            {demo && <a className="pill pill--soft-gold topbar__demo" href="#/reglages" title="Données d'exemple, tout en local. Changer dans Réglages.">Démo</a>}
             <div className="topbar__spacer" />
             <Cloche signaux={signaux} />
           </header>

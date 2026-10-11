@@ -7,12 +7,16 @@
 import { heure, jourLong } from "./format";
 
 export interface Email { to: string; subject: string; html: string; text: string; lien: string }
-export interface DonneesEmail { prenom: string; to: string; poste: string; date: string; recruteur: string; token: string; relance: boolean; objet: string; intro: string }
+export interface DonneesEmail { prenom: string; to: string; poste: string; date: string; recruteur: string; token: string; relance: boolean; objet: string; intro: string; /** true : lien vers la page candidat du moteur (/check/<jeton>) */ moteur?: boolean }
 export type ResultatEnvoi = { mode: "envoye" } | { mode: "test" } | { mode: "manuel"; raison: string };
 
 /** Adresse de la page candidat : VITE_PUBLIC_URL si elle est définie, sinon l'adresse actuelle. */
 export const baseUrl = () => (import.meta.env.VITE_PUBLIC_URL ?? "").replace(/\/+$/, "") || location.origin;
 export const lienCandidat = (token: string) => `${baseUrl()}/#/candidat/${token}`;
+/** Adresse du site du moteur (pages candidat, visio, panneau) : VITE_MOTEUR_URL, sinon http://localhost:5173. */
+export const moteurUrl = () => (import.meta.env.VITE_MOTEUR_URL ?? "http://localhost:5173").replace(/\/+$/, "");
+/** Lien candidat du moteur : /check/<jeton>, pré-vérification réelle (identité, Face ID, reflet de l'écran). */
+export const lienCandidatMoteur = (token: string) => `${moteurUrl()}/check/${token}`;
 
 const ENT: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ENT[c] ?? c);
@@ -20,7 +24,7 @@ const VERIFIE = ["Votre caméra et votre connexion", "La lumière de l'écran su
 const JAMAIS = ["Aucune vidéo enregistrée", "Aucune pièce d'identité demandée", "Aucune analyse de vos émotions"];
 
 export function composerEmail(d: DonneesEmail): Email {
-  const lien = lienCandidat(d.token);
+  const lien = d.moteur ? lienCandidatMoteur(d.token) : lienCandidat(d.token);
   const quand = `${jourLong(d.date)} à ${heure(d.date)}`;
   const intro = d.intro.replace(/\{prenom\}/g, d.prenom);
   const subject = `${d.relance ? "Rappel : " : ""}${d.objet}`;

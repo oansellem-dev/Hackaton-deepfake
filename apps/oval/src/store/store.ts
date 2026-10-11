@@ -52,6 +52,10 @@ export const actions = {
   marquerLienEnvoye(id: string, lien: LienPreVerif, relance: boolean) {
     maj(id, (x) => { const p = x.preVerification; return { ...x, preVerification: { ...p, lien, statut: p.statut === "non_envoyee" || p.statut === "non_faite" ? "envoyee" : p.statut, envoyeeLe: relance && p.envoyeeLe ? p.envoyeeLe : iso(), relanceeLe: relance ? iso() : p.relanceeLe } }; });
   },
+  /** Entretien relié au moteur : identifiants de session et lien candidat fournis par le serveur. */
+  lierMoteur(id: string, moteur: NonNullable<Entretien["moteur"]>, lien: LienPreVerif) { maj(id, (x) => ({ ...x, moteur, preVerification: { ...x.preVerification, lien } })); },
+  /** Synchronisation : l'entretien recalculé depuis la session du moteur remplace la copie locale. */
+  remplacer(ent: Entretien) { maj(ent.id, () => ent); },
   restaurerPreVerif(id: string, p: PreVerification) { maj(id, (x) => ({ ...x, preVerification: p })); },
   preVerifRefusee(id: string) { maj(id, (x) => ({ ...x, preVerification: { ...x.preVerification, statut: x.preVerification.statut === "faite" ? "faite" : "non_faite", refuseeLe: iso() } })); },
   /** Pendant la visio */

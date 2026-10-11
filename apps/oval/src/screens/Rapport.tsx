@@ -5,6 +5,7 @@ import { debutJour, heure, jourCourt, quand, relatif } from "../store/format";
 import { DECISIONS, DEFI_NOMS, DEFI_PHRASES } from "../store/texts";
 import { doux, etapesFaites, etiquetteDefi, etiquetteEtape, etiquetteSignal, point, statutEntretien, statutPreVerif } from "../store/statuts";
 import { envoyerPreVerif } from "../store/envoi";
+import { envoyerDecision, lienPanneau, lienVisio } from "../store/moteur";
 import { Manta } from "../manta/Manta";
 import { Avatar, Btn, Pill, Vide } from "../ui/ui";
 import { toast } from "../ui/toast";
@@ -43,7 +44,7 @@ export function Rapport({ id }: { id: string }) {
         </div>
         <div className="rp__actions">
           <Pill ton={doux(st.ton)} dot>{st.texte}</Pill>
-          {!termine && <Btn variant="now" icon={<IcPlay />} href={`#/visio/${x.id}`}>Rejoindre avec Oval</Btn>}
+          {!termine && <Btn variant="now" icon={<IcPlay />} href={lienVisio(x)} newTab={!!x.moteur}>Rejoindre avec Oval</Btn>}
           <Btn icon={<IcDownload />} href={`#/rapport/${x.id}/imprimer`}>Exporter</Btn>
         </div>
       </header>
@@ -51,7 +52,8 @@ export function Rapport({ id }: { id: string }) {
       <div className="rp__hero">
         <Jauge x={x} />
         <Chiffres x={x} />
-        {termine ? <Decision x={x} /> : <AvantEntretien x={x} />}
+        {/* Entretien relié au moteur : la décision peut se prendre dès que la pré-vérification est faite (elle clôt l'entretien côté serveur). */}
+        {termine || (x.moteur && x.preVerification.statut === "faite") ? <Decision x={x} /> : <AvantEntretien x={x} />}
       </div>
 
       <div className="rp__bas">
@@ -237,7 +239,12 @@ function Decision({ x }: { x: Entretien }) {
   const [note, setNote] = useState(x.decision.note ?? "");
   useEffect(() => { setNote(x.decision.note ?? ""); }, [x.id]); // eslint-disable-line
   const d = x.decision;
-  const choisir = (val: (typeof DECIDER)[number]) => { actions.decider(x.id, val, note); toast(`Décision enregistrée : ${DECISIONS[val]}`); };
+  const choisir = (val: (typeof DECIDER)[number]) => {
+    actions.decider(x.id, val, note);
+    toast(`Décision enregistrée : ${DECISIONS[val]}`);
+    // Entretien relié au moteur : la décision part au serveur (qui efface alors les biométries) et revient dans son rapport.
+    if (x.moteur) envoyerDecision(x, val, note).catch((e) => toast(`Décision gardée en local, moteur injoignable (${e instanceof Error ? e.message : e})`));
+  };
   const sauver = () => { if (note !== (x.decision.note ?? "")) { actions.noter(x.id, note); toast("Note enregistrée"); } };
   return (
     <section className={`panel rp__dec rise${d.valeur === "non_prise" ? " is-attente" : ""}`} style={v({ "--i": 4 })}>
@@ -260,10 +267,10 @@ function AvantEntretien({ x }: { x: Entretien }) {
   return (
     <section className="panel rp__dec rise" style={v({ "--i": 4 })}>
       <header className="rp__h"><h2 className="t-h2">Avant l'entretien</h2></header>
-      <Btn variant="now" block size="lg" icon={<IcPlay />} href={`#/visio/${x.id}`}>Rejoindre avec Oval</Btn>
+      <Btn variant="now" block size="lg" icon={<IcPlay />} href={lienVisio(x)} newTab={!!x.moteur}>Rejoindre avec Oval</Btn>
       {p.statut === "non_envoyee" && <Btn block icon={<IcMail />} onClick={() => void envoyerPreVerif(x.id)}>Envoyer le lien de pré-vérification</Btn>}
       {p.statut !== "non_envoyee" && p.statut !== "faite" && <Btn block icon={<IcRefresh />} onClick={() => void envoyerPreVerif(x.id, true)}>Relancer le lien{p.envoyeeLe ? ` · envoyé ${relatif(p.envoyeeLe).toLowerCase()}` : ""}</Btn>}
-      <Btn block variant="ghost" icon={<IcArrowUR />} href={`/sidepanel.html?e=${x.id}`} newTab>Ouvrir le panneau seul (360 px)</Btn>
+      <Btn block variant="ghost" icon={<IcArrowUR />} href={lienPanneau(x)} newTab>Ouvrir le panneau seul (360 px)</Btn>
       <p className="t-small faint">La décision se prend après l'entretien. Le recruteur décide, l'outil éclaire.</p>
     </section>
   );

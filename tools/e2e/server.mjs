@@ -151,7 +151,7 @@ ok((await rpost(id3, '/presence', {})).status === 409, 'confirmation d’apparei
 const id4 = (await create()).id;
 await cand(id4, '/identity', { firstName: 'Eve', lastName: 'Dupont', consent: true });
 await faceId(id4);
-v = (await rpost(id4, '/decision', { value: 'continue' })).json;
+v = (await rpost(id4, '/decision', { value: 'poursuivre' })).json;
 ok(v.hasFaceProfile === false, 'décision du recruteur : gabarit supprimé');
 
 // ---------- F1 : journal d'audit sans donnée biométrique

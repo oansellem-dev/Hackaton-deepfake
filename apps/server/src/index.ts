@@ -142,7 +142,7 @@ app.delete('/api/sessions/:id/biometrics', recruiterOnly, async (req, res) => {
 app.post('/api/sessions/:id/decision', recruiterOnly, async (req, res) => {
   const session = getSession(req.params.id)!;
   const { value, note } = req.body as { value: Decision; note?: string };
-  if (!['continue', 'extra_check', 'stop'].includes(value)) return res.status(400).json({ error: 'décision inconnue' });
+  if (!['poursuivre', 'refaire_defi', 'presentiel'].includes(value)) return res.status(400).json({ error: 'décision inconnue' });
   session.decision = { value, note, at: Date.now() };
   audit(session, 'recruteur', 'Décision', value);
   purgeBiometrics(session, 'décision du recruteur', 'recruteur');

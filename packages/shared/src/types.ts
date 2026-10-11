@@ -33,7 +33,9 @@ export interface ChallengeRun {
 }
 
 // Règle n°2 : le recruteur décide, l'outil éclaire.
-export type Decision = 'continue' | 'extra_check' | 'stop';
+// Valeurs communes à Oval et au moteur : poursuivre le recrutement, refaire un défi au prochain échange,
+// proposer un entretien en présentiel.
+export type Decision = 'poursuivre' | 'refaire_defi' | 'presentiel';
 
 export type ScoreLevel = 'green' | 'orange' | 'red';
 

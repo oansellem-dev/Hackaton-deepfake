@@ -104,6 +104,8 @@ export interface Entretien {
   score?: Score;           // brique D
   decision: Decision;
   creeLe: ISODate;
+  /** Entretien relié au moteur (apps/server) : identifiant de session, clé recruteur, jeton du lien candidat. */
+  moteur?: { sessionId: string; recruiterKey: string; lienToken?: string };
 }
 
 // ── État global du magasin ──────────────────────────────────────────────
@@ -112,6 +114,10 @@ export interface Reglages {
   lumiere: { dureeMs: number; fonduMs: number; etapes: number };
   textesLien: { objet: string; intro: string };
   defisActifs: DefiType[];
+  /** Source des données : « moteur » (serveur apps/server) ou « démo » (données d'exemple, tout en local). */
+  donnees?: "demo" | "moteur";
+  /** Entreprise qui recrute : responsable du traitement envoyé au moteur à la création d'un entretien. */
+  entreprise?: string;
 }
 export interface Etat {
   version: number;

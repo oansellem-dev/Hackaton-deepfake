@@ -4,6 +4,7 @@ import { seed } from "../store/seed";
 import { composerEmail } from "../store/email";
 import { apercuEmail } from "../store/envoi";
 import { plusJours } from "../store/format";
+import { moteurDisponible } from "../store/moteur";
 import { Avatar, Btn, Field, Input, Modal, Pill, Select, Textarea } from "../ui/ui";
 import { toast } from "../ui/toast";
 import { IcCheck, IcMail, IcPlay, IcRefresh, IcSun } from "../ui/icons";
@@ -24,6 +25,8 @@ export function Reglages() {
   const l = r.lumiere;
   const [envoi, setEnvoi] = useState<{ configure: boolean; test: boolean } | "inconnu" | null>(null);
   const [confirmer, setConfirmer] = useState(false);
+  const [moteur, setMoteur] = useState<boolean | null>(null);
+  useEffect(() => { void moteurDisponible().then(setMoteur); }, []);
   useEffect(() => { fetch("/api/email").then((x) => x.json()).then(setEnvoi, () => setEnvoi("inconnu")); }, []);
   const setL = (p: Partial<typeof l>) => actions.reglages({ lumiere: { ...l, ...p } });
   const setT = (p: Partial<typeof r.textesLien>) => actions.reglages({ textesLien: { ...r.textesLien, ...p } });
@@ -37,6 +40,23 @@ export function Reglages() {
         <div><h1 className="t-display">Réglages</h1><p className="muted">Test de lumière, e-mail envoyé aux candidats, équipe et démo.</p></div>
       </header>
       <div className="reglages-grid">
+        <section className="panel bloc rise" style={{ "--i": 2 } as CSSProperties}>
+          <div className="bloc__head">
+            <h2 className="t-h2">Données</h2>
+            {moteur === null ? <Pill dot>Vérification…</Pill> : moteur ? <Pill ton="soft-green" icon={<IcCheck />}>Moteur en ligne (8787)</Pill> : <Pill ton="soft-gold" dot>Moteur injoignable</Pill>}
+          </div>
+          <Field label="Source des entretiens" hint={r.donnees === "moteur" ? "Les nouveaux entretiens sont créés sur le serveur de l'équipe ; le lien candidat mène à la vraie pré-vérification." : "Tout reste dans ce navigateur, avec les données d'exemple. Les résultats sont simulés."}>
+            <Select value={r.donnees ?? "demo"} onChange={(e) => { actions.reglages({ donnees: e.target.value as "demo" | "moteur" }); toast(e.target.value === "moteur" ? "Mode moteur : les nouveaux entretiens passent par le serveur" : "Mode démo : tout en local"); }}>
+              <option value="moteur">Moteur (serveur de l'équipe)</option>
+              <option value="demo">Démo (données d'exemple)</option>
+            </Select>
+          </Field>
+          <Field label="Entreprise qui recrute" hint="Responsable du traitement, indiqué au candidat sur la page de pré-vérification.">
+            <Input value={r.entreprise ?? ""} placeholder="Ex. Secure Horizons" onChange={(e) => actions.reglages({ entreprise: e.target.value })} />
+          </Field>
+          <p className="t-small faint">Les entretiens déjà reliés au moteur restent synchronisés toutes les 4 secondes, quel que soit ce réglage. Les données d'exemple ne sont jamais envoyées au serveur.</p>
+        </section>
+
         <section className="panel bloc rise" style={{ "--i": 2 } as CSSProperties}>
           <div className="bloc__head"><h2 className="t-h2">Test de lumière</h2><Pill ton="soft-blue" icon={<IcSun />}>≈ {Math.round((900 + n * l.dureeMs) / 1000)} s</Pill></div>
           <Curseur label="Durée par couleur" valeur={l.dureeMs} min={800} max={1500} pas={100} unite="ms" onChange={(v) => setL({ dureeMs: v })} />

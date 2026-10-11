@@ -33,9 +33,9 @@ const LEVEL_LABEL = {
 } as const;
 
 const DECISIONS: { value: Decision; label: string }[] = [
-  { value: 'continue', label: 'Poursuivre' },
-  { value: 'extra_check', label: 'Vérification complémentaire' },
-  { value: 'stop', label: "Mettre fin à l'entretien" },
+  { value: 'poursuivre', label: 'Poursuivre le recrutement' },
+  { value: 'refaire_defi', label: 'Refaire un défi au prochain échange' },
+  { value: 'presentiel', label: 'Proposer un entretien en présentiel' },
 ];
 
 const SAMPLE_INTERVAL_MS = 2000;

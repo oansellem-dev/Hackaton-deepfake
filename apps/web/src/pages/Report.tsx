@@ -5,9 +5,9 @@ import { combineFlashAttempts, getChallenge, type FlashSummary, type SessionView
 import { API_BASE, recruiterKeyFor } from '../config.ts';
 
 const DECISION_LABEL = {
-  continue: 'Poursuivre',
-  extra_check: 'Vérification complémentaire',
-  stop: "Fin de l'entretien",
+  poursuivre: 'Poursuivre le recrutement',
+  refaire_defi: 'Refaire un défi au prochain échange',
+  presentiel: 'Proposer un entretien en présentiel',
 } as const;
 
 const RESULT_LABEL = { passed: 'réussi', failed: 'non exécuté ou image déformée', inconclusive: 'non concluant' } as const;

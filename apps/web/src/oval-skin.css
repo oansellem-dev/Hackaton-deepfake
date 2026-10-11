@@ -173,3 +173,23 @@ button.pp-share small { font-size: 12.5px; color: var(--ink-2); }
 .done-privacy { margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: var(--blue-soft); font-size: 13px; color: var(--ink); display: grid; gap: 8px; }
 .done-privacy button { justify-self: start; }
 @media (prefers-reduced-motion: reduce) { .faceid-scan, .faceid-ok .faceid-oval, .faceid-live i, .done-check, .done-check::after, .flash-stage::after { animation: none; } }
+
+/* ═══ Vérification du visage : cadran doux (remplace l'ovale dur) ═══ */
+.faceid-stage { border-radius: 28px; background: radial-gradient(120% 100% at 50% 0%, #27304c 0%, #121829 60%, #0b0f1e 100%); overflow: visible; animation: faceid-popin 600ms cubic-bezier(.2,.9,.3,1.25) backwards; isolation: isolate; }
+@keyframes faceid-popin { from { opacity: 0; transform: scale(.92) translateY(10px); } to { opacity: 1; transform: none; } }
+.faceid-stage::before { content: ""; position: absolute; inset: 0; border-radius: 28px; background: radial-gradient(120% 100% at 50% 0%, #27304c 0%, #121829 60%, #0b0f1e 100%); z-index: 0; overflow: hidden; }
+/* Image et maillage : bords fondus en douceur, aucune ligne */
+.faceid-stage video, .faceid-mesh { border-radius: 28px; -webkit-mask-image: radial-gradient(ellipse 50% 66% at 50% 50%, #000 62%, rgba(0,0,0,.55) 78%, transparent 100%); mask-image: radial-gradient(ellipse 50% 66% at 50% 50%, #000 62%, rgba(0,0,0,.55) 78%, transparent 100%); z-index: 1; }
+.faceid-stage video { position: absolute; inset: 0; }
+/* Halo animé autour du visage, à la place de l'ovale */
+.faceid-oval { width: 60%; height: 82%; border: 0; box-shadow: none; border-radius: 50%; background: radial-gradient(ellipse at center, transparent 58%, rgba(120,210,255,.10) 72%, rgba(120,210,255,.28) 86%, transparent 100%); animation: faceid-halo 3.2s ease-in-out infinite; z-index: 2; pointer-events: none; }
+@keyframes faceid-halo { 50% { transform: translate(-50%, -50%) scale(1.04); opacity: .85; } }
+.faceid-ok .faceid-oval { background: radial-gradient(ellipse at center, transparent 58%, rgba(110,240,180,.12) 72%, rgba(110,240,180,.34) 86%, transparent 100%); animation: faceid-halo 1.6s ease-in-out infinite; box-shadow: none; }
+/* Cadre extérieur : fin liseré lumineux qui apparaît après le pop */
+.faceid-stage::after { content: ""; position: absolute; inset: -3px; border-radius: 31px; padding: 3px; background: linear-gradient(135deg, rgba(120,210,255,.9), rgba(120,210,255,0) 40%, rgba(120,210,255,0) 60%, rgba(120,210,255,.6)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; z-index: 3; animation: faceid-frame 900ms ease-out 250ms backwards; }
+@keyframes faceid-frame { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: none; } }
+.faceid-ok.faceid-stage::after { background: linear-gradient(135deg, rgba(110,240,180,.95), rgba(110,240,180,0) 40%, rgba(110,240,180,0) 60%, rgba(110,240,180,.7)); }
+.faceid-corner { z-index: 3; opacity: .55; }
+.faceid-scan, .faceid-live { z-index: 4; }
+.faceid-scan { border-radius: 28px 28px 0 0; }
+@media (prefers-reduced-motion: reduce) { .faceid-stage, .faceid-stage::after, .faceid-oval { animation: none; } }

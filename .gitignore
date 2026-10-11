@@ -8,3 +8,4 @@ apps/web/public/models/
 apps/web/public/mediapipe-wasm/
 apps/server/data/
 apps/web/public/ort/
+.claude/

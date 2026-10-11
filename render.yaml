@@ -1,0 +1,16 @@
+# Render (palier gratuit) : le moteur en un seul service web, serveur Express + site construit (apps/web/dist).
+# Dashboard Render → New → Blueprint → ce dépôt, branche integration/oval-moteur. HTTPS fourni : la caméra fonctionne.
+services:
+  - type: web
+    name: oval-moteur
+    runtime: node
+    plan: free
+    branch: integration/oval-moteur
+    buildCommand: npm install && npm -w apps/web run build
+    startCommand: npm -w apps/server run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
